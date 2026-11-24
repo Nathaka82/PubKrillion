@@ -1,0 +1,2720 @@
+{
+  "sources": [
+    "https://www.wikidata.org/wiki/Wikidata:WikiProject_Video_games/Lists/Controllers",
+    "https://support.apple.com/en-gb/108044",
+    "https://en.wikipedia.org/wiki/Game_controller",
+    "https://en.wikipedia.org/wiki/Smartphone",
+    "https://en.wikipedia.org/wiki/Video_game_console",
+    "https://en.wikipedia.org/wiki/Xbox_Wireless_Controller",
+    "https://en.wikipedia.org/wiki/Nintendo_Switch_Pro_Controller",
+    "https://en.wikipedia.org/wiki/DualSense"
+  ],
+  "equivalents": [
+    [
+      "games controller",
+      "game controller",
+      "games controllers",
+      "video game controller",
+      "gaming controller"
+    ],
+    [
+      "gamepad",
+      "game pad",
+      "joypad",
+      "control pad"
+    ],
+    [
+      "mobile phone",
+      "mobile phones",
+      "cell phone",
+      "cellphone"
+    ],
+    [
+      "trainers",
+      "sneakers",
+      "training shoes"
+    ],
+    [
+      "games console",
+      "game console",
+      "video game console"
+    ],
+    [
+      "memory stick",
+      "usb stick",
+      "usb flash drive",
+      "thumb drive",
+      "pen drive"
+    ],
+    [
+      "smartphone",
+      "smart phone"
+    ],
+    [
+      "joy con",
+      "joy cons"
+    ]
+  ],
+  "parents": [
+    [
+      "3d control pad",
+      "gamepad"
+    ],
+    [
+      "3do pad",
+      "gamepad"
+    ],
+    [
+      "3do pad",
+      "video game controller model"
+    ],
+    [
+      "8bitdo sfc30",
+      "gamepad"
+    ],
+    [
+      "8bitdo sfc30",
+      "product model"
+    ],
+    [
+      "8bitdo ultimate 2 wireless controller",
+      "gamepad"
+    ],
+    [
+      "8bitdo ultimate 2 wireless controller",
+      "video game controller model"
+    ],
+    [
+      "a button",
+      "digital face button"
+    ],
+    [
+      "a button",
+      "nintendo style game controller button"
+    ],
+    [
+      "a button",
+      "xbox style game controller button"
+    ],
+    [
+      "ace combat 6 flight stick",
+      "joystick"
+    ],
+    [
+      "ace combat 6 flight stick",
+      "video game controller model"
+    ],
+    [
+      "amazon luna controller",
+      "gamepad"
+    ],
+    [
+      "amazon luna controller",
+      "video game controller model"
+    ],
+    [
+      "amiga cd32 controller",
+      "gamepad"
+    ],
+    [
+      "amstrad gx4000 controller",
+      "gamepad"
+    ],
+    [
+      "amstrad gx4000 controller",
+      "video game controller model"
+    ],
+    [
+      "analog stick",
+      "joystick"
+    ],
+    [
+      "analog stick",
+      "video game controller"
+    ],
+    [
+      "arcade controller",
+      "game controller"
+    ],
+    [
+      "arcade controller",
+      "video game controller"
+    ],
+    [
+      "arcade racer",
+      "video game controller"
+    ],
+    [
+      "arkanoid controller",
+      "paddle"
+    ],
+    [
+      "arkanoid controller",
+      "product model"
+    ],
+    [
+      "asciipad",
+      "gamepad"
+    ],
+    [
+      "asciipad",
+      "video game controller model"
+    ],
+    [
+      "asymmetrical gamepad",
+      "form factor"
+    ],
+    [
+      "asymmetrical gamepad",
+      "gamepad"
+    ],
+    [
+      "atari cx40 joystick",
+      "joystick"
+    ],
+    [
+      "atari cx40 joystick",
+      "product model"
+    ],
+    [
+      "atari cx40 joystick",
+      "video game controller"
+    ],
+    [
+      "atari cx78",
+      "gamepad"
+    ],
+    [
+      "atari cx78",
+      "video game controller model"
+    ],
+    [
+      "atari jaguar controller",
+      "gamepad"
+    ],
+    [
+      "atari jaguar pro controller",
+      "gamepad"
+    ],
+    [
+      "atari jaguar pro controller",
+      "video game controller model"
+    ],
+    [
+      "atari mindlink",
+      "product model"
+    ],
+    [
+      "atari mindlink",
+      "video game controller"
+    ],
+    [
+      "b button",
+      "digital face button"
+    ],
+    [
+      "b button",
+      "nintendo style game controller button"
+    ],
+    [
+      "b button",
+      "xbox style game controller button"
+    ],
+    [
+      "batterup",
+      "product model"
+    ],
+    [
+      "batterup",
+      "video game controller"
+    ],
+    [
+      "battlergc pro black",
+      "gamepad"
+    ],
+    [
+      "battlergc pro black",
+      "video game controller model"
+    ],
+    [
+      "battlergc pro crystal",
+      "gamepad"
+    ],
+    [
+      "battlergc pro crystal",
+      "video game controller model"
+    ],
+    [
+      "battlergc pro glacier",
+      "gamepad"
+    ],
+    [
+      "battlergc pro glacier",
+      "video game controller model"
+    ],
+    [
+      "battlergc pro purple",
+      "gamepad"
+    ],
+    [
+      "battlergc pro purple",
+      "video game controller model"
+    ],
+    [
+      "beatmania controller",
+      "video game controller"
+    ],
+    [
+      "boomerang",
+      "gamepad"
+    ],
+    [
+      "boomerang",
+      "video game controller model"
+    ],
+    [
+      "c stick",
+      "analog stick"
+    ],
+    [
+      "c stick",
+      "gamecube style game controller button"
+    ],
+    [
+      "capacitive touch analog stick",
+      "analog stick"
+    ],
+    [
+      "capacitive touch analog stick",
+      "push button"
+    ],
+    [
+      "capacitive touch analog stick",
+      "type of gamepad input"
+    ],
+    [
+      "capcom home arcade",
+      "arcade controller"
+    ],
+    [
+      "capcom home arcade",
+      "dedicated console"
+    ],
+    [
+      "capcom home arcade",
+      "home video game console"
+    ],
+    [
+      "capcom home arcade",
+      "home video game console model"
+    ],
+    [
+      "category colecovision hand controller",
+      "video game controller"
+    ],
+    [
+      "circle button",
+      "digital face button"
+    ],
+    [
+      "circle button",
+      "playstation style game controller button"
+    ],
+    [
+      "circle pad",
+      "joystick"
+    ],
+    [
+      "classic controller",
+      "gamepad"
+    ],
+    [
+      "classic controller",
+      "video game controller model"
+    ],
+    [
+      "classic controller",
+      "wii remote extension"
+    ],
+    [
+      "classic controller pro",
+      "gamepad"
+    ],
+    [
+      "classic controller pro",
+      "video game controller model"
+    ],
+    [
+      "classic controller pro",
+      "wii remote extension"
+    ],
+    [
+      "clickable analog stick",
+      "analog stick"
+    ],
+    [
+      "clickable analog stick",
+      "push button"
+    ],
+    [
+      "clickable analog stick",
+      "type of gamepad input"
+    ],
+    [
+      "clickable capacitive touch analog sticks",
+      "capacitive touch analog stick"
+    ],
+    [
+      "clickable capacitive touch analog sticks",
+      "clickable analog stick"
+    ],
+    [
+      "coffee table",
+      "arcade controller"
+    ],
+    [
+      "coffee table",
+      "work of art"
+    ],
+    [
+      "competition pro",
+      "joystick"
+    ],
+    [
+      "competition pro",
+      "model series"
+    ],
+    [
+      "control stick",
+      "analog stick"
+    ],
+    [
+      "control stick",
+      "gamecube style game controller button"
+    ],
+    [
+      "cross button",
+      "digital face button"
+    ],
+    [
+      "cross button",
+      "playstation style game controller button"
+    ],
+    [
+      "dance pad",
+      "game controller"
+    ],
+    [
+      "dance pad",
+      "video game controller"
+    ],
+    [
+      "digital face button",
+      "digital button"
+    ],
+    [
+      "digital face button",
+      "face button"
+    ],
+    [
+      "digital face button",
+      "type of gamepad input"
+    ],
+    [
+      "digital shoulder button",
+      "shoulder button"
+    ],
+    [
+      "digital shoulder button",
+      "type of gamepad input"
+    ],
+    [
+      "dj controller",
+      "midi controller"
+    ],
+    [
+      "dj controller",
+      "video game controller"
+    ],
+    [
+      "dk bongos",
+      "musical instrument game controller"
+    ],
+    [
+      "dk bongos",
+      "video game controller model"
+    ],
+    [
+      "dream blaster",
+      "light gun"
+    ],
+    [
+      "dream blaster",
+      "video game controller model"
+    ],
+    [
+      "dreamcast arcade stick",
+      "arcade controller"
+    ],
+    [
+      "dreamcast arcade stick",
+      "video game controller model"
+    ],
+    [
+      "dreamcast gun",
+      "light gun"
+    ],
+    [
+      "dreamcast gun",
+      "video game controller model"
+    ],
+    [
+      "dual analog controller",
+      "gamepad"
+    ],
+    [
+      "dual analog controller",
+      "video game controller model"
+    ],
+    [
+      "dualsense",
+      "gamepad"
+    ],
+    [
+      "dualsense",
+      "video game controller model"
+    ],
+    [
+      "dualshock",
+      "gamepad"
+    ],
+    [
+      "dualshock",
+      "model series"
+    ],
+    [
+      "dualshock",
+      "video game controller model"
+    ],
+    [
+      "dualshock 2",
+      "gamepad"
+    ],
+    [
+      "dualshock 2",
+      "video game controller model"
+    ],
+    [
+      "dualshock 3",
+      "gamepad"
+    ],
+    [
+      "dualshock 3",
+      "video game controller model"
+    ],
+    [
+      "dualshock 4",
+      "gamepad"
+    ],
+    [
+      "dualshock 4",
+      "video game controller model"
+    ],
+    [
+      "dualshock 4",
+      "wireless game controller"
+    ],
+    [
+      "emerson arcadia 2001 controller",
+      "video game controller"
+    ],
+    [
+      "face button",
+      "push button"
+    ],
+    [
+      "face button",
+      "video game controller"
+    ],
+    [
+      "face button",
+      "video game feature"
+    ],
+    [
+      "face button layout",
+      "face button"
+    ],
+    [
+      "face button layout",
+      "second order class"
+    ],
+    [
+      "face button layout",
+      "spatial arrangement"
+    ],
+    [
+      "flight yoke",
+      "video game controller"
+    ],
+    [
+      "fm towns marty controller",
+      "gamepad"
+    ],
+    [
+      "fx pad",
+      "gamepad"
+    ],
+    [
+      "game racing wheel",
+      "product category"
+    ],
+    [
+      "game racing wheel",
+      "video game controller"
+    ],
+    [
+      "game remote",
+      "product category"
+    ],
+    [
+      "game remote",
+      "video game controller"
+    ],
+    [
+      "gamecube controller",
+      "gamepad"
+    ],
+    [
+      "gamecube controller",
+      "product model"
+    ],
+    [
+      "gamecube controller",
+      "video game controller"
+    ],
+    [
+      "gamecube style face buttons",
+      "face button"
+    ],
+    [
+      "gamecube style face buttons",
+      "face button layout"
+    ],
+    [
+      "gamegun",
+      "light gun"
+    ],
+    [
+      "gamegun",
+      "video game controller model"
+    ],
+    [
+      "gamepad",
+      "game controller"
+    ],
+    [
+      "gamepad",
+      "video game controller"
+    ],
+    [
+      "gamercize",
+      "model series"
+    ],
+    [
+      "gamercize",
+      "video game controller"
+    ],
+    [
+      "gamesir x5 lite",
+      "gamepad"
+    ],
+    [
+      "gaming keypad",
+      "keypad"
+    ],
+    [
+      "gaming keypad",
+      "video game controller"
+    ],
+    [
+      "gaming pedals",
+      "video game controller"
+    ],
+    [
+      "go cam",
+      "digital camera"
+    ],
+    [
+      "go cam",
+      "product model"
+    ],
+    [
+      "go cam",
+      "video game controller"
+    ],
+    [
+      "google pixel",
+      "smartphone"
+    ],
+    [
+      "google stadia controller",
+      "gamepad"
+    ],
+    [
+      "google stadia controller",
+      "video game controller model"
+    ],
+    [
+      "gravis gamepad",
+      "gamepad"
+    ],
+    [
+      "gravis gamepad",
+      "video game controller model"
+    ],
+    [
+      "gravis pc gamepad",
+      "gamepad"
+    ],
+    [
+      "gravis pc gamepad",
+      "video game controller model"
+    ],
+    [
+      "guitar controller",
+      "game controller"
+    ],
+    [
+      "guitar controller",
+      "musical instrument game controller"
+    ],
+    [
+      "guitar controller",
+      "video game controller"
+    ],
+    [
+      "guncon",
+      "light gun"
+    ],
+    [
+      "guncon",
+      "product model"
+    ],
+    [
+      "home video game console",
+      "games console"
+    ],
+    [
+      "hotas",
+      "aircraft component"
+    ],
+    [
+      "hotas",
+      "form factor"
+    ],
+    [
+      "hotas",
+      "video game controller"
+    ],
+    [
+      "htc vive controller",
+      "motion controller"
+    ],
+    [
+      "htc vive controller",
+      "video game controller model"
+    ],
+    [
+      "hunter",
+      "gamepad"
+    ],
+    [
+      "hunter",
+      "video game controller model series"
+    ],
+    [
+      "hunter black",
+      "gamepad"
+    ],
+    [
+      "hunter black",
+      "video game controller model"
+    ],
+    [
+      "hunter crystal",
+      "gamepad"
+    ],
+    [
+      "hunter crystal",
+      "video game controller model"
+    ],
+    [
+      "hunter transparent green",
+      "gamepad"
+    ],
+    [
+      "hunter transparent green",
+      "video game controller model"
+    ],
+    [
+      "icontrolpad",
+      "product model"
+    ],
+    [
+      "icontrolpad",
+      "video game controller"
+    ],
+    [
+      "iphone",
+      "smartphone"
+    ],
+    [
+      "iphone 11",
+      "smartphone"
+    ],
+    [
+      "iphone 11 pro",
+      "smartphone"
+    ],
+    [
+      "iphone 11 pro max",
+      "smartphone"
+    ],
+    [
+      "iphone 12",
+      "smartphone"
+    ],
+    [
+      "iphone 12 mini",
+      "smartphone"
+    ],
+    [
+      "iphone 12 pro",
+      "smartphone"
+    ],
+    [
+      "iphone 12 pro max",
+      "smartphone"
+    ],
+    [
+      "iphone 13",
+      "smartphone"
+    ],
+    [
+      "iphone 13 mini",
+      "smartphone"
+    ],
+    [
+      "iphone 13 pro",
+      "smartphone"
+    ],
+    [
+      "iphone 13 pro max",
+      "smartphone"
+    ],
+    [
+      "iphone 14",
+      "smartphone"
+    ],
+    [
+      "iphone 14 plus",
+      "smartphone"
+    ],
+    [
+      "iphone 14 pro",
+      "smartphone"
+    ],
+    [
+      "iphone 14 pro max",
+      "smartphone"
+    ],
+    [
+      "iphone 15",
+      "smartphone"
+    ],
+    [
+      "iphone 15 plus",
+      "smartphone"
+    ],
+    [
+      "iphone 15 pro",
+      "smartphone"
+    ],
+    [
+      "iphone 15 pro max",
+      "smartphone"
+    ],
+    [
+      "iphone 16",
+      "smartphone"
+    ],
+    [
+      "iphone 16 plus",
+      "smartphone"
+    ],
+    [
+      "iphone 16 pro",
+      "smartphone"
+    ],
+    [
+      "iphone 16 pro max",
+      "smartphone"
+    ],
+    [
+      "iphone 16e",
+      "smartphone"
+    ],
+    [
+      "iphone 17",
+      "smartphone"
+    ],
+    [
+      "iphone 17 pro",
+      "smartphone"
+    ],
+    [
+      "iphone 17 pro max",
+      "smartphone"
+    ],
+    [
+      "iphone 17e",
+      "smartphone"
+    ],
+    [
+      "iphone 18 pro",
+      "smartphone"
+    ],
+    [
+      "iphone 18 pro max",
+      "smartphone"
+    ],
+    [
+      "iphone 3g",
+      "smartphone"
+    ],
+    [
+      "iphone 3gs",
+      "smartphone"
+    ],
+    [
+      "iphone 4",
+      "smartphone"
+    ],
+    [
+      "iphone 4s",
+      "smartphone"
+    ],
+    [
+      "iphone 5",
+      "smartphone"
+    ],
+    [
+      "iphone 5c",
+      "smartphone"
+    ],
+    [
+      "iphone 5s",
+      "smartphone"
+    ],
+    [
+      "iphone 6",
+      "smartphone"
+    ],
+    [
+      "iphone 6 plus",
+      "smartphone"
+    ],
+    [
+      "iphone 6s",
+      "smartphone"
+    ],
+    [
+      "iphone 6s plus",
+      "smartphone"
+    ],
+    [
+      "iphone 7",
+      "smartphone"
+    ],
+    [
+      "iphone 7 plus",
+      "smartphone"
+    ],
+    [
+      "iphone 8",
+      "smartphone"
+    ],
+    [
+      "iphone 8 plus",
+      "smartphone"
+    ],
+    [
+      "iphone air",
+      "smartphone"
+    ],
+    [
+      "iphone duo",
+      "smartphone"
+    ],
+    [
+      "iphone se 1st generation",
+      "smartphone"
+    ],
+    [
+      "iphone se 2nd generation",
+      "smartphone"
+    ],
+    [
+      "iphone se 3rd generation",
+      "smartphone"
+    ],
+    [
+      "iphone x",
+      "smartphone"
+    ],
+    [
+      "iphone xr",
+      "smartphone"
+    ],
+    [
+      "iphone xs",
+      "smartphone"
+    ],
+    [
+      "iphone xs max",
+      "smartphone"
+    ],
+    [
+      "jamstykk",
+      "guitar controller"
+    ],
+    [
+      "jamstykk",
+      "video game controller model"
+    ],
+    [
+      "jogcon",
+      "video game controller"
+    ],
+    [
+      "jogcon",
+      "video game controller model"
+    ],
+    [
+      "joy con",
+      "video game controller"
+    ],
+    [
+      "joy con",
+      "video game controller model"
+    ],
+    [
+      "joy con 2",
+      "video game controller"
+    ],
+    [
+      "joy con 2",
+      "video game controller model"
+    ],
+    [
+      "joyboard",
+      "balance board"
+    ],
+    [
+      "joyboard",
+      "video game"
+    ],
+    [
+      "joyboard",
+      "video game controller"
+    ],
+    [
+      "joyboard",
+      "video game controller model"
+    ],
+    [
+      "joystick",
+      "aircraft component"
+    ],
+    [
+      "joystick",
+      "game controller"
+    ],
+    [
+      "joystick",
+      "product category"
+    ],
+    [
+      "joystick",
+      "video game controller"
+    ],
+    [
+      "kempston interface",
+      "joystick"
+    ],
+    [
+      "kempston interface",
+      "peripheral"
+    ],
+    [
+      "kempston interface",
+      "physical interface"
+    ],
+    [
+      "kinect",
+      "brand"
+    ],
+    [
+      "kinect",
+      "model series"
+    ],
+    [
+      "kinect",
+      "motion controller"
+    ],
+    [
+      "kinect",
+      "software"
+    ],
+    [
+      "kinect",
+      "video camera"
+    ],
+    [
+      "kinect for xbox one",
+      "input device"
+    ],
+    [
+      "kinect for xbox one",
+      "motion controller"
+    ],
+    [
+      "kinect for xbox one",
+      "peripheral"
+    ],
+    [
+      "kinect for xbox one",
+      "product model"
+    ],
+    [
+      "konami justifier",
+      "light gun"
+    ],
+    [
+      "konami justifier",
+      "video game controller model"
+    ],
+    [
+      "laserscope",
+      "light gun"
+    ],
+    [
+      "laserscope",
+      "video game controller model"
+    ],
+    [
+      "layout of face buttons",
+      "face button"
+    ],
+    [
+      "layout of face buttons",
+      "second order class"
+    ],
+    [
+      "light gun",
+      "game controller"
+    ],
+    [
+      "light gun",
+      "pointing device"
+    ],
+    [
+      "light gun",
+      "video game controller"
+    ],
+    [
+      "light phaser",
+      "light gun"
+    ],
+    [
+      "light phaser",
+      "video game accessory"
+    ],
+    [
+      "logitech action controller",
+      "gamepad"
+    ],
+    [
+      "logitech action controller",
+      "video game controller model"
+    ],
+    [
+      "logitech attack 3",
+      "joystick"
+    ],
+    [
+      "logitech attack 3",
+      "video game controller model"
+    ],
+    [
+      "logitech chillstream",
+      "electronic device model series"
+    ],
+    [
+      "logitech chillstream",
+      "gamepad"
+    ],
+    [
+      "logitech chillstream controller for pc",
+      "logitech chillstream"
+    ],
+    [
+      "logitech chillstream controller for pc",
+      "video game controller model"
+    ],
+    [
+      "logitech chillstream controller for playstation 3",
+      "logitech chillstream"
+    ],
+    [
+      "logitech chillstream controller for playstation 3",
+      "video game controller model"
+    ],
+    [
+      "logitech cordless action controller",
+      "gamepad"
+    ],
+    [
+      "logitech cordless action controller",
+      "video game controller model"
+    ],
+    [
+      "logitech cordless precision controller",
+      "gamepad"
+    ],
+    [
+      "logitech cordless precision controller",
+      "video game controller model"
+    ],
+    [
+      "logitech cordless rumblepad 2",
+      "gamepad"
+    ],
+    [
+      "logitech cordless rumblepad 2",
+      "video game controller model"
+    ],
+    [
+      "logitech drivefx",
+      "sim racing wheel"
+    ],
+    [
+      "logitech drivefx",
+      "video game controller model"
+    ],
+    [
+      "logitech driving force",
+      "sim racing wheel"
+    ],
+    [
+      "logitech driving force",
+      "video game controller model"
+    ],
+    [
+      "logitech driving force ex",
+      "sim racing wheel"
+    ],
+    [
+      "logitech driving force ex",
+      "video game controller model"
+    ],
+    [
+      "logitech driving force gt",
+      "sim racing wheel"
+    ],
+    [
+      "logitech driving force gt",
+      "video game controller model"
+    ],
+    [
+      "logitech driving force pro",
+      "sim racing wheel"
+    ],
+    [
+      "logitech driving force pro",
+      "video game controller model"
+    ],
+    [
+      "logitech driving force wireless",
+      "sim racing wheel"
+    ],
+    [
+      "logitech driving force wireless",
+      "video game controller model"
+    ],
+    [
+      "logitech dual action",
+      "gamepad"
+    ],
+    [
+      "logitech dual action",
+      "video game controller model"
+    ],
+    [
+      "logitech extreme 3d pro",
+      "joystick"
+    ],
+    [
+      "logitech extreme 3d pro",
+      "video game controller model"
+    ],
+    [
+      "logitech extreme action controller",
+      "gamepad"
+    ],
+    [
+      "logitech extreme action controller",
+      "video game controller model"
+    ],
+    [
+      "logitech f310",
+      "gamepad"
+    ],
+    [
+      "logitech f310",
+      "video game controller model"
+    ],
+    [
+      "logitech f510",
+      "gamepad"
+    ],
+    [
+      "logitech f510",
+      "video game controller model"
+    ],
+    [
+      "logitech f710",
+      "gamepad"
+    ],
+    [
+      "logitech f710",
+      "video game controller model"
+    ],
+    [
+      "logitech f710 oceangate titan",
+      "individual entity"
+    ],
+    [
+      "logitech f710 oceangate titan",
+      "logitech f710"
+    ],
+    [
+      "logitech formula force",
+      "sim racing wheel"
+    ],
+    [
+      "logitech formula force",
+      "video game controller model"
+    ],
+    [
+      "logitech formula force ex",
+      "sim racing wheel"
+    ],
+    [
+      "logitech formula force ex",
+      "video game controller model"
+    ],
+    [
+      "logitech formula force gp",
+      "sim racing wheel"
+    ],
+    [
+      "logitech formula force gp",
+      "video game controller model"
+    ],
+    [
+      "logitech formula gp",
+      "sim racing wheel"
+    ],
+    [
+      "logitech formula gp",
+      "video game controller model"
+    ],
+    [
+      "logitech freedom 2 4",
+      "joystick"
+    ],
+    [
+      "logitech freedom 2 4",
+      "video game controller model"
+    ],
+    [
+      "logitech g pro racing wheel",
+      "model series"
+    ],
+    [
+      "logitech g pro racing wheel",
+      "sim racing wheel"
+    ],
+    [
+      "logitech g pro racing wheel for pc",
+      "logitech g pro racing wheel"
+    ],
+    [
+      "logitech g pro racing wheel for pc",
+      "video game controller model"
+    ],
+    [
+      "logitech g pro racing wheel for playstation and pc",
+      "logitech g pro racing wheel"
+    ],
+    [
+      "logitech g pro racing wheel for playstation and pc",
+      "video game controller model"
+    ],
+    [
+      "logitech g pro racing wheel for xbox and pc",
+      "logitech g pro racing wheel"
+    ],
+    [
+      "logitech g pro racing wheel for xbox and pc",
+      "video game controller model"
+    ],
+    [
+      "logitech g25",
+      "sim racing wheel"
+    ],
+    [
+      "logitech g25",
+      "video game controller model"
+    ],
+    [
+      "logitech g27",
+      "sim racing wheel"
+    ],
+    [
+      "logitech g27",
+      "video game controller model"
+    ],
+    [
+      "logitech g29",
+      "sim racing wheel"
+    ],
+    [
+      "logitech g29",
+      "video game controller model"
+    ],
+    [
+      "logitech g920",
+      "sim racing wheel"
+    ],
+    [
+      "logitech g920",
+      "video game controller model"
+    ],
+    [
+      "logitech g923",
+      "sim racing wheel"
+    ],
+    [
+      "logitech g923",
+      "video game controller model"
+    ],
+    [
+      "logitech momo force",
+      "sim racing wheel"
+    ],
+    [
+      "logitech momo force",
+      "video game controller model"
+    ],
+    [
+      "logitech momo racing",
+      "sim racing wheel"
+    ],
+    [
+      "logitech momo racing",
+      "video game controller model"
+    ],
+    [
+      "logitech nascar racing wheel",
+      "sim racing wheel"
+    ],
+    [
+      "logitech nascar racing wheel",
+      "video game controller model"
+    ],
+    [
+      "logitech netplay controller",
+      "gamepad"
+    ],
+    [
+      "logitech netplay controller",
+      "video game controller model"
+    ],
+    [
+      "logitech precision gamepad 2",
+      "gamepad"
+    ],
+    [
+      "logitech precision gamepad 2",
+      "video game controller model"
+    ],
+    [
+      "logitech rumblepad 2",
+      "gamepad"
+    ],
+    [
+      "logitech rumblepad 2",
+      "video game controller model"
+    ],
+    [
+      "logitech speed force",
+      "sim racing wheel"
+    ],
+    [
+      "logitech speed force",
+      "video game controller model"
+    ],
+    [
+      "logitech speed force wireless",
+      "sim racing wheel"
+    ],
+    [
+      "logitech speed force wireless",
+      "video game controller model"
+    ],
+    [
+      "logitech thunderpad digital",
+      "gamepad"
+    ],
+    [
+      "logitech thunderpad digital",
+      "video game controller model"
+    ],
+    [
+      "logitech thunderpad for xbox",
+      "gamepad"
+    ],
+    [
+      "logitech thunderpad for xbox",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman action pad",
+      "gamepad"
+    ],
+    [
+      "logitech wingman action pad",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman attack",
+      "joystick"
+    ],
+    [
+      "logitech wingman attack",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman attack 2",
+      "joystick"
+    ],
+    [
+      "logitech wingman attack 2",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman cordless rumblepad",
+      "gamepad"
+    ],
+    [
+      "logitech wingman cordless rumblepad",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman extreme",
+      "joystick"
+    ],
+    [
+      "logitech wingman extreme",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman extreme digital",
+      "joystick"
+    ],
+    [
+      "logitech wingman extreme digital",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman extreme digital 3d",
+      "joystick"
+    ],
+    [
+      "logitech wingman extreme digital 3d",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman force",
+      "joystick"
+    ],
+    [
+      "logitech wingman force",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman force 3d",
+      "joystick"
+    ],
+    [
+      "logitech wingman force 3d",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman formula",
+      "sim racing wheel"
+    ],
+    [
+      "logitech wingman formula",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman gamepad",
+      "gamepad"
+    ],
+    [
+      "logitech wingman gamepad",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman gamepad extreme",
+      "gamepad"
+    ],
+    [
+      "logitech wingman gamepad extreme",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman joystick",
+      "joystick"
+    ],
+    [
+      "logitech wingman joystick",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman precision",
+      "gamepad"
+    ],
+    [
+      "logitech wingman precision",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman rumblepad",
+      "gamepad"
+    ],
+    [
+      "logitech wingman rumblepad",
+      "video game controller model"
+    ],
+    [
+      "logitech wingman warrior",
+      "joystick"
+    ],
+    [
+      "logitech wingman warrior",
+      "video game controller model"
+    ],
+    [
+      "logitech wireless drum controller",
+      "musical instrument game controller"
+    ],
+    [
+      "logitech wireless drum controller",
+      "video game controller model"
+    ],
+    [
+      "logitech wireless guitar controller",
+      "guitar controller"
+    ],
+    [
+      "logitech wireless guitar controller",
+      "video game controller model"
+    ],
+    [
+      "logitech wireless guitar controller premiere edition",
+      "guitar controller"
+    ],
+    [
+      "logitech wireless guitar controller premiere edition",
+      "video game controller model"
+    ],
+    [
+      "magnum light phaser",
+      "light gun"
+    ],
+    [
+      "magnum light phaser",
+      "video game controller model"
+    ],
+    [
+      "menacer",
+      "light gun"
+    ],
+    [
+      "menacer",
+      "video game accessory"
+    ],
+    [
+      "microsoft sidewinder 3d pro",
+      "joystick"
+    ],
+    [
+      "microsoft sidewinder 3d pro",
+      "video game controller model"
+    ],
+    [
+      "microsoft sidewinder freestyle pro",
+      "gamepad"
+    ],
+    [
+      "microsoft sidewinder freestyle pro",
+      "video game controller model"
+    ],
+    [
+      "motion controller",
+      "game controller"
+    ],
+    [
+      "motion controller",
+      "video game controller"
+    ],
+    [
+      "musical instrument game controller",
+      "product category"
+    ],
+    [
+      "musical instrument game controller",
+      "video game controller"
+    ],
+    [
+      "n30 arcade stick",
+      "arcade controller"
+    ],
+    [
+      "n30 arcade stick",
+      "product model"
+    ],
+    [
+      "namco arcade stick",
+      "arcade controller"
+    ],
+    [
+      "namco arcade stick",
+      "product model"
+    ],
+    [
+      "negcon",
+      "gamepad"
+    ],
+    [
+      "negcon",
+      "product model"
+    ],
+    [
+      "neo geo cd pad",
+      "gamepad"
+    ],
+    [
+      "neo geo cd pad",
+      "video game controller model"
+    ],
+    [
+      "nes advantage",
+      "arcade controller"
+    ],
+    [
+      "nes advantage",
+      "product model"
+    ],
+    [
+      "nes max",
+      "gamepad"
+    ],
+    [
+      "nes max",
+      "video game controller model"
+    ],
+    [
+      "nes zapper",
+      "light gun"
+    ],
+    [
+      "nes zapper",
+      "video game controller model"
+    ],
+    [
+      "nintendo score master",
+      "arcade controller"
+    ],
+    [
+      "nintendo score master",
+      "product model"
+    ],
+    [
+      "nintendo style face buttons",
+      "face button layout"
+    ],
+    [
+      "nintendo switch",
+      "games console"
+    ],
+    [
+      "nintendo switch 2 pro controller",
+      "video game controller"
+    ],
+    [
+      "nintendo switch 2 pro controller",
+      "video game controller model"
+    ],
+    [
+      "nintendo switch controller",
+      "nintendo switch pro controller"
+    ],
+    [
+      "nintendo switch pro controller",
+      "video game controller"
+    ],
+    [
+      "nintendo switch pro controller",
+      "video game controller model"
+    ],
+    [
+      "novint falcon",
+      "haptic technology"
+    ],
+    [
+      "novint falcon",
+      "video game controller"
+    ],
+    [
+      "nunchuk",
+      "video game controller model"
+    ],
+    [
+      "nunchuk",
+      "wii remote extension"
+    ],
+    [
+      "nyko kama",
+      "product model"
+    ],
+    [
+      "nyko kama",
+      "video game controller"
+    ],
+    [
+      "nyko wand",
+      "motion controller"
+    ],
+    [
+      "nyko wand",
+      "product model"
+    ],
+    [
+      "oculus touch",
+      "motion controller"
+    ],
+    [
+      "ouya controller",
+      "gamepad"
+    ],
+    [
+      "ouya controller",
+      "video game controller model"
+    ],
+    [
+      "paddle",
+      "video game controller"
+    ],
+    [
+      "panther xl",
+      "joystick"
+    ],
+    [
+      "panther xl",
+      "product model"
+    ],
+    [
+      "panther xl",
+      "trackball"
+    ],
+    [
+      "panther xl",
+      "video game controller"
+    ],
+    [
+      "playstation 3 concept controller",
+      "gamepad"
+    ],
+    [
+      "playstation 3 concept controller",
+      "product concept"
+    ],
+    [
+      "playstation 3 concept controller",
+      "video game controller model"
+    ],
+    [
+      "playstation 5",
+      "games console"
+    ],
+    [
+      "playstation 5 controller",
+      "dualsense"
+    ],
+    [
+      "playstation classic controller",
+      "gamepad"
+    ],
+    [
+      "playstation classic controller",
+      "video game controller model"
+    ],
+    [
+      "playstation controller",
+      "gamepad"
+    ],
+    [
+      "playstation controller",
+      "video game controller model"
+    ],
+    [
+      "playstation eye",
+      "digital camera model"
+    ],
+    [
+      "playstation eye",
+      "video game controller"
+    ],
+    [
+      "playstation eye",
+      "webcam"
+    ],
+    [
+      "playstation eye",
+      "webcam model"
+    ],
+    [
+      "playstation face buttons",
+      "face button layout"
+    ],
+    [
+      "playstation face buttons",
+      "trademark"
+    ],
+    [
+      "playstation mouse",
+      "computer mouse"
+    ],
+    [
+      "playstation mouse",
+      "video game controller"
+    ],
+    [
+      "playstation mouse",
+      "video game controller model"
+    ],
+    [
+      "playstation move",
+      "motion controller"
+    ],
+    [
+      "playstation move",
+      "product model"
+    ],
+    [
+      "playstation move",
+      "wireless game controller"
+    ],
+    [
+      "pointing stick",
+      "joystick"
+    ],
+    [
+      "pointing stick",
+      "pointing device"
+    ],
+    [
+      "power glove",
+      "video game controller"
+    ],
+    [
+      "power glove",
+      "video game controller model"
+    ],
+    [
+      "power pad",
+      "dance pad"
+    ],
+    [
+      "power pad",
+      "video game accessory"
+    ],
+    [
+      "raildriver",
+      "product"
+    ],
+    [
+      "raildriver",
+      "video game controller"
+    ],
+    [
+      "razer hydra",
+      "video game controller"
+    ],
+    [
+      "razer hydra",
+      "video game controller model"
+    ],
+    [
+      "remotext",
+      "product model"
+    ],
+    [
+      "remotext",
+      "video game controller"
+    ],
+    [
+      "right stick",
+      "clickable analog stick"
+    ],
+    [
+      "right stick",
+      "playstation style game controller button"
+    ],
+    [
+      "saitek x52",
+      "joystick"
+    ],
+    [
+      "saitek x52",
+      "video game controller model"
+    ],
+    [
+      "sega dreamcast controller",
+      "gamepad"
+    ],
+    [
+      "sega dreamcast gun",
+      "light gun"
+    ],
+    [
+      "sega dreamcast gun",
+      "model"
+    ],
+    [
+      "sega dreamcast twin stick",
+      "joystick"
+    ],
+    [
+      "sega dreamcast twin stick",
+      "video game controller model"
+    ],
+    [
+      "sega light phaser",
+      "light gun"
+    ],
+    [
+      "sega light phaser",
+      "video game controller model"
+    ],
+    [
+      "sega master system control pad",
+      "gamepad"
+    ],
+    [
+      "sega master system control pad",
+      "video game controller model"
+    ],
+    [
+      "sega saturn control pad",
+      "gamepad"
+    ],
+    [
+      "sega saturn control pad",
+      "product model"
+    ],
+    [
+      "sega saturn control pad",
+      "wired game controller"
+    ],
+    [
+      "shooting gallery",
+      "light gun"
+    ],
+    [
+      "shooting gallery",
+      "video game accessory"
+    ],
+    [
+      "shoulder button",
+      "push button"
+    ],
+    [
+      "shoulder button",
+      "video game controller"
+    ],
+    [
+      "shoulder button",
+      "video game feature"
+    ],
+    [
+      "sim racing wheel",
+      "game controller"
+    ],
+    [
+      "sim racing wheel",
+      "video game controller"
+    ],
+    [
+      "sinden light gun",
+      "light gun"
+    ],
+    [
+      "sinden light gun",
+      "product model"
+    ],
+    [
+      "sixaxis",
+      "gamepad"
+    ],
+    [
+      "sixaxis",
+      "playstation 3 accessories"
+    ],
+    [
+      "sixaxis",
+      "product model"
+    ],
+    [
+      "sixaxis",
+      "wireless game controller"
+    ],
+    [
+      "sjs 1",
+      "joystick"
+    ],
+    [
+      "sjs 1",
+      "video game controller model"
+    ],
+    [
+      "sjs 2",
+      "joystick"
+    ],
+    [
+      "sjs 2",
+      "video game controller model"
+    ],
+    [
+      "smartphone",
+      "mobile phone"
+    ],
+    [
+      "snes controller",
+      "gamepad"
+    ],
+    [
+      "snes controller",
+      "video game controller model"
+    ],
+    [
+      "spaceball 2003",
+      "joystick"
+    ],
+    [
+      "spaceball 2003",
+      "product model"
+    ],
+    [
+      "spectravideo quickshot i",
+      "joystick"
+    ],
+    [
+      "spectravideo quickshot i",
+      "video game controller model"
+    ],
+    [
+      "spectravideo quickshot ii turbo",
+      "joystick"
+    ],
+    [
+      "spectravideo quickshot ii turbo",
+      "video game controller model"
+    ],
+    [
+      "spirotroller enhanced",
+      "gamepad"
+    ],
+    [
+      "spirotroller enhanced",
+      "open hardware"
+    ],
+    [
+      "spj 1",
+      "joystick"
+    ],
+    [
+      "square button",
+      "digital face button"
+    ],
+    [
+      "square button",
+      "playstation style game controller button"
+    ],
+    [
+      "src bio gun",
+      "light gun"
+    ],
+    [
+      "src bio gun",
+      "model"
+    ],
+    [
+      "starfire lightblaster",
+      "light gun"
+    ],
+    [
+      "starfire lightblaster",
+      "model"
+    ],
+    [
+      "steam controller",
+      "gamepad"
+    ],
+    [
+      "steam controller",
+      "video game controller model"
+    ],
+    [
+      "steam controller analog stick",
+      "clickable analog stick"
+    ],
+    [
+      "steam controller analog stick",
+      "steam controller button"
+    ],
+    [
+      "steel battalion controller",
+      "video game accessory"
+    ],
+    [
+      "steel battalion controller",
+      "video game controller"
+    ],
+    [
+      "super advantage",
+      "joystick"
+    ],
+    [
+      "super advantage",
+      "video game controller model"
+    ],
+    [
+      "super controller",
+      "video game controller"
+    ],
+    [
+      "super nes mouse",
+      "computer mouse"
+    ],
+    [
+      "super nes mouse",
+      "product model"
+    ],
+    [
+      "super nes mouse",
+      "video game controller"
+    ],
+    [
+      "super scope",
+      "light gun"
+    ],
+    [
+      "super scope",
+      "video game controller model"
+    ],
+    [
+      "symmetrical gamepad",
+      "form factor"
+    ],
+    [
+      "symmetrical gamepad",
+      "gamepad"
+    ],
+    [
+      "tac 2",
+      "joystick"
+    ],
+    [
+      "tac 2",
+      "video game controller model"
+    ],
+    [
+      "teenage mutant ninja turtles battle for the city",
+      "dedicated console"
+    ],
+    [
+      "teenage mutant ninja turtles battle for the city",
+      "home video game console"
+    ],
+    [
+      "teenage mutant ninja turtles battle for the city",
+      "product model"
+    ],
+    [
+      "teenage mutant ninja turtles battle for the city",
+      "video game controller"
+    ],
+    [
+      "teenage mutant ninja turtles mutant and monster mayhem",
+      "dedicated console"
+    ],
+    [
+      "teenage mutant ninja turtles mutant and monster mayhem",
+      "home video game console"
+    ],
+    [
+      "teenage mutant ninja turtles mutant and monster mayhem",
+      "product model"
+    ],
+    [
+      "teenage mutant ninja turtles mutant and monster mayhem",
+      "video game controller"
+    ],
+    [
+      "the arcade",
+      "joystick"
+    ],
+    [
+      "the arcade",
+      "video game controller model"
+    ],
+    [
+      "throttle quadrant",
+      "video game controller"
+    ],
+    [
+      "timex sinclair 2090",
+      "joystick"
+    ],
+    [
+      "tracked motion controller",
+      "motion controller"
+    ],
+    [
+      "trackir",
+      "product model"
+    ],
+    [
+      "trackir",
+      "video game controller"
+    ],
+    [
+      "triangle button",
+      "digital face button"
+    ],
+    [
+      "triangle button",
+      "playstation style game controller button"
+    ],
+    [
+      "turbografx 16 turbopad",
+      "gamepad"
+    ],
+    [
+      "turbografx 16 turbopad",
+      "model"
+    ],
+    [
+      "turbografx 16 turbostick",
+      "arcade controller"
+    ],
+    [
+      "turbografx 16 turbostick",
+      "product model"
+    ],
+    [
+      "type of face button",
+      "face button"
+    ],
+    [
+      "type of face button",
+      "second order class"
+    ],
+    [
+      "ubisoft motion tracking camera",
+      "digital camera"
+    ],
+    [
+      "ubisoft motion tracking camera",
+      "video game controller"
+    ],
+    [
+      "vectrex controller",
+      "gamepad"
+    ],
+    [
+      "vectrex controller",
+      "video game controller model"
+    ],
+    [
+      "video game controller",
+      "input device"
+    ],
+    [
+      "video game controller",
+      "video game accessory"
+    ],
+    [
+      "video game controller model",
+      "game controller"
+    ],
+    [
+      "virtua gun",
+      "light gun"
+    ],
+    [
+      "virtua gun",
+      "video game controller model"
+    ],
+    [
+      "virtual boy controller",
+      "gamepad"
+    ],
+    [
+      "virtual boy controller",
+      "video game controller model"
+    ],
+    [
+      "virtuix omni",
+      "motion controller"
+    ],
+    [
+      "virtuix omni",
+      "treadmill"
+    ],
+    [
+      "virtuix omni",
+      "video game controller model"
+    ],
+    [
+      "virtuix omni",
+      "virtual reality accessorie"
+    ],
+    [
+      "wavebird wireless controller",
+      "gamepad"
+    ],
+    [
+      "wavebird wireless controller",
+      "product model"
+    ],
+    [
+      "wavebird wireless controller",
+      "wireless game controller"
+    ],
+    [
+      "wii balance board",
+      "product model"
+    ],
+    [
+      "wii balance board",
+      "video game accessory"
+    ],
+    [
+      "wii balance board",
+      "video game controller"
+    ],
+    [
+      "wii balance board",
+      "weighing scale"
+    ],
+    [
+      "wii remote",
+      "motion controller"
+    ],
+    [
+      "wii remote",
+      "product model"
+    ],
+    [
+      "wii remote",
+      "video game controller"
+    ],
+    [
+      "wii remote extension",
+      "nonbiological component"
+    ],
+    [
+      "wii remote extension",
+      "video game controller"
+    ],
+    [
+      "wii remote plus",
+      "motion controller"
+    ],
+    [
+      "wii remote plus",
+      "product model"
+    ],
+    [
+      "wii remote plus",
+      "video game controller"
+    ],
+    [
+      "wii u gamepad",
+      "product model"
+    ],
+    [
+      "wii u gamepad",
+      "wireless game controller"
+    ],
+    [
+      "wii u pro controller",
+      "video game controller"
+    ],
+    [
+      "wii wheel",
+      "product model"
+    ],
+    [
+      "wii wheel",
+      "video game controller"
+    ],
+    [
+      "wii zapper",
+      "video game controller"
+    ],
+    [
+      "wii zapper",
+      "video game controller model"
+    ],
+    [
+      "wired game controller",
+      "game controller"
+    ],
+    [
+      "wired game controller",
+      "video game controller"
+    ],
+    [
+      "wireless game controller",
+      "game controller"
+    ],
+    [
+      "wireless game controller",
+      "video game controller"
+    ],
+    [
+      "wizdish rovr",
+      "model series"
+    ],
+    [
+      "wizdish rovr",
+      "treadmill"
+    ],
+    [
+      "wizdish rovr",
+      "video game controller"
+    ],
+    [
+      "x button",
+      "digital face button"
+    ],
+    [
+      "x button",
+      "nintendo style game controller button"
+    ],
+    [
+      "x button",
+      "xbox style game controller button"
+    ],
+    [
+      "xbox 360 controller",
+      "product model"
+    ],
+    [
+      "xbox 360 controller",
+      "video game controller"
+    ],
+    [
+      "xbox 360 wireless controller",
+      "gamepad"
+    ],
+    [
+      "xbox 360 wireless controller",
+      "wireless game controller"
+    ],
+    [
+      "xbox 360 wireless racing wheel",
+      "sim racing wheel"
+    ],
+    [
+      "xbox 360 wireless racing wheel",
+      "video game controller model"
+    ],
+    [
+      "xbox adaptive controller",
+      "gamepad"
+    ],
+    [
+      "xbox adaptive controller",
+      "product model"
+    ],
+    [
+      "xbox controller",
+      "gamepad"
+    ],
+    [
+      "xbox controller",
+      "model series"
+    ],
+    [
+      "xbox controller",
+      "video game controller model"
+    ],
+    [
+      "xbox controller s",
+      "gamepad"
+    ],
+    [
+      "xbox controller s",
+      "video game controller model"
+    ],
+    [
+      "xbox elite wireless controller",
+      "gamepad"
+    ],
+    [
+      "xbox elite wireless controller",
+      "video game controller model"
+    ],
+    [
+      "xbox elite wireless controller series 2",
+      "gamepad"
+    ],
+    [
+      "xbox elite wireless controller series 2",
+      "video game controller model"
+    ],
+    [
+      "xbox live vision",
+      "video game controller"
+    ],
+    [
+      "xbox live vision",
+      "webcam"
+    ],
+    [
+      "xbox nano controller",
+      "xbox controller"
+    ],
+    [
+      "xbox one controller",
+      "xbox wireless controller"
+    ],
+    [
+      "xbox one wireless controller",
+      "xbox wireless controller"
+    ],
+    [
+      "xbox one x project scorpio wireless controller",
+      "gamepad"
+    ],
+    [
+      "xbox one x project scorpio wireless controller",
+      "video game controller model"
+    ],
+    [
+      "xbox series s",
+      "games console"
+    ],
+    [
+      "xbox series s controller",
+      "xbox wireless controller"
+    ],
+    [
+      "xbox series s wireless controller",
+      "xbox wireless controller"
+    ],
+    [
+      "xbox series x",
+      "games console"
+    ],
+    [
+      "xbox series x controller",
+      "xbox wireless controller"
+    ],
+    [
+      "xbox series x s controller",
+      "xbox wireless controller"
+    ],
+    [
+      "xbox series x s wireless controller",
+      "xbox wireless controller"
+    ],
+    [
+      "xbox series x wireless controller",
+      "xbox wireless controller"
+    ],
+    [
+      "xbox style face buttons",
+      "face button"
+    ],
+    [
+      "xbox style face buttons",
+      "face button layout"
+    ],
+    [
+      "xbox wireless controller",
+      "gamepad"
+    ],
+    [
+      "xbox wireless controller",
+      "video game controller model"
+    ],
+    [
+      "xg 1",
+      "light gun"
+    ],
+    [
+      "xg 1",
+      "video game controller model"
+    ],
+    [
+      "y button",
+      "digital face button"
+    ],
+    [
+      "y button",
+      "nintendo style game controller button"
+    ],
+    [
+      "y button",
+      "xbox style game controller button"
+    ],
+    [
+      "zwift play",
+      "product"
+    ],
+    [
+      "zwift play",
+      "video game controller"
+    ]
+  ]
+}

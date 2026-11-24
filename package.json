@@ -1,0 +1,31 @@
+{
+  "name": "krill-club",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.12"
+  },
+  "scripts": {
+    "build:answer-index": "node scripts/build-answer-index.mjs",
+    "build:pages": "node scripts/pages.mjs",
+    "setup": "node scripts/setup.mjs",
+    "start": "node --env-file-if-exists=.env server/main.ts",
+    "dev": "node --watch --env-file-if-exists=.env server/main.ts",
+    "build": "tsc --noEmit",
+    "test": "node --test tests/game.test.mjs tests/catalogue.test.mjs tests/repairs.test.mjs tests/intent.test.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/browser-repairs.mjs"
+  },
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
+    "onnxruntime-web": "1.23.2",
+    "qrcode": "^1.5.4",
+    "wordnet-db": "3.1.14"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.0.0",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.9.2"
+  }
+}

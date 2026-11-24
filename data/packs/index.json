@@ -1,0 +1,44 @@
+[
+  {
+    "id": "general",
+    "title": "General Knowledge",
+    "count": 30,
+    "description": "From the periodic table and the Booker Prize to the Olympic programme and the cocktail bar.",
+    "answers": 2370
+  },
+  {
+    "id": "screen",
+    "title": "Film & TV",
+    "count": 30,
+    "description": "British telly, animation studios, film awards and the people on screen.",
+    "answers": 3562
+  },
+  {
+    "id": "music",
+    "title": "Music",
+    "count": 30,
+    "description": "UK number ones, festival headliners, Eurovision, instruments and artists’ back catalogues.",
+    "answers": 3079
+  },
+  {
+    "id": "geography",
+    "title": "Geography",
+    "count": 30,
+    "description": "Countries, capitals, mountains and rivers, with a closer look at the UK.",
+    "answers": 1937
+  },
+  {
+    "id": "animals",
+    "title": "Animals",
+    "count": 30,
+    "description": "British birds, living mammals and the English names of animal families.",
+    "answers": 3849
+  },
+  {
+    "id": "ultimate",
+    "title": "Ultimate Frisbee",
+    "count": 30,
+    "description": "22 playing and rules rounds, plus eight rounds on university, club and international competition.",
+    "answers": 257
+  }
+]

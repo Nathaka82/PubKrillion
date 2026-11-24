@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#070e1d" />
+    <meta
+      name="description"
+      content="A live pub quiz where rarer answers take your team deeper."
+    />
+    <title>Krill Club · The Pub Dive</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link
+      rel="preload"
+      href="./fonts/VT323-Regular.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <div id="ambient-krill" aria-hidden="true" inert></div>
+    <header class="mast">
+      <div class="mast-inner">
+        <a class="brand" href="#/" aria-label="Krill Club home"
+          ><canvas
+            id="brand-krill"
+            width="45"
+            height="36"
+            aria-hidden="true"
+          ></canvas
+          ><span>KRILL CLUB</span></a
+        >
+        <div class="mast-controls">
+          <div id="sound-control"></div>
+          <button class="nav-help" id="help-button">
+            <span aria-hidden="true">?</span> How to play
+          </button>
+        </div>
+      </div>
+    </header>
+    <main id="app" tabindex="-1"></main>
+    <div id="connection" role="status" hidden></div>
+    <div id="toast" role="status" hidden></div>
+    <dialog id="modal" aria-labelledby="dialog-title">
+      <div id="dialog-content"></div>
+    </dialog>
+    <noscript>This multiplayer quiz requires JavaScript.</noscript>
+  </body>
+</html>

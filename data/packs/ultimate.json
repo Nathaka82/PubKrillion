@@ -1,0 +1,2074 @@
+{
+  "title": "Ultimate Frisbee",
+  "questions": [
+    {
+      "id": "ultimate-throws",
+      "title": "Ways to throw a disc",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a throw in this collection of ultimate release techniques. Variants of a release score together.",
+      "source": "https://ultimaterob.com/2013/10/24/uncommon-throws-in-ultimate-frisbee/",
+      "coverage": "Ten release families from USA Ultimate’s beginner terminology and Ultimate Rob’s uncommon-throws collection. Release height, throwing hand and curve share a family. Distance, tactical purpose and trick routines are outside this question.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Backhand",
+          "aliases": [
+            "Air bounce",
+            "Airbounce"
+          ],
+          "depth": 1,
+          "examples": [
+            "Around Both Legs Backhand",
+            "Around-the-back backhand",
+            "Behind the Back Backhand",
+            "Between the Legs Backhand",
+            "Leftie Backhand",
+            "No Look Backhand",
+            "Upside Down Backhand",
+            "high release Backhand",
+            "inside out Backhand",
+            "low release Backhand",
+            "off hand Backhand",
+            "outside in Backhand"
+          ]
+        },
+        {
+          "name": "Forehand",
+          "aliases": [
+            "Flick",
+            "Side arm",
+            "Sidearm"
+          ],
+          "depth": 1,
+          "examples": [
+            "Behind the Back Forehand",
+            "Between the Legs Forehand",
+            "Blade",
+            "No Look Forehand",
+            "high release Forehand",
+            "high release flick",
+            "high release sidearm",
+            "inside out Forehand",
+            "inside out flick",
+            "inside out sidearm",
+            "low release Forehand",
+            "low release flick",
+            "low release sidearm",
+            "off hand Forehand",
+            "off hand flick",
+            "off hand sidearm",
+            "outside in Forehand",
+            "outside in flick",
+            "outside in sidearm"
+          ]
+        },
+        {
+          "name": "Hammer",
+          "aliases": [
+            "Overhead hammer"
+          ],
+          "depth": 2,
+          "examples": [
+            "Helix Hammer"
+          ]
+        },
+        {
+          "name": "Overhand wrist flip",
+          "aliases": [
+            "Chicken wing",
+            "Chickenwing",
+            "Overhand wristflip",
+            "Wrist flip"
+          ],
+          "depth": 4,
+          "examples": [
+            "Reverse Overhand Wrist Flip"
+          ]
+        },
+        {
+          "name": "Push pass",
+          "aliases": [
+            "Push throw"
+          ],
+          "depth": 1,
+          "examples": []
+        },
+        {
+          "name": "Reverse overhand wrist flip",
+          "aliases": [
+            "Blind overhand wrist flip",
+            "Reverse wrist flip"
+          ],
+          "depth": 5,
+          "examples": []
+        },
+        {
+          "name": "Scoober",
+          "aliases": [
+            "Scoobie"
+          ],
+          "depth": 5,
+          "examples": [
+            "Helix Scoober"
+          ]
+        },
+        {
+          "name": "Sky hook",
+          "aliases": [
+            "Skyhook"
+          ],
+          "depth": 5,
+          "examples": []
+        },
+        {
+          "name": "Thumber",
+          "aliases": [],
+          "depth": 5,
+          "examples": [
+            "Helix Thumber"
+          ]
+        },
+        {
+          "name": "Upside-down backhand",
+          "aliases": [
+            "Inverted backhand"
+          ],
+          "depth": 3,
+          "examples": []
+        }
+      ]
+    },
+    {
+      "id": "ultimate-catches",
+      "title": "Hands on the disc",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a standard catching technique taught in USA Ultimate’s Skills & Drills manual.",
+      "source": "https://archive.usaultimate.org/assets/1/Page/Skills%20and%20Drills%20manual_revised2019.pdf",
+      "coverage": "All three techniques in Standard Catches, pp. 11–13.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "One-handed rim grab",
+          "aliases": [
+            "One hand catch",
+            "One handed rim catch",
+            "One-handed catch"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Pancake catch",
+          "aliases": [
+            "Clap catch",
+            "Pancake",
+            "Sandwich catch",
+            "Two-handed clap catch"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Two-handed rim grab",
+          "aliases": [
+            "Two hand rim catch",
+            "Two handed rim catch",
+            "Two-handed claw"
+          ],
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "ultimate-cuts",
+      "title": "Lose your defender",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a cutting technique described in USA Ultimate’s cutting and handler sections.",
+      "source": "https://archive.usaultimate.org/assets/1/Page/Skills%20and%20Drills%20manual_revised2019.pdf",
+      "coverage": "The three illustrated changes of direction and the straight cut named in the handler section.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Double cut",
+          "aliases": [
+            "Double cuts"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Full cut",
+          "aliases": [
+            "Full cuts"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Straight cut",
+          "aliases": [
+            "Straight line cut"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Two-step juke",
+          "aliases": [
+            "Juke",
+            "Two step fake"
+          ],
+          "depth": 4
+        }
+      ]
+    },
+    {
+      "id": "ultimate-offence",
+      "title": "Seven on the line",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name one of the three person-to-person offensive positions in the USA Ultimate coaching manual.",
+      "source": "https://archive.usaultimate.org/assets/1/Page/Skills%20and%20Drills%20manual_revised2019.pdf",
+      "coverage": "The manual’s Positions section groups players by their role on offence.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Handler",
+          "aliases": [
+            "Handlers"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Long",
+          "aliases": [
+            "Deep",
+            "Deep cutter",
+            "Deeps",
+            "Longs"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Middle",
+          "aliases": [
+            "Middles"
+          ],
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "ultimate-forces",
+      "title": "Setting the force",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a force illustrated in the manual’s person-to-person defence section.",
+      "source": "https://archive.usaultimate.org/assets/1/Page/Skills%20and%20Drills%20manual_revised2019.pdf",
+      "coverage": "All four illustrated schemes, figures 9a–9d.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Force backhand",
+          "aliases": [
+            "Backhand"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Force forehand",
+          "aliases": [
+            "Flick",
+            "Force flick",
+            "Forehand"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Force middle",
+          "aliases": [
+            "Forcing middle",
+            "Middle"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Straight up",
+          "aliases": [
+            "Flat mark",
+            "Force straight up",
+            "Straight-up force"
+          ],
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "id": "ultimate-zone",
+      "title": "Inside the zone",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a defensive position in the manual’s three-person-cup zone.",
+      "source": "https://archive.usaultimate.org/assets/1/Page/Skills%20and%20Drills%20manual_revised2019.pdf",
+      "coverage": "All five role names in the manual’s zone positioning diagrams; the two points and wings each share one answer.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Deep-deep",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Middle-middle",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Point",
+          "aliases": [
+            "Point defender",
+            "Points"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Short deep",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Wing",
+          "aliases": [
+            "Wings"
+          ],
+          "depth": 5
+        }
+      ]
+    },
+    {
+      "id": "ultimate-pass-purpose",
+      "title": "Reading a pass",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name the USA Ultimate glossary term for a long pass, a lateral pass across the field, a reset pass, or a pass through the force.",
+      "source": "https://usaultimate.org/discover-ultimate/",
+      "coverage": "One named pass for each of the four descriptions in the prompt.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Breakmark",
+          "aliases": [
+            "Break mark",
+            "Break pass",
+            "Break throw"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Dump",
+          "aliases": [
+            "Dump pass",
+            "Reset",
+            "Reset pass"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Huck",
+          "aliases": [
+            "Deep throw",
+            "Long throw"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Swing",
+          "aliases": [
+            "Swing pass"
+          ],
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "id": "ultimate-spirit",
+      "title": "Scoring Spirit",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a category on the WFDF Spirit of the Game score sheet.",
+      "source": "https://wfdf.sport/spirit-of-the-game/",
+      "coverage": "The five scored spirit categories. Word variants share the same score.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Communication",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Fair-mindedness",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Fouls and body contact",
+          "aliases": [
+            "Body contact",
+            "Fouls"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Positive attitude and self-control",
+          "aliases": [
+            "Positive attitude",
+            "Self control"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Rules knowledge and use",
+          "aliases": [
+            "Knowledge and use of the rules",
+            "Rules knowledge"
+          ],
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "ultimate-mark",
+      "title": "On the mark",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a marking infraction in section 18.1 of the WFDF 2025–2028 rules.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "All six named marking infractions.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Disc space",
+          "aliases": [
+            "Discspace"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Double team",
+          "aliases": [
+            "Double teaming"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Fast count",
+          "aliases": [
+            "Fast counting"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Straddle",
+          "aliases": [
+            "Straddling"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Vision",
+          "aliases": [
+            "Vision blocking"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Wrapping",
+          "aliases": [
+            "Wrap"
+          ],
+          "depth": 4
+        }
+      ]
+    },
+    {
+      "id": "ultimate-live-turns",
+      "title": "Live turnovers",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a turnover under WFDF rule 13.1 that transfers possession without a stoppage.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "The four cases in 13.1. The pull must have been touched by the receiving team.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Down",
+          "aliases": [
+            "Dropped pass",
+            "Grounded disc",
+            "Incomplete pass"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Dropped pull",
+          "aliases": [
+            "Drop the pull",
+            "Muffed pull"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Interception",
+          "aliases": [
+            "Intercept",
+            "Intercepted pass"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Out-of-bounds",
+          "aliases": [
+            "OB"
+          ],
+          "depth": 3
+        }
+      ]
+    },
+    {
+      "id": "ultimate-stopped-turns",
+      "title": "Turnovers that stop play",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a turnover in WFDF rule 13.2 that stops play.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "All seven cases in 13.2, including the two distinct forms of assistance.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Accepted offensive receiving foul",
+          "aliases": [
+            "Offensive receiving foul"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Deflection",
+          "aliases": [
+            "Intentional deflection"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Equipment-assisted catch",
+          "aliases": [
+            "Object assisted catch",
+            "Using equipment to catch"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Handover",
+          "aliases": [
+            "Hand off",
+            "Hand-off"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Self-catch",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Stall-out",
+          "aliases": [
+            "Stall",
+            "Stalled out"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Team-mate assisted catch",
+          "aliases": [
+            "Assisted catch",
+            "Team assisted catch"
+          ],
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "ultimate-fouls",
+      "title": "Making the call",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a foul heading in section 17 of the WFDF rules.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "All nine headings in section 17, including dangerous play.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Blocking foul",
+          "aliases": [
+            "Block",
+            "Blocking"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Dangerous play",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Defensive throwing foul",
+          "aliases": [
+            "Marking foul"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Force-out foul",
+          "aliases": [
+            "Force out"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Indirect foul",
+          "aliases": [
+            "Indirect"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Offensive throwing foul",
+          "aliases": [
+            "Thrower foul"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Offsetting fouls",
+          "aliases": [
+            "Offsetting foul"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Receiving foul",
+          "aliases": [
+            "Receiving"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Strip foul",
+          "aliases": [
+            "Strip"
+          ],
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "ultimate-signals",
+      "title": "Say it with your hands",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a signal on WFDF’s January 2025 hand signals sheet.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2025/03/WFDF-Rules-of-Ultimate-2025-2028-Hand-Signals-1-page.pdf",
+      "coverage": "All 24 numbered signals. The shared in/out gesture counts once.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Accepted",
+          "aliases": [
+            "Uncontested"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Contest",
+          "aliases": [
+            "Contested"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Did not affect the play",
+          "aliases": [
+            "No effect"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Disc down",
+          "aliases": [
+            "Down"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Disc up",
+          "aliases": [
+            "Up"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Female-matching ratio",
+          "aliases": [
+            "Female matching"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Foul",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Goal",
+          "aliases": [
+            "Score"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "In or out-of-bounds",
+          "aliases": [
+            "In",
+            "Out",
+            "Out of end zone"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Male-matching ratio",
+          "aliases": [
+            "Male matching"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Marking infraction",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Match point",
+          "aliases": [
+            "Game point"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Offside or false start",
+          "aliases": [
+            "False start",
+            "Offside"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Pick",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Play has stopped",
+          "aliases": [
+            "Stopped play"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Retracted",
+          "aliases": [
+            "Retract"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Spirit stoppage",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Stoppage",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Time-out",
+          "aliases": [
+            "Timeout"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Timing violation",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Travel",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Turnover",
+          "aliases": [
+            "Turn"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Violation",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Who made the call",
+          "aliases": [
+            "Who called it"
+          ],
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "id": "ultimate-definitions",
+      "title": "The rules glossary",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a defined term in the glossary at the end of WFDF’s 2025–2028 ultimate rules.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "Defined terms in the rules glossary, as printed in the 2025–2028 edition.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Act of throwing",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Affect the play",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Attacking end zone",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Best perspective",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Call",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Catch",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Central zone",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Defending end zone",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Defensive player",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "End zone",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Goal line",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Ground",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Ground contact",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Guarding",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Interception",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Legitimate position",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Line",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Making a play on the disc",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Marker",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Minor contact",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Non-player",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Offensive player",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Out-of-bounds (OB)",
+          "aliases": [
+            "OB",
+            "Out of bounds"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Perimeter lines",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Pivot",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Pivot Location",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Play",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Player",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Playing Field",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Possession of the disc",
+          "aliases": [
+            "Possession"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Pre-stall",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Pull",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Receivers",
+          "aliases": [
+            "Receiver"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Spirit Stoppage",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Stoppage of play",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Throw",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Thrower",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Throwing motion",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Turnover",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Where the disc stops",
+          "aliases": [],
+          "depth": 4
+        }
+      ]
+    },
+    {
+      "id": "ultimate-lines",
+      "title": "Marking out a pitch",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a type of boundary line shown in the WFDF playing-field diagram.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "Figure 1. The brick mark is a point on the field.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Endline",
+          "aliases": [
+            "End line",
+            "Endlines"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Goal line",
+          "aliases": [
+            "Goal lines",
+            "Goalline"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Sideline",
+          "aliases": [
+            "Side line",
+            "Sidelines"
+          ],
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "ultimate-check",
+      "title": "Checking the disc in",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a reason for a stoppage listed in WFDF rule 10.1 that requires a check to restart.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "The eight listed reasons in rule 10.1.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Contested goal",
+          "aliases": [
+            "Disputed goal"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Contested turnover",
+          "aliases": [
+            "Disputed turnover"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Discussion",
+          "aliases": [
+            "Rules discussion"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "End of a time-out",
+          "aliases": [
+            "Time out",
+            "Timeout"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Foul",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Specified turnover",
+          "aliases": [
+            "Specified turnover under rule 13.2"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Stoppage",
+          "aliases": [
+            "Injury stoppage",
+            "Technical stoppage"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Violation",
+          "aliases": [],
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "ultimate-safety",
+      "title": "Stopping for safety",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name one of the two stoppage headings in section 19.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "Section 19 covers injuries and technical issues affecting safety.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Injury stoppage",
+          "aliases": [
+            "Injury"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Technical stoppage",
+          "aliases": [
+            "Technical"
+          ],
+          "depth": 3
+        }
+      ]
+    },
+    {
+      "id": "ultimate-good-spirit",
+      "title": "Showing good Spirit",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name one of rule 1.5’s five examples of good Spirit.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "Five example actions identified in rule 1.5.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Check in with an opponent",
+          "aliases": [
+            "Check in after a disagreement"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Compliment an opponent",
+          "aliases": [
+            "Compliment good play",
+            "Compliment good spirit"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Introduce yourself",
+          "aliases": [
+            "Introductions"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "React calmly",
+          "aliases": [
+            "Calm reaction",
+            "Stay calm"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Retract an incorrect call",
+          "aliases": [
+            "Retract a call",
+            "Retraction"
+          ],
+          "depth": 5
+        }
+      ]
+    },
+    {
+      "id": "ultimate-poor-spirit",
+      "title": "Crossing the Spirit line",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name behaviour listed in WFDF rule 1.6 as a breach of Spirit.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "All seven examples in rule 1.6.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Calling for an opponent’s pass",
+          "aliases": [
+            "Calling for a pass from the opposition"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Dangerous or aggressive play",
+          "aliases": [
+            "Aggressive behaviour",
+            "Dangerous play"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Deliberate rule breach",
+          "aliases": [
+            "Intentional foul",
+            "Intentional fouling"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Disrespectful celebration",
+          "aliases": [
+            "Disrespectful celebrating"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Intimidation",
+          "aliases": [
+            "Taunting"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Retaliatory call",
+          "aliases": [
+            "Revenge call"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Win-at-all-costs behaviour",
+          "aliases": [
+            "Win at all costs"
+          ],
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "id": "ultimate-team-spirit",
+      "title": "Team responsibilities",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a team duty for upholding Spirit under rule 1.7.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "All four team duties in 1.7.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Call a Spirit stoppage",
+          "aliases": [
+            "Spirit stoppage",
+            "Spirit timeout"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Discipline poor Spirit",
+          "aliases": [
+            "Discipline team-mates"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Give constructive feedback",
+          "aliases": [
+            "Feedback to other teams"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Teach rules and Spirit",
+          "aliases": [
+            "Teach spirit",
+            "Teach the rules"
+          ],
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "id": "ultimate-bad-check",
+      "title": "An invalid restart",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a reason to call a check violation in rule 10.7.",
+      "source": "https://rules.wfdf.sport/wp-content/uploads/2024/12/WFDF-Rules-of-Ultimate-2025-2028.pdf",
+      "coverage": "The four opponent actions in 10.7.1–10.7.4.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Move before the check",
+          "aliases": [
+            "Early movement"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Pass without a valid check",
+          "aliases": [
+            "No check"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Restart without verification",
+          "aliases": [
+            "No verification"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Start in the wrong position",
+          "aliases": [
+            "Incorrect position",
+            "Wrong position"
+          ],
+          "depth": 2
+        }
+      ]
+    },
+    {
+      "id": "ultimate-sideline",
+      "title": "Sideline vocabulary",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a term defined in USA Ultimate’s spectator glossary.",
+      "source": "https://usaultimate.org/discover-ultimate/",
+      "coverage": "Every entry in Ultimate Terminology, from Bid through Swing.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Bid",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Blade",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Break",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Breakmark",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Brickmark",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Callahan",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Cup",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Cutter",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Deep",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Dump",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Flick",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Force",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Greatest",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Hammer",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Handler",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Huck",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Mark",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Poach",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Pull",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Push Pass",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Scoober",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "Stall",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Strip",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Swing",
+          "aliases": [],
+          "depth": 3
+        }
+      ]
+    },
+    {
+      "id": "ultimate-uni-men",
+      "title": "University men’s championship",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a university in the men's championship standings at UK Ultimate’s April 2025 Outdoor Championships.",
+      "source": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSkJHlwarSwo3qy6py-ph4x_D0B8_983ehYdNckDrgXpmI0UgZFGOJGn7YQfVsqHsOfwRDsrWl_tUkQ/pub?output=csv&gid=897873158",
+      "coverage": "Every university in this championship division’s final standings. Trophy and Shield are separate divisions.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Bath",
+          "aliases": [
+            "Bath University",
+            "University of Bath"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Bristol",
+          "aliases": [
+            "Bristol University",
+            "University of Bristol"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Durham",
+          "aliases": [
+            "Durham University",
+            "University of Durham"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Edinburgh",
+          "aliases": [
+            "Edinburgh University",
+            "University of Edinburgh"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Glasgow",
+          "aliases": [
+            "Glasgow University",
+            "University of Glasgow"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "King's College",
+          "aliases": [
+            "King's College London",
+            "King's College University",
+            "University of King's College"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Leeds",
+          "aliases": [
+            "Leeds University",
+            "University of Leeds"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Loughborough",
+          "aliases": [
+            "Loughborough University",
+            "University of Loughborough"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Nottingham",
+          "aliases": [
+            "Nottingham University",
+            "University of Nottingham"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Sheffield",
+          "aliases": [
+            "Sheffield University",
+            "University of Sheffield"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Southampton",
+          "aliases": [
+            "Southampton University",
+            "University of Southampton"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "St Andrews",
+          "aliases": [
+            "Saint Andrews",
+            "St Andrews University",
+            "University of St Andrews"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Strathclyde",
+          "aliases": [
+            "Strathclyde University",
+            "University of Strathclyde"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Sussex",
+          "aliases": [
+            "Sussex University",
+            "University of Sussex"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "UCL",
+          "aliases": [
+            "UCL University",
+            "University College London",
+            "University of UCL"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Warwick",
+          "aliases": [
+            "University of Warwick",
+            "Warwick University"
+          ],
+          "depth": 4
+        }
+      ]
+    },
+    {
+      "id": "ultimate-uni-women",
+      "title": "University women’s championship",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a university in the women's championship standings at UK Ultimate’s April 2025 Outdoor Championships.",
+      "source": "https://docs.google.com/spreadsheets/d/e/2PACX-1vSkJHlwarSwo3qy6py-ph4x_D0B8_983ehYdNckDrgXpmI0UgZFGOJGn7YQfVsqHsOfwRDsrWl_tUkQ/pub?output=csv&gid=897873158",
+      "coverage": "Every university in this championship division’s final standings. Trophy and Shield are separate divisions.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Birmingham",
+          "aliases": [
+            "Birmingham University",
+            "University of Birmingham"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Bristol",
+          "aliases": [
+            "Bristol University",
+            "University of Bristol"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Cambridge",
+          "aliases": [
+            "Cambridge University",
+            "University of Cambridge"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Durham",
+          "aliases": [
+            "Durham University",
+            "University of Durham"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Edinburgh",
+          "aliases": [
+            "Edinburgh University",
+            "University of Edinburgh"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Exeter",
+          "aliases": [
+            "Exeter University",
+            "University of Exeter"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "King's College",
+          "aliases": [
+            "King's College London",
+            "King's College University",
+            "University of King's College"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Loughborough",
+          "aliases": [
+            "Loughborough University",
+            "University of Loughborough"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Nottingham",
+          "aliases": [
+            "Nottingham University",
+            "University of Nottingham"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Sheffield",
+          "aliases": [
+            "Sheffield University",
+            "University of Sheffield"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Southampton",
+          "aliases": [
+            "Southampton University",
+            "University of Southampton"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "St Andrews",
+          "aliases": [
+            "Saint Andrews",
+            "St Andrews University",
+            "University of St Andrews"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "UCL",
+          "aliases": [
+            "UCL University",
+            "University College London",
+            "University of UCL"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "York",
+          "aliases": [
+            "University of York",
+            "York University"
+          ],
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "id": "ultimate-uni-winners",
+      "title": "University outdoor champions",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a university that won a division at the April 2025 UK University Outdoor Championships.",
+      "source": "https://www.ukultimate.com/news/uwmon-2025-winners",
+      "coverage": "Winners of the five Championship, Trophy and Shield divisions.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Loughborough",
+          "aliases": [
+            "Loughborough University",
+            "University of Loughborough"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Manchester",
+          "aliases": [
+            "Manchester University",
+            "University of Manchester"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Oxford",
+          "aliases": [
+            "Oxford University",
+            "University of Oxford"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Sheffield",
+          "aliases": [
+            "Sheffield University",
+            "University of Sheffield"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "York",
+          "aliases": [
+            "University of York",
+            "York University"
+          ],
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "id": "ultimate-clubs-open",
+      "title": "UKU Nationals · Open",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a club team in the open division of the 2026 UKU Nationals.",
+      "source": "https://uku-schedule.ultimatefederation.eu/teams/division/open",
+      "coverage": "All eight entries in the tournament’s division directory. Numbered squads count separately.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Alba",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Bristol Open",
+          "aliases": [
+            "Bristol"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Chevron Action Flash",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Clapham Ultimate",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Manchester Ultimate",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "SMASH'D",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "SMOG Open",
+          "aliases": [
+            "SMOG"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "SOLENT Open",
+          "aliases": [
+            "SOLENT"
+          ],
+          "depth": 4
+        }
+      ]
+    },
+    {
+      "id": "ultimate-clubs-mixed",
+      "title": "UKU Nationals · Mixed",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a club team in the mixed division of the 2026 UKU Nationals.",
+      "source": "https://uku-schedule.ultimatefederation.eu/teams/division/mixed",
+      "coverage": "All eight entries in the tournament’s division directory. Numbered squads count separately.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Deep Space",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Heck",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Lemmings Mixed",
+          "aliases": [
+            "Lemmings"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Newcastle Brown Mixed",
+          "aliases": [
+            "Newcastle Brown"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Reading Ultimate 1",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Reading Ultimate 2",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Sheffield Steal Mixed",
+          "aliases": [
+            "Sheffield Steal"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "SOLENT Mixed",
+          "aliases": [
+            "SOLENT"
+          ],
+          "depth": 5
+        }
+      ]
+    },
+    {
+      "id": "ultimate-clubs-women",
+      "title": "UKU Nationals · Women",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a club team in the women division of the 2026 UKU Nationals.",
+      "source": "https://uku-schedule.ultimatefederation.eu/teams/division/women",
+      "coverage": "All eight entries in the tournament’s division directory. Numbered squads count separately.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Bristol Women",
+          "aliases": [
+            "Bristol"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Horizon",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Iceni",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "LMU",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Midlands Boom",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "SMOG Women",
+          "aliases": [
+            "SMOG"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Spice",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "SYC",
+          "aliases": [],
+          "depth": 5
+        }
+      ]
+    },
+    {
+      "id": "ultimate-chengdu",
+      "title": "The World Games",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a country in the ultimate tournament at the 2025 World Games in Chengdu.",
+      "source": "https://wfdf.sport/2025/08/team-usa-wins-ultimate-gold-medal-in-thrilling-final-at-the-world-games-2025-chengdu/",
+      "coverage": "All eight teams in WFDF’s published final ranking.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Australia",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Canada",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "China",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Colombia",
+          "aliases": [],
+          "depth": 5
+        },
+        {
+          "name": "France",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Germany",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Japan",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "United States",
+          "aliases": [
+            "US",
+            "USA",
+            "United States of America"
+          ],
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "id": "ultimate-uni-divisions",
+      "title": "The university silverware",
+      "topic": "Ultimate Frisbee",
+      "prompt": "Name a division contested at the April 2025 UK University Outdoor Championships.",
+      "source": "https://www.ukultimate.com/news/uwmon-2025-winners",
+      "coverage": "The five named divisions in the published final standings.",
+      "matching": "names",
+      "answers": [
+        {
+          "name": "Men's Championship",
+          "aliases": [],
+          "depth": 1
+        },
+        {
+          "name": "Men's Shield",
+          "aliases": [],
+          "depth": 2
+        },
+        {
+          "name": "Men's Trophy",
+          "aliases": [],
+          "depth": 3
+        },
+        {
+          "name": "Women's Championship",
+          "aliases": [],
+          "depth": 4
+        },
+        {
+          "name": "Women's Trophy",
+          "aliases": [],
+          "depth": 5
+        }
+      ]
+    }
+  ]
+}

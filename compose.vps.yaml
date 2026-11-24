@@ -1,0 +1,30 @@
+name: krillion
+services:
+  app:
+    image: ${KRILL_IMAGE:?Set KRILL_IMAGE in the release environment}
+    restart: unless-stopped
+    environment:
+      HOST_PASSWORD: ${HOST_PASSWORD?Set HOST_PASSWORD in .env}
+      PUBLIC_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
+      QUIZ_SEMANTIC: ${QUIZ_SEMANTIC:-on}
+      TRUST_PROXY: "1"
+    volumes:
+      - quiz_data:/app/storage
+      - quiz_backups:/app/backups
+    networks:
+      proxy:
+        aliases:
+          - krillion-quiz
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      start_period: 10s
+      interval: 5s
+      timeout: 4s
+      retries: 10
+networks:
+  proxy:
+    external: true
+    name: ${CADDY_NETWORK:?Set CADDY_NETWORK to the existing Caddy network}
+volumes:
+  quiz_data:
+  quiz_backups:
