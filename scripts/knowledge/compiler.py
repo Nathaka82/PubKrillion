@@ -6,7 +6,7 @@ import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
-BANK_FORMAT = 33
+BANK_FORMAT = 34
 
 
 def noun(text):
@@ -1003,12 +1003,15 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         INSERT OR IGNORE INTO playable_terms SELECT s.folded FROM spellings s JOIN qualified q USING(id);""")
     for form, column in enumerate(("exact", "folded")):
         decisions = db.execute(f"""WITH decisions AS (SELECT s.{column} term,
-            CASE WHEN {form}=0 AND count(DISTINCT CASE WHEN s.preferred THEN q.owner END)=1
+            CASE WHEN count(q.owner)=count(*) AND count(DISTINCT q.owner)=1 THEN min(q.owner)
+                 WHEN {form}=0 AND count(q.owner)=count(*) THEN ''
+                 WHEN {form}=0 AND count(DISTINCT CASE WHEN s.preferred THEN q.owner END)=1
                       AND max(s.preferred AND q.owner IS NULL)=0 THEN min(CASE WHEN s.preferred THEN q.owner END)
                  WHEN count(q.owner)<count(*) OR
                       ({form}=1 AND count(DISTINCT s.exact)>1 AND count(DISTINCT q.owner)>1) THEN NULL
-                 WHEN count(DISTINCT q.owner)=1 THEN min(q.owner) ELSE '' END owner,
-            min(s.display) display,min(2,min(r.depth)) shared_depth
+                 ELSE '' END owner,
+            coalesce(min(CASE WHEN s.preferred AND r.term=s.exact THEN r.name END),min(s.display)) display,
+            min(2,min(r.depth)) shared_depth
             FROM spellings s JOIN playable_terms t ON t.term=s.folded
             LEFT JOIN qualified q ON q.id=s.id LEFT JOIN result r ON r.id=q.owner
             WHERE s.{column}<>'' GROUP BY s.{column})

@@ -6,8 +6,37 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fixture, client } from "./fixture.mjs";
 import { questionDrafts } from "../server/question-drafts.ts";
-import { additionalAnswer, indexedPage, restoreRoundNames } from "../server/knowledge.ts";
+import { additionalAnswer, indexedPage, lookup, restoreRoundNames } from "../server/knowledge.ts";
 import { readFileSync } from "node:fs";
+
+test("prefix and typo confirmations preserve the score of a qualified spelling", () => {
+  const db = new DatabaseSync(":memory:");
+  try {
+    db.exec(readFileSync(new URL("../server/knowledge.sql", import.meta.url), "utf8"));
+    db.prepare("INSERT INTO kb_bank VALUES('works','Name a work','{}')").run();
+    for (const [id,name,aliases,depth] of [
+      ["rare","Signal",["1989 Signal"],4], ["common","The Signal Album",["Signal"],1],
+    ]) {
+      db.prepare("INSERT INTO kb_member VALUES('works',?,?,?,?, '[]')").run(id,name,depth,JSON.stringify(aliases));
+      for (const form of [name,...aliases]) {
+        db.prepare("INSERT INTO kb_name VALUES('works',?,?)").run(form.toLowerCase(),id);
+        if (form !== "Signal")
+          db.prepare("INSERT INTO kb_answer_key VALUES('works',0,?,?,?,?)").run(form.toLowerCase(),id,name,depth);
+      }
+    }
+    db.prepare("INSERT INTO kb_answer_key VALUES('works',0,'signal','','Signal',1)").run();
+    for (const text of ["1989 Sig","1989 Signql"]) {
+      const suggestion = lookup(db,"works",text);
+      assert.equal(suggestion?.exact,false);
+      assert.equal(suggestion.answer.name,"1989 Signal");
+      const accepted = lookup(db,"works",suggestion.answer.name);
+      assert.equal(accepted.entity,"rare");
+      assert.equal(accepted.answer.depth,4);
+    }
+    assert.equal(lookup(db,"works","Signal").answer.depth,1);
+    assert.equal(lookup(db,"works","1988 Signal"),undefined);
+  } finally { db.close(); }
+});
 
 test("a later source change preserves accepted alternate names, their proof and their round score", () => {
   const db = new DatabaseSync(":memory:");

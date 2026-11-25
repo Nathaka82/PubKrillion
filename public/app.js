@@ -617,6 +617,7 @@ async function acceptedAnswers(path, scale, back, trigger) {
     rows.innerHTML = part.answers
       .map(a => {
         const longList = a.aliases.length > 4 || a.aliases.join(", ").length > 100;
+        const sharedTitle = a.sharedNames?.find(shared => shared.name === a.name);
         return (
           '<li data-rarity="' +
           a.depth +
@@ -630,6 +631,7 @@ async function acceptedAnswers(path, scale, back, trigger) {
           depthNames[a.depth] +
           " · " +
           depthLabel(a.depth) +
+          (sharedTitle ? " · This name alone scores " + scale[sharedTitle.depth] + " pts" : "") +
           (a.needsDetail?.includes(a.name) ? " · This name alone is ambiguous" : "") +
           (a.aliases.length && !longList
             ? " · Also accepts " + spellings(a.aliases)

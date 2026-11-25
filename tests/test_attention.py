@@ -23,6 +23,23 @@ class ReadershipTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
 
+    def test_exact_title_shared_with_another_valid_alias_earns_the_common_score(self):
+        prompt = "Name a work"
+        source = {"source":"works","revision":"1","url":"https://example.org","terms":{"work":[]}}
+        works = [{"id":"rare","name":"Signal","aliases":["Signal (radio play)"],"types":["work"],
+                  "recall":[{"prompt":prompt,"count":3,"participants":1000}]},
+                 {"id":"common","name":"The Signal Album","aliases":["Signal"],"types":["work"],
+                  "recall":[{"prompt":prompt,"count":550,"participants":1000}]}]
+        with closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            ingest(graph,source,works)
+            bank,_ = evaluate(graph,game,prompt)
+            decisions = {term:(entity,depth) for term,entity,depth in game.execute(
+                "SELECT term,entity,depth FROM kb_answer_key WHERE bank=? AND form=0",(bank,))}
+            self.assertEqual(decisions["signal"],("",1))
+            self.assertEqual(decisions["signal (radio play)"],("rare",4))
+            self.assertEqual(decisions["the signal album"],("common",1))
+
     def test_readership_cannot_promote_a_shared_title_past_a_survey_of_one_owner(self):
         prompt = "Name a film"
         with closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:

@@ -84,7 +84,23 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
       : null;
   }
   const list = exact.length || key.length < 4 ? exact : byTerm(true);
-  const canConfirm = (name: string, entity: string) => !checked || nameDecision(db, bank, name)?.entity === entity;
+  const confirmation = (answer: Answer, entity: string, prefix: boolean) => {
+    const owned = (name: string) => nameDecision(db, bank, name)?.entity === entity;
+    if (!checked || owned(answer.name)) return answer;
+    const row = db.prepare("SELECT aliases FROM kb_member WHERE bank=? AND entity=?").get(bank, entity);
+    const names: string[] = JSON.parse(String(row?.aliases ?? "[]"));
+    // A shared title would submit a different score. Confirm a recorded spelling
+    // that matches the player's input and resolves uniquely to the intended entity.
+    if (prefix) {
+      const matches = names.filter(name => (normal(name) || spelling(name)).startsWith(key))
+        .sort((a, b) => a.length - b.length);
+      const name = matches.find(owned);
+      if (name) return { ...answer, name };
+    }
+    const options = names.map(name => ({ name, aliases: [], depth: answer.depth }));
+    const match = resolveAnswer(raw, options, "full");
+    if (match && owned(match.answer.name)) return match.answer;
+  };
   if (list.length === 1) {
     const answer = {
       name: String(list[0].name),
@@ -92,7 +108,8 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
       depth: Number(list[0].depth),
     };
     const entity = String(list[0].entity);
-    if (canConfirm(answer.name, entity)) return { answer, exact: !checked && exact.length === 1, entity };
+    const confirmed = confirmation(answer, entity, true);
+    if (confirmed) return { answer: confirmed, exact: !checked && exact.length === 1, entity };
   }
   // Limit typo correction to a small indexed neighbourhood. Always ask for confirmation.
   if (key.length >= 5) {
@@ -125,8 +142,11 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
         shortlist.get(entity)!.aliases.push(String(r.term));
       }
       const match = resolveAnswer(raw, [...shortlist.values()], "full");
-      if (match && [...shortlist].some(([id, answer]) => answer === match.answer && canConfirm(answer.name, id)))
-        return { answer: match.answer, exact: false };
+      if (match) {
+        const owner = [...shortlist].find(([, answer]) => answer === match.answer);
+        const confirmed = owner && confirmation(owner[1], owner[0], false);
+        if (confirmed) return { answer: confirmed, exact: false };
+      }
     }
   }
   return undefined;
