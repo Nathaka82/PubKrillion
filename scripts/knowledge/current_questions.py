@@ -65,9 +65,7 @@ def publish(db):
             if not labels:
                 break
             subject, relation, target_name = labels
-            if identifiers(db, folded_spelling(subject), "class") != [cls]:
-                break
-            subject=display_subject(db,cls,subject)
+            subject = display_subject(db,cls,subject)
             unique_target = identifiers(db, folded_spelling(target_name), "target") == [target]
             if part.startswith("g-"):
                 label = target_name if unique_target else f"{target_name} (Q{target})"

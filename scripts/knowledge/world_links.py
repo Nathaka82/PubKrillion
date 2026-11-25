@@ -17,22 +17,16 @@ CREATE TABLE world_property_name(term TEXT,prop INTEGER,PRIMARY KEY(term,prop)) 
 
 
 def publish(db, reuse):
-    tables = ("world_link", "world_property_name")
     if reuse:
-        for table in tables:
-            db.execute(f"INSERT INTO main.{table} SELECT * FROM prior.{table}")
+        db.execute("INSERT INTO main.world_link SELECT * FROM prior.world_link")
     else:
         db.execute("""INSERT OR IGNORE INTO world_link SELECT p,o,s FROM world.triple
                       WHERE p NOT IN (31,106,279) ORDER BY p,o,s""")
-        db.executemany(
-            "INSERT OR IGNORE INTO world_property_name VALUES(?,?)",
-            (
-                (folded_spelling(name), pid)
-                for pid, aliases in db.execute("SELECT id,names FROM world.property")
-                for name in aliases.split("\t")
-                if name
-            ),
-        )
+    db.executemany(
+        "INSERT OR IGNORE INTO world_property_name VALUES(?,?)",
+        ((folded_spelling(name), pid) for pid, aliases in db.execute("SELECT id,names FROM world.property")
+         for name in aliases.split("\t") if name),
+    )
     if reuse and db.execute("SELECT format FROM prior.publication").fetchone()[0] >= 18:
         db.execute("INSERT INTO world_name SELECT * FROM prior.world_name")
         db.execute("INSERT INTO world_target SELECT * FROM prior.world_target")
@@ -110,8 +104,11 @@ def identifiers(db, term, role):
     )
     if re.fullmatch(prefix + r"[1-9]\d{0,11}", term):
         return [int(term[1:])]
-    if role=="target" and (tagged:=re.fullmatch(r"(.+) q([1-9]\d{0,11})",term)):
+    if tagged:=re.fullmatch(r"(.+) q([1-9]\d{0,11})",term):
         item=int(tagged[2])
+        if role == "class":
+            return [item] if db.execute("SELECT 1 FROM world_class_name WHERE term=? AND cls=?",
+                                        (tagged[1],item)).fetchone() else []
         if db.execute("SELECT 1 FROM world_target_name WHERE term=? AND target=?",(tagged[1],item)).fetchone():
             return [item]
         if (db.execute("SELECT 1 FROM sqlite_master WHERE name='current_target'").fetchone()
@@ -162,6 +159,9 @@ def display_subject(db, cls, label):
         candidate=parts[2]+" "+parts[1].lower()
         if identifiers(db,folded_spelling(candidate),"class")==[cls]:
             return candidate
+    if (db.execute("SELECT 1 FROM sqlite_master WHERE name='source_vocabulary'").fetchone()
+            and identifiers(db,folded_spelling(label),"class") != [cls]):
+        return f"{label} (Q{cls})"
     return label
 
 

@@ -207,8 +207,9 @@ def discovered_requests(storage, publication, *, include_topics=False):
 def due_requests(storage, publication=None):
     from class_updates import registered,due
     import date_updates
-    import target_lookup, topic_sources
+    import target_lookup, topic_sources, source_vocabulary
     return (any(time.time() >= due_at(cached) for _, cached in topic_sources.requests(storage)) or
+            source_vocabulary.due(storage, publication) or
             any(time.time() >= due_at(cached) for _, cached in target_lookup.requests(storage)) or
             any(time.time() >= due_at(cached) for _, cached in requests(storage)) or
             any(time.time() >= due_at(cached) for _, cached in discovered_requests(storage, publication, include_topics=True)) or
@@ -217,6 +218,7 @@ def due_requests(storage, publication=None):
 
 
 def collect(db, storage, offline, publication=None):
+    from source_vocabulary import known
     now = int(time.time())
     requested = dict(requests(storage))
     discovered = dict(discovered_requests(storage, publication))
@@ -226,12 +228,11 @@ def collect(db, storage, offline, publication=None):
                   for key, in db.execute("SELECT DISTINCT rule FROM source_topic_rule")}
     pending = []
     have_targets = db.execute("SELECT 1 FROM sqlite_master WHERE name='current_target'").fetchone()
-    targets = "SELECT 1 FROM world.entity WHERE id=?"
-    if have_targets:
-        targets = "SELECT 1 FROM (SELECT id FROM world.entity UNION ALL SELECT id FROM current_target) WHERE id=?"
     for key, cached in (discovered | topics | requested).items():
-        if any(not db.execute(f"""SELECT 1 FROM world.entity c,world.property p
-               WHERE c.id=? AND p.id=? AND EXISTS({targets})""", condition).fetchone() for condition in predicates(key)):
+        if any(not (known(db, f"Q{cls}") and known(db, f"P{prop}") and
+                    (known(db, f"Q{target}") or have_targets and
+                     db.execute("SELECT 1 FROM current_target WHERE id=?", (target,)).fetchone()))
+               for cls, prop, target in predicates(key)):
             if not offline and now >= due_at(cached):
                 cached.parent.mkdir(parents=True, exist_ok=True)
                 cached.with_suffix(".attempt").touch()

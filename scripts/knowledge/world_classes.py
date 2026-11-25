@@ -48,10 +48,12 @@ KINDS = """SELECT p.child AS id,p.parent AS cls,279 AS property FROM scope s CRO
 def card(db, phrase, *, strict=False):
     kinds = phrase.startswith("type of ")
     term = phrase[8:] if kinds else phrase
+    tagged = re.fullmatch(r"(.+) q([1-9]\d{0,11})", term)
+    match = "n.term=? AND n.cls=?" if tagged else "n.term=?"
+    args = (tagged[1], int(tagged[2])) if tagged else (term,)
     rows = db.execute(
-        """SELECT n.cls,i.name,n.preferred FROM world_class_name n JOIN item i ON i.id=n.cls
-                         WHERE n.term=? ORDER BY n.preferred DESC,n.cls LIMIT 3""",
-        (term,),
+        f"""SELECT n.cls,i.name,n.preferred FROM world_class_name n JOIN item i ON i.id=n.cls
+                         WHERE {match} ORDER BY n.preferred DESC,n.cls LIMIT 3""", args,
     ).fetchall()
     if not rows and term.endswith("s"):
         return card(db, ("type of " if kinds else "") + term[:-1], strict=strict)
@@ -84,8 +86,17 @@ def card(db, phrase, *, strict=False):
             args,
         ).fetchone()[0]
     if not count:
+        if strict and not live and fmt >= 27 and db.execute(
+            "SELECT 1 FROM source_vocabulary WHERE token=? AND name IS NOT NULL", (f"Q{cls}",)
+        ).fetchone():
+            from catalogue import UnverifiedRule
+            raise UnverifiedRule(key, "The builder has learned this class and can verify its full answer list.")
         return None
     name = label if label.isupper() else label[:1].lower() + label[1:]
+    if tagged or term == f"q{cls}":
+        from world_links import identifiers
+        if identifiers(db, folded_spelling(label), "class") != [cls]:
+            name += f" (Q{cls})"
     prefix = "a type of " if kinds else ("an " if name[:1].lower() in "aeiou" else "a ")
     return {
         "key": key,

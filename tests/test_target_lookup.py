@@ -299,9 +299,12 @@ class CurrentTargets(unittest.TestCase):
             }
             for i in (11, 1001)
         ]
+        counts.append({"property": {"value": "http://www.wikidata.org/entity/P9999"},
+                       "target": {"value": "http://www.wikidata.org/entity/Q1002"},
+                       "n": {"value": "2"}})
         with patch.object(target_discovery, "bindings", return_value=counts) as source:
             nominated = target_discovery.tick(self.root, self.pub)
-            self.assertEqual(nominated, [target_lookup.Request(10, 123, "q1001")])
+            self.assertEqual(nominated, [target_lookup.Request(10, 123, "q1001"), target_lookup.Request(10, 9999, "q1002")])
             self.assertEqual(target_discovery.tick(self.root, self.pub), [])
             self.assertEqual(source.call_count, 1)
         self.assertEqual(list(watched_rules.requests(self.root)), [])
@@ -311,3 +314,57 @@ class CurrentTargets(unittest.TestCase):
                     "SELECT 1 FROM current_question WHERE rule=?", (nominated[0].rule(1001),)
                 ).fetchone()
             )
+
+    def test_background_lookup_can_publish_a_property_and_subject_missing_from_the_release(self):
+        import topic_sources
+        import source_vocabulary
+        from graph import digest
+
+        req = target_lookup.Request(10, 9999, "q1001")
+        watched_rules.follow(self.root, req.key)
+        rows, matched, related = [[1001, "New Studio", []]], [1001], [[9100, 1001, 2]]
+        record = dict(
+            key=req.key,
+            rows=rows,
+            crowded=False,
+            matched=matched,
+            related=related,
+            checked=10,
+            revision=digest([req.key, rows, False, matched, related]),
+        )
+
+        def roster(query):
+            self.assertIn("wdt:P9999 wd:Q1001", query)
+            return (
+                [{"n": {"value": "2"}}]
+                if "COUNT(" in query
+                else [{"item": {"value": f"http://www.wikidata.org/entity/Q{i}"}} for i in (61, 62)]
+            )
+
+        with (
+            closing(sqlite3.connect(":memory:")) as stage,
+            patch.object(target_lookup, "capture", return_value=record),
+            patch.object(
+                source_vocabulary,
+                "capture",
+                return_value={
+                    "P9999": ["commissioning studio", ["commissioner"]],
+                    "Q9100": ["audio essay", []],
+                },
+            ),
+            patch.object(watched_rules, "bindings", side_effect=roster),
+            patch.object(
+                watched_rules, "named_items", return_value=[("Q61", "One", [], 1), ("Q62", "Two", [], 1)]
+            ),
+        ):
+            stage.execute("ATTACH ? AS world", (str(self.world),))
+            stage.executescript(topic_sources.SCHEMA + target_lookup.SCHEMA)
+            stage.execute("CREATE TABLE live_rule(key,revision,captured,n,release)")
+            target_lookup.collect(stage, self.root, False, previous=self.pub)
+            watched_rules.collect(stage, self.root, False)
+        self.publish()
+        with closing(catalogue.reader(self.pub)) as db:
+            self.assertFalse(db.execute("SELECT 1 FROM source_topic").fetchone())
+            card = catalogue.match_question(db, "Name an audio essay whose commissioner is New Studio")
+            self.assertEqual((card["key"], card["records"]), ("w-9100-9999-1001", 2))
+            self.assertEqual(catalogue.match_question(db, card["prompt"])["key"], card["key"])

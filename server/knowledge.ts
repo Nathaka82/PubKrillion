@@ -354,7 +354,7 @@ export class Research {
     if (stamp === this.catalogueStamp) return this.catalogueEdition;
     const publication = new DatabaseSync(this.catalogueFile, { readOnly: true });
     let edition;
-    try { edition = publication.prepare("SELECT edition FROM publication WHERE format BETWEEN 4 AND 26").get()?.edition; }
+    try { edition = publication.prepare("SELECT edition FROM publication WHERE format BETWEEN 4 AND 27").get()?.edition; }
     finally { publication.close(); }
     if (typeof edition !== "string") return;
     const checkpoint = edition + ":answer-scores-v31";

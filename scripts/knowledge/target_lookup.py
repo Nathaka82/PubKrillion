@@ -241,10 +241,12 @@ def requests(storage):
 
 
 def collect(db, storage, offline, previous=None, topic_captures=()):
+    import source_vocabulary
     from watched_rules import due_at, follow, replace
 
     pending = sorted((due_at(file), req.key, file, req) for req, file in requests(storage))
     versions, targets, descriptions = [], {}, {}
+    proposals, related_subjects = [], []
     for data in topic_captures:
         version = (data["checked"], data["key"])
         for item, name, aliases in data["rows"]:
@@ -285,18 +287,28 @@ def collect(db, storage, offline, previous=None, topic_captures=()):
                 descriptions[item] = (version, hint)
             if not offline and item in ids and not crowded and len(ids) <= 8:
                 follow(storage, req.rule(item))
+        if req.mode == "w" and (ids or related):
+            terms = {f"Q{cls}" for cls, _, _ in related}
+            terms.add(f"P{req.prop}")
+            if ids:
+                terms.add(f"Q{req.cls}")
+            proposals.append((key, terms))
+        related_subjects.append((req, related))
+        versions.append((key, data["revision"]))
+    if db.execute("SELECT 1 FROM sqlite_master WHERE name='source_vocabulary'").fetchone():
+        source_vocabulary.collect(db, storage, proposals, offline)
+    for req, related in related_subjects:
         offered = 0
         for cls, item, _ in related:
-            if not db.execute("SELECT 1 FROM world.triple WHERE p=31 AND o=? LIMIT 1", (cls,)).fetchone():
+            if not source_vocabulary.known(db, f"Q{cls}", direct_class=True):
                 continue
             rule = f"w-{cls}-{req.prop}-{item}"
-            db.execute("INSERT INTO target_related VALUES(?,?,?)", (key, req.rule(item), rule))
+            db.execute("INSERT INTO target_related VALUES(?,?,?)", (req.key, req.rule(item), rule))
             if not offline:
                 follow(storage, rule)
             offered += 1
             if offered == 2:
                 break
-        versions.append((key, data["revision"]))
     for item, (_, name, aliases) in sorted(targets.items()):
         db.execute("INSERT INTO current_target VALUES(?,?)", (item, name))
         db.executemany(
@@ -380,6 +392,9 @@ def require(db, request, edition):
                 "The builder is verifying related question subjects for this name.",
                 requests=pending,
             )
+        from source_vocabulary import pending_names
+        if pending_names(db,request.key):
+            raise UnverifiedRule(request.key, "The builder is checking a newly recorded question subject for that relationship.")
         raise RuleWithdrawn("The source check found no named target with that spelling and relationship.")
     if crowded or len(ids) > 1:
         choices = []

@@ -6,18 +6,22 @@ import re
 import time
 import unicodedata
 from dataclasses import dataclass
+import source_vocabulary
 
 from graph import digest, folded_spelling, spelling
 from target_lookup import QID, named_candidates, prior_candidates
 from world_facts import bindings
 
-SCHEMA = """
-CREATE TABLE source_topic(key TEXT PRIMARY KEY,ids TEXT NOT NULL,crowded INTEGER NOT NULL) WITHOUT ROWID;
+SCHEMA = source_vocabulary.SCHEMA + """
+CREATE TABLE source_topic(key TEXT PRIMARY KEY,ids TEXT NOT NULL,crowded INTEGER NOT NULL,upgrade INTEGER NOT NULL) WITHOUT ROWID;
+CREATE INDEX topic_upgrade ON source_topic(key) WHERE upgrade=1;
 CREATE TABLE source_topic_rule(topic TEXT,rule TEXT,position INTEGER,PRIMARY KEY(topic,rule)) WITHOUT ROWID;
 """
 
 # Authorship and artistic/technical credits. The selected question always names the exact credit.
 CREDITS = (50, 57, 58, 84, 86, 87, 110, 162, 170, 175, 176, 178, 287, 676, 943)
+# Some source records describe a work's form or genre as a separate statement.
+CLASSIFICATIONS = (7937, 136)
 MAX_NAMES = 6
 # Equivalence, disambiguation and Wikimedia maintenance links describe records themselves.
 METADATA_PROPERTIES = {301, 360, 387, 460, 910, 1151, 1204, 1423, 1424, 1753, 1889, 2354, 3733, 5008}
@@ -83,8 +87,13 @@ def source_id(row, field, prefix):
     return int(match[1])
 
 
-def capture(topic, seeds=()):
-    forms, crowded = named_candidates(topic.term, seeds)
+def capture(topic, seeds=(), *, identity=None):
+    if identity is None:
+        forms, crowded = named_candidates(topic.term, seeds)
+        named_at = int(time.time())
+    else:
+        forms = {row[0]: row for row in identity["rows"]}
+        crowded, named_at = identity["crowded"], identity.get("namedAt", identity["checked"])
     crowded = crowded or len(forms) > MAX_NAMES
     proposals, descriptions = [], {}
     # If search was truncated, require a specific identity before proposing any rule.
@@ -116,6 +125,21 @@ def capture(topic, seeds=()):
             rows = counts(scope)
             alternative = topic.cls and not rows
             if alternative:
+                classifications = " ".join(f"wd:P{p}" for p in CLASSIFICATIONS)
+                classified = bindings(f"""SELECT ?property ?class ?basis (COUNT(DISTINCT ?item) AS ?n) WHERE {{
+                    VALUES ?property {{ {values} }} VALUES ?basis {{ {classifications} }}
+                    ?property wikibase:directClaim ?edge . ?basis wikibase:directClaim ?form .
+                    ?item ?edge wd:Q{target}; ?form wd:Q{topic.cls}; wdt:P31 ?class .
+                    }} GROUP BY ?property ?class ?basis HAVING(COUNT(DISTINCT ?item)>=2)
+                    ORDER BY DESC(?n) ?property ?class ?basis LIMIT 80""")
+                for row in classified:
+                    cls, prop = source_id(row, "class", "Q"), source_id(row, "property", "P")
+                    basis, n = source_id(row, "basis", "P"), int(row["n"]["value"])
+                    if basis not in CLASSIFICATIONS or prop not in CREDITS or n < 2:
+                        raise ValueError("The source returned a different credit or classification.")
+                    proposals.append([cls, prop, target, n, basis, topic.cls])
+                if classified:
+                    continue
                 rows = counts(f"VALUES ?property {{ {values} }} ?item wdt:P31 ?class .")
             for row in rows:
                 prop, cls, n = source_id(row, "property", "P"), source_id(row, "class", "Q"), int(row["n"]["value"])
@@ -123,9 +147,13 @@ def capture(topic, seeds=()):
                     raise ValueError("The source returned a relationship outside the topic query.")
                 proposals.append([cls, prop, target, n])
     rows = [] if crowded else [forms[i] for i in sorted(forms)]
-    identity = [topic.key, rows, crowded, proposals, descriptions]
+    content = [topic.key, rows, crowded, proposals, descriptions]
     return dict(key=topic.key, rows=rows, crowded=crowded, proposals=proposals, descriptions=descriptions,
-                revision=digest(identity), checked=int(time.time()))
+                revision=digest(content), checked=int(time.time()), namedAt=named_at, discoveryVersion=2)
+
+
+def cache_path(storage, key):
+    return storage / "knowledge-sources" / "topics" / (digest(key) + ".v2.json.gz")
 
 
 def requests(storage):
@@ -138,25 +166,50 @@ def requests(storage):
         except UnicodeError:
             continue
         if file.stem == digest(key) and (topic := Topic.decode(key)):
-            yield topic, storage / "knowledge-sources" / "topics" / (file.stem + ".v2.json.gz")
+            yield topic, cache_path(storage, key)
+
+
+def vocabulary_terms(proposals):
+    tokens = set()
+    for cls, prop, _, _n, *classification in proposals:
+        if prop in METADATA_PROPERTIES:
+            continue
+        tokens.update((f"Q{cls}", f"P{prop}"))
+        if classification:
+            basis, value = classification
+            tokens.update((f"P{basis}", f"Q{value}"))
+    return tokens
+
+
+def read_capture(file, key):
+    saved = json.loads(gzip.decompress(file.read_bytes()))
+    identity = [saved[k] for k in ("key", "rows", "crowded", "proposals", "descriptions")]
+    if saved["key"] != key or digest(identity) != saved["revision"]:
+        raise ValueError("The source topic failed its fingerprint check.")
+    return saved
 
 
 def pick(db, proposals):
     from catalogue import RELATION_PHRASES
     choices = []
-    for cls, prop, target, n in proposals:
+    for cls, prop, target, n, *classification in proposals:
         if prop in METADATA_PROPERTIES:
             continue
-        if not db.execute("""SELECT 1 FROM world.entity c,world.property p WHERE c.id=? AND p.id=?
-                AND EXISTS(SELECT 1 FROM world.triple WHERE p=31 AND o=?)""", (cls, prop, cls)).fetchone():
+        if not (source_vocabulary.known(db, f"Q{cls}", direct_class=True)
+                and source_vocabulary.known(db, f"P{prop}")):
             continue
+        rule = f"w-{cls}-{prop}-{target}"
+        if classification:
+            basis, value = classification
+            if not source_vocabulary.known(db, f"P{basis}") or not source_vocabulary.known(db, f"Q{value}"):
+                continue
+            rule = "and:" + "+".join(sorted([rule, f"w-{cls}-{basis}-{value}"]))
         choices.append((prop not in RELATION_PHRASES and prop not in CREDITS,
-                        not 5 <= n <= 250, n > 250, -min(n, 250), target, prop, cls))
+                        not 5 <= n <= 250, n > 250, -min(n, 250), target, prop, rule))
     selected, properties, entities = [], set(), set()
     # Give each identity a slot, then each distinct property before repeating a credit.
     for pass_no in range(3):
-        for *_, target, prop, cls in sorted(choices):
-            key = f"w-{cls}-{prop}-{target}"
+        for *_, target, prop, key in sorted(choices):
             if key in selected or pass_no == 0 and target in entities or pass_no == 1 and prop in properties:
                 continue
             selected.append(key)
@@ -171,27 +224,44 @@ def collect(db, storage, offline, previous=None):
     from watched_rules import due_at, replace
     captures = []
     budget = 3
-    for due, key, topic, file in sorted((due_at(f), t.key, t, f) for t, f in requests(storage)):
+    pending = []
+    identities = {}
+    for topic, file in requests(storage):
+        saved = read_capture(file, topic.key) if file.is_file() else None
+        due = due_at(file)
+        if saved:
+            named_at = saved.get("namedAt", saved["checked"])
+            if time.time() - 86400 < named_at and named_at >= identities.get(topic.term, (0,))[0]:
+                identities[topic.term] = (named_at, saved)
+            # A current name search can also be used to discover newly supported credit rules.
+            if topic.cls and saved.get("discoveryVersion", 1) < 2:
+                attempt = file.with_suffix(".attempt")
+                due = attempt.stat().st_mtime + 900 if attempt.exists() else 0
+        pending.append((due, topic.key, topic, file, saved))
+    for due, key, topic, file, data in sorted(pending):
         if not offline and due <= time.time() and budget:
             budget -= 1
             try:
-                data = capture(topic, prior_candidates(previous, topic.term))
-                replace(file, gzip.compress(json.dumps(data, ensure_ascii=False).encode(), mtime=0))
+                identity = identities.get(topic.term)
+                seeds = [] if identity else prior_candidates(previous, topic.term)
+                updated = capture(topic, seeds, identity=identity[1] if identity else None)
+                replace(file, gzip.compress(json.dumps(updated, ensure_ascii=False).encode(), mtime=0))
+                data = updated
+                identities[topic.term] = (data["namedAt"], data)
             except (OSError, KeyError, ValueError) as error:
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.with_suffix(".attempt").touch()
                 print(f"Topic discovery deferred: {error}", flush=True)
-        if not file.is_file():
+        if data is None:
             continue
-        data = json.loads(gzip.decompress(file.read_bytes()))
-        identity = [data[k] for k in ("key", "rows", "crowded", "proposals", "descriptions")]
-        if data["key"] != key or digest(identity) != data["revision"]:
-            raise ValueError("The source topic failed its fingerprint check.")
-        db.execute("INSERT INTO source_topic VALUES(?,?,?)",
-                   (key, json.dumps([i for i, _, _ in data["rows"]]), data["crowded"]))
-        for pos, rule in enumerate(pick(db, data["proposals"])):
-            db.execute("INSERT INTO source_topic_rule VALUES(?,?,?)", (key, rule, pos))
+        db.execute("INSERT INTO source_topic VALUES(?,?,?,?)",
+                   (key, json.dumps([i for i, _, _ in data["rows"]]), data["crowded"],
+                    bool(topic.cls and data.get("discoveryVersion", 1) < 2)))
         captures.append(data)
+    source_vocabulary.collect(db, storage, ((d["key"], vocabulary_terms(d["proposals"])) for d in captures), offline)
+    for data in captures:
+        for pos, rule in enumerate(pick(db, data["proposals"])):
+            db.execute("INSERT INTO source_topic_rule VALUES(?,?,?)", (data["key"], rule, pos))
     return captures
 
 
@@ -238,10 +308,14 @@ def choices(db, topic, edition):
     cards = [dict(key=key, prompt=prompt, edition=edition, records=n, complete=False)
              for key, n, prompt in rows if prompt and n is not None and n >= 2]
     note = "Choose a question to play with its documented answers."
-    if topic.cls and any(int(card["key"].split("-")[1]) != topic.cls for card in cards):
-        exact = [card for card in cards if int(card["key"].split("-")[1]) == topic.cls]
+    if topic.cls and cards:
+        from watched_rules import predicates
+        exact = [card for card in cards if any(cls == topic.cls or (prop in CLASSIFICATIONS and target == topic.cls)
+                 for cls,prop,target in predicates(card["key"]))]
         if exact:
             cards = exact
+            if any(c["key"].startswith("and:") for c in cards):
+                note = "These questions use a recorded form or genre and a separate creator credit."
         else:
             note = ("The source records these credits under different subjects. "
                     "Select a revised question to use the subject shown.")
@@ -256,6 +330,8 @@ def choices(db, topic, edition):
     pending = [key for key, n, _ in rows if n is None]
     if pending:
         raise UnverifiedRule(topic.key, "The builder is checking the answer lists for this topic.")
+    if source_vocabulary.pending_names(db,topic.key):
+        raise UnverifiedRule(topic.key, "The builder is checking source names for newly recorded classes or properties.")
     if not ids:
         raise RuleWithdrawn("The source search found no entity with that name. Try another spelling or its Wikidata Q number.")
     raise RuleWithdrawn("The builder found no playable question with two verified answers for this topic. "

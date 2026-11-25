@@ -212,6 +212,7 @@ def advance(key, file, *, pages=2, page_size=320, bulk_limit=8000):
 
 def collect(db, storage, offline, previous=None):
     import date_subjects
+    from source_vocabulary import known as known_term
     from watched_rules import rule_keys
     from world_index import install_lock
 
@@ -232,7 +233,7 @@ def collect(db, storage, offline, previous=None):
         rule = Rule.decode(key)
         known = (
             db.execute("SELECT 1 FROM date_property WHERE prop=?", (rule.prop,)).fetchone()
-            and db.execute("SELECT 1 FROM world.entity WHERE id=?", (rule.cls,)).fetchone()
+            and known_term(db, f"Q{rule.cls}")
             and db.execute("SELECT 1 FROM date_subject WHERE cls=?", (rule.cls,)).fetchone()
         )
         if not known:

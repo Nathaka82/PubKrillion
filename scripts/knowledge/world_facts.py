@@ -63,6 +63,7 @@ def bindings(query):
         PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
         PREFIX ql: <http://qlever.cs.uni-freiburg.de/builtin-functions/>
     """
+    errors = []
     for endpoint in (
         "https://qlever.dev/api/wikidata?",
         "https://query.wikidata.org/sparql?",
@@ -86,8 +87,9 @@ def bindings(query):
             return json.loads(data)["results"]["bindings"]
         except (OSError, ValueError, KeyError) as err:
             failure = err
+            errors.append(f"{urllib.parse.urlsplit(endpoint).hostname}: {err}")
     raise ValueError(
-        "The Wikidata query services could not return these facts: " + str(failure)
+        "The Wikidata query services could not return these facts: " + " / ".join(errors)
     ) from failure
 
 

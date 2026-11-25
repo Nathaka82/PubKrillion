@@ -179,13 +179,14 @@ def advance(key, file, *, pages=2, page_size=200):
 
 def refresh(db, storage, offline):
     from world_index import install_lock
+    from source_vocabulary import known
 
     now = time.time()
     editions = []
     attempted = 0
     for key, file in sorted(registered(storage), key=lambda pair: (due(pair[1]), pair[0])):
         cls = int(KEY.fullmatch(key)[2][1:])
-        if not db.execute("SELECT 1 FROM world.entity WHERE id=?", (cls,)).fetchone():
+        if not known(db, f"Q{cls}"):
             if not offline and due(file) <= now:
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.with_suffix(".retry").touch()

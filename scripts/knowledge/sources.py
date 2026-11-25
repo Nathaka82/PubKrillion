@@ -1,6 +1,7 @@
 """Bounded, free structured-data readers used by the local research worker."""
 
 import csv
+import email.utils
 import gzip
 import hashlib
 import io
@@ -10,6 +11,7 @@ import sqlite3
 import tempfile
 import time
 import urllib.parse
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from contextlib import closing
@@ -22,6 +24,7 @@ FISH_PREFIX = "cboettig/fishbase/fb/"
 PEAR = "https://plantdatabase.kpu.ca/PlantPrint/pycm"
 DATA = ROOT / "data/knowledge"
 AGENT = "KrillClubQuiz/1.0 (source-backed quiz research; single worker)"
+_retry_after = {}
 
 
 class DownloadTooLarge(ValueError):
@@ -29,8 +32,23 @@ class DownloadTooLarge(ValueError):
 
 
 def fetch(url, limit=8_000_000, timeout=20):
+    origin = urllib.parse.urlsplit(url).netloc.lower()
+    if _retry_after.get(origin, 0) > time.monotonic():
+        raise OSError(f"{origin} requested a pause before the next download.")
     request = urllib.request.Request(url, headers={"User-Agent": AGENT})
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    try:
+        response = urllib.request.urlopen(request, timeout=timeout)
+    except urllib.error.HTTPError as error:
+        header = (error.headers or {}).get("Retry-After", "")
+        if error.code == 429 or error.code == 503 and header:
+            try:
+                delay = int(header) if header.isascii() and header.isdecimal() else (
+                    email.utils.parsedate_to_datetime(header).timestamp() - time.time())
+            except (TypeError, ValueError, OverflowError):
+                delay = 900
+            _retry_after[origin] = time.monotonic() + max(1, delay)
+        raise
+    with response:
         if int(response.headers.get("Content-Length") or 0) > limit:
             raise DownloadTooLarge("Source exceeds download budget.")
         data = response.read(limit + 1)

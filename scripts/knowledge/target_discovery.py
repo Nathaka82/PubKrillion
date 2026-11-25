@@ -28,6 +28,7 @@ def is_due(storage):
 
 def nominations(db, storage, cls, ids):
     from catalogue import RELATION_PHRASES
+    from topic_sources import METADATA_PROPERTIES
 
     values = " ".join(f"wd:Q{i}" for i in ids)
     rows = bindings(f"""SELECT ?property ?target (COUNT(DISTINCT ?item) AS ?n) WHERE {{
@@ -45,7 +46,7 @@ def nominations(db, storage, cls, ids):
         if not pid or not qid or not 2 <= hits <= len(ids):
             raise ValueError("The current graph returned an inconsistent relationship sample.")
         prop, target = int(pid[1]), int(qid[1])
-        if cls == target or prop in (31, 106, 279):
+        if cls == target or prop in (31, 106, 279) or prop in METADATA_PROPERTIES:
             continue
         key = f"w-{cls}-{prop}-{target}"
         if db.execute("SELECT 1 FROM live_rule WHERE key=?", (key,)).fetchone():
@@ -53,8 +54,6 @@ def nominations(db, storage, cls, ids):
         if db.execute(
             "SELECT 1 FROM world_link WHERE prop=? AND target=? LIMIT 1", (prop, target)
         ).fetchone():
-            continue
-        if not db.execute("SELECT 1 FROM predicate WHERE id=?", (prop,)).fetchone():
             continue
         req = Request(cls, prop, "q" + str(target))
         if (requests_folder(storage) / (digest(req.key) + ".lookup")).exists():

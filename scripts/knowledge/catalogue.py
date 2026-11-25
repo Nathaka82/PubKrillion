@@ -17,8 +17,8 @@ from graph import ROOT, digest, folded_spelling, ingest, norm, open_graph, spell
 from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
-FORMAT = 26
-RULE_REVISION = "source-topics-1"
+FORMAT = 27
+RULE_REVISION = "source-vocabulary-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -285,7 +285,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             db.executescript(SCHEMA)
             db.executescript(comparisons.SCHEMA)
             db.executescript(world_classes.SCHEMA)
-            import target_lookup, topic_sources
+            import target_lookup, topic_sources, source_vocabulary
             db.executescript(target_lookup.SCHEMA)
             db.executescript(topic_sources.SCHEMA)
             db.executescript(world_links.SCHEMA)
@@ -352,8 +352,10 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                     except (OSError,ValueError,KeyError) as error:
                         print(f"Relationship-target discovery deferred: {error}",flush=True)
                 topics = topic_sources.collect(db,output.parent,offline,previous=output)
-                watched = sorted((t["key"],t["revision"]) for t in topics)
+                watched = sorted((t["key"],t["revision"],t.get("discoveryVersion",1)) for t in topics)
                 watched += target_lookup.collect(db,output.parent,offline,previous=output,topic_captures=topics)
+                watched.append(("source-vocabulary", digest([tuple(r) for r in db.execute(
+                    "SELECT * FROM source_vocabulary ORDER BY token")])))
                 watched += collect(db, output.parent, offline, publication=output)
                 watched += class_updates.refresh(db,output.parent,offline)
                 watched += date_updates.collect(db,output.parent,offline,previous=output)
@@ -383,6 +385,8 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                     db.execute("ATTACH DATABASE ? AS prior", (output.resolve().as_uri() + "?mode=ro&immutable=1",))
                     for table in WORLD_TABLES:
                         db.execute(f"INSERT INTO main.{table} SELECT * FROM prior.{table}")
+                    if db.execute("SELECT format FROM prior.publication").fetchone()[0] >= 27:
+                        source_vocabulary.remove_prior_additions(db)
                 else:
                     print("Indexing direct class and relationship evidence", flush=True)
                     compile_world(db)
@@ -390,6 +394,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 print("Indexing individual entity relationships and their names", flush=True)
                 reuse_links = reuse_world and db.execute("SELECT format FROM prior.publication").fetchone()[0] >= 17
                 world_links.publish(db,reuse_links)
+                source_vocabulary.publish(db)
                 current_questions.publish(db)
                 date_rules.index_questions(db)
                 dated_links.discover(db)
@@ -420,6 +425,8 @@ def summary(db):
     return {
         "edition": db.execute("SELECT edition FROM publication").fetchone()[0],
         "format": file_format,
+        "learnedClasses": db.execute("SELECT count(*) FROM source_vocabulary WHERE token GLOB 'Q*' AND name IS NOT NULL").fetchone()[0] if file_format >= 27 else 0,
+        "learnedProperties": db.execute("SELECT count(*) FROM source_vocabulary WHERE token GLOB 'P*' AND name IS NOT NULL").fetchone()[0] if file_format >= 27 else 0,
         "researchedTopics": db.execute("SELECT count(*) FROM source_topic").fetchone()[0] if file_format>=26 else 0,
         "playableTopicRules": db.execute("""SELECT count(DISTINCT t.rule) FROM source_topic_rule t
             JOIN current_question q USING(rule) WHERE q.n>=2""").fetchone()[0] if file_format>=26 else 0,
@@ -463,7 +470,7 @@ RELATION_PHRASES = {
     291: "published in", 375: "launched using", 400: "released for", 421: "in the time zone", 449: "originally broadcast on",
     495: "whose country of origin is", 725: "with a voice performance by", 750: "distributed by",
     676: "with lyrics by", 793: "whose recorded events include", 840: "set in", 915: "filmed in",
-    921: "whose main subject is",
+    921: "whose main subject is", 7937: "in the form of",
 }
 
 
@@ -559,6 +566,8 @@ def compile_question_text(db):
         SELECT 'w-'||p.cls||'-'||p.prop||'-'||p.target rule,world_prompt(c.name,p.prop,r.name,t.name) prompt,p.n
         FROM pattern p JOIN item c ON c.id=p.cls JOIN predicate r ON r.id=p.prop JOIN item t ON t.id=p.target)
         INSERT INTO question_text SELECT prompt_term(prompt),rule,prompt,n,0 FROM cards WHERE length(prompt)<=240""")
+    db.execute("""INSERT OR IGNORE INTO question_text SELECT prompt_term(prompt),rule,prompt,n,0
+                  FROM current_question WHERE rule GLOB 'and:*'""")
     for table, complete in (("register_rule", 1), ("class_rule", 0)):
         for row in db.execute(f"SELECT * FROM {table}"):
             prompt = register_card(db, row, "")["prompt"]
@@ -968,7 +977,10 @@ def match_single(db, prompt, *, include_empty=False, request_target=False):
                     from world_links import identifiers,target_label
                     target=int(key.split("-")[3])
                     label=target_label(db,target)
-                    if label and identifiers(db,folded_spelling(label),"target") != [target]:
+                    cls = int(key.split("-")[1])
+                    subject = db.execute("SELECT name FROM item WHERE id=?", (cls,)).fetchone()
+                    if ((label and identifiers(db,folded_spelling(label),"target") != [target])
+                        or (edition[1]>=27 and subject and identifiers(db,folded_spelling(subject[0]),"class") != [cls])):
                         return match_relation(db,body,place_body,edition,include_empty=include_empty,
                                               request_target=request_target)
                 n = current_count(db,key,n,edition[1])
