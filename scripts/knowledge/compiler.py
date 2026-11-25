@@ -6,6 +6,8 @@ import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
+BANK_FORMAT = 32
+
 
 def noun(text):
     return re.sub(
@@ -316,6 +318,21 @@ def class_paths(db, cls, sources, include_measured):
     return paths
 
 
+def observed_choices(game, cohort):
+    cutoff = game.execute("SELECT population FROM kb_calibration WHERE cohort=?", (cohort,)).fetchone()
+    if not cutoff:
+        return {}
+    # Only closed rounds count. Each team contributes once per rule and edition.
+    observed, rooms = {}, set()
+    for name, room, count in game.execute("""SELECT choice,room,count(*) FROM (
+        SELECT p.choice,p.room FROM kb_pick p JOIN rounds r ON r.id=p.round
+        WHERE p.cohort=? AND p.choice IS NOT NULL AND r.phase<>'open' ORDER BY p.id LIMIT ?
+    ) GROUP BY choice,room""", (cohort, cutoff[0])):
+        observed[name] = observed.get(name, 0) + count
+        rooms.add(room)
+    return observed if len(rooms) >= 3 and sum(observed.values()) >= 200 else {}
+
+
 def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None, missing_members=0, measured_decisions=False, unnamed_members=0,relationship_proof=None,name_catalogue=None):
     import attested_names
     plan = plan or interpret(db, prompt)
@@ -399,21 +416,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         )
     )
     cohort = digest(["source-name-decisions-v2", prompt, plan, [(s, sources[s]["revision"]) for s in sorted(dependencies)]])
-    observed = {}
-    population = 0
-    cutoff = game.execute("SELECT population FROM kb_calibration WHERE cohort=?", (cohort,)).fetchone()
-    if cutoff:
-        # Only rounds that have closed can contribute. Each team contributes once per rule and edition.
-        sample_rooms = set()
-        for name, room, count in game.execute("""SELECT choice,room,count(*) FROM (
-            SELECT p.choice,p.room FROM kb_pick p JOIN rounds r ON r.id=p.round
-            WHERE p.cohort=? AND p.choice IS NOT NULL AND r.phase<>'open' ORDER BY p.id LIMIT ?
-        ) GROUP BY choice,room""", (cohort, cutoff[0])):
-            observed[name] = observed.get(name, 0) + count
-            sample_rooms.add(room)
-        population = sum(observed.values())
-        if population < 200 or len(sample_rooms) < 3:
-            observed, population = {}, 0
+    observed = observed_choices(game, cohort)
+    population = sum(observed.values())
     # Another group in the publication may introduce a conflicting alias while
     # this question's own qualifying records and recall cohort stay the same.
     if name_catalogue is None and plan.get("catalogueKey"):
@@ -421,14 +425,20 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     if name_edition is None and name_catalogue is not None and name_catalogue.execute(
         "SELECT 1 FROM sqlite_master WHERE name='attested_name'").fetchone():
         name_edition = name_catalogue.execute("SELECT edition FROM publication").fetchone()[0]
-    version = "kb-" + digest([32, cohort, observed, name_edition,missing_members])[:36]
+    version = "kb-" + digest([BANK_FORMAT, cohort, observed, name_edition,missing_members])[:36]
     if unnamed_members:
         version = "kb-" + digest([version,unnamed_members])[:36]
     cached = game.execute(
         "SELECT metadata FROM kb_bank WHERE id=?", (version,)
     ).fetchone()
     if cached and cached[0] != "null":
-        return version, json.loads(cached[0])
+        meta = json.loads(cached[0])
+        if observed and "choiceSignature" not in meta:
+            # The immutable bank ID already includes these exact observations.
+            meta["choiceSignature"] = digest(observed)
+            with game:
+                game.execute("UPDATE kb_bank SET metadata=? WHERE id=?", (json.dumps(meta), version))
+        return version, meta
     paths = class_paths(db,cls,sources,comparing)
     from itertools import groupby
 
@@ -864,6 +874,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         "sourceJudged": True,
         "nameIndex": 2,
         "observedTeams": population,
+        **({"choiceSignature": digest(observed)} if observed else {}),
         "examples": [row[0] for row in db.execute(
             """SELECT name FROM (SELECT name,depth,row_number() OVER
                 (PARTITION BY depth ORDER BY links DESC,name) pos FROM result) ORDER BY pos,depth LIMIT 3"""

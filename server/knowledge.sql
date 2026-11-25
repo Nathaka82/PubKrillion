@@ -1,6 +1,12 @@
 CREATE TABLE IF NOT EXISTS kb_bank(
  id TEXT PRIMARY KEY, prompt TEXT NOT NULL, metadata TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS kb_catalogue_cache(
+ edition TEXT NOT NULL, file_revision TEXT NOT NULL, rule TEXT NOT NULL, prompt TEXT NOT NULL, compiler INTEGER NOT NULL,
+ bank TEXT NOT NULL REFERENCES kb_bank(id) ON DELETE CASCADE,
+ PRIMARY KEY(edition,file_revision,rule,prompt,compiler)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS kb_catalogue_cache_bank ON kb_catalogue_cache(bank);
 CREATE TABLE IF NOT EXISTS kb_member(
  bank TEXT NOT NULL REFERENCES kb_bank(id), entity TEXT NOT NULL,
  name TEXT NOT NULL, depth INTEGER NOT NULL CHECK(depth BETWEEN 1 AND 5),

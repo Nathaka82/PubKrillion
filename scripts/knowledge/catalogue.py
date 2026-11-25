@@ -71,8 +71,32 @@ def catalogue_path(game):
     return Path(override) if override else Path(game).parent / "knowledge-catalogue.sqlite"
 
 
+class PublishedCatalogue(sqlite3.Connection):
+    """A read-only catalogue file whose on-disk revision can be checked across workers."""
+
+    path: Path
+    open_revision: str | None
+
+
+def file_revision(path):
+    try:
+        with path.open("rb") as handle:
+            stat = os.fstat(handle.fileno())
+            handle.seek(24)  # SQLite's file change counter, updated on each commit.
+            counter = handle.read(4).hex()
+        return f"{stat.st_dev}/{stat.st_ino}/{stat.st_size}/{stat.st_mtime_ns}/{counter}"
+    except OSError:
+        return None
+
+
 def reader(file):
-    db = sqlite3.connect(Path(file).resolve().as_uri() + "?mode=ro", uri=True)
+    path = Path(file).resolve()
+    revision = file_revision(path)
+    db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, factory=PublishedCatalogue)
+    db.path = path
+    # A WAL can hold committed changes outside the main file.
+    journal = db.execute("PRAGMA main.journal_mode").fetchone()[0]
+    db.open_revision = revision if journal != "wal" and revision == file_revision(path) else None
     db.row_factory = sqlite3.Row
     db.create_function("normalize", 1, norm, deterministic=True)
     db.create_function("spelling_key", 1, folded_spelling, deterministic=True)
@@ -1165,10 +1189,34 @@ def match_relation(db, body, place_body, edition, *, include_empty=False, resolv
 
 
 def play(db, game, key, prompt, edition=None):
-    from compiler import evaluate
+    from compiler import BANK_FORMAT, observed_choices
+
     release = db.execute("SELECT edition,format FROM publication WHERE format BETWEEN 4 AND ?", (FORMAT,)).fetchone()
     if not release or edition and edition != release[0]:
         raise ValueError("The knowledge publication changed. Search again for the latest edition.")
+    # Older game files can still be opened directly before the server migrates them.
+    revision = db.open_revision if isinstance(db, PublishedCatalogue) else None
+    cache = (game is not None and revision and revision == file_revision(db.path)
+             and game.execute("SELECT 1 FROM sqlite_master WHERE name='kb_catalogue_cache'").fetchone())
+    identity = (release[0], revision, key, prompt, BANK_FORMAT)
+    if cache:
+        row = game.execute("""SELECT b.id,b.metadata FROM kb_catalogue_cache c JOIN kb_bank b ON b.id=c.bank
+            WHERE (c.edition,c.file_revision,c.rule,c.prompt,c.compiler)=(?,?,?,?,?) AND b.metadata<>'null'""", identity).fetchone()
+        if row:
+            meta = json.loads(row[1])
+            choices = observed_choices(game, meta["cohort"])
+            if (not choices and not meta["observedTeams"]) or (choices and digest(choices) == meta.get("choiceSignature")):
+                return row[0], meta
+    bank, meta = prepare_bank(db, game, key, prompt, release)
+    if cache:
+        with game:
+            game.execute("INSERT OR REPLACE INTO kb_catalogue_cache VALUES(?,?,?,?,?,?)", (*identity,bank))
+    return bank, meta
+
+
+def prepare_bank(db, game, key, prompt, release):
+    from compiler import evaluate
+
     if key.startswith("during:") and release[1]>=20:
         import dated_links
         if rule := dated_links.Rule.decode(key):

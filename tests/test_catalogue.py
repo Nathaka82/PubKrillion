@@ -107,6 +107,40 @@ class CatalogueTests(unittest.TestCase):
             world.commit()
         self.assertEqual(taxonomy.due(self.world,snapshot),0)
 
+    def test_prepared_catalogue_bank_reopens_and_rechecks_the_exact_scoring_sample(self):
+        edition = self.publish()["edition"]
+        prompt, rule = "Name a work", "type:Q10"
+        gamefile = self.root / "game.sqlite"
+        with closing(catalogue.reader(self.published)) as db, closing(sqlite3.connect(gamefile)) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            first, meta = catalogue.play(db, game, rule, prompt)
+        with closing(catalogue.reader(self.published)) as db, closing(sqlite3.connect(gamefile)) as game:
+            with patch.object(catalogue, "prepare_bank", side_effect=AssertionError("unnecessary compilation")):
+                self.assertEqual(catalogue.play(db, game, rule, prompt, edition), (first, meta))
+                with self.assertRaisesRegex(ValueError, "publication changed"):
+                    catalogue.play(db, game, rule, prompt, "obsolete")
+            other, _ = catalogue.play(db, game, rule, "Name one work")
+            self.assertNotEqual(other, first)
+            game.executescript("CREATE TABLE rounds(id PRIMARY KEY,phase);")
+            game.executemany("INSERT INTO rounds VALUES(?,'locked')", ((i,) for i in (1, 2, 3)))
+            game.executemany("INSERT INTO kb_pick(cohort,team,room,round,choice) VALUES(?,?,?,?,'Work 1')",
+                             ((meta["cohort"], i, str(i % 3), 1 + i % 3) for i in range(200)))
+            game.execute("INSERT INTO kb_calibration VALUES(?,200)", (meta["cohort"],))
+            scored, measured = catalogue.play(db, game, rule, prompt)
+            self.assertNotEqual(scored, first)
+            self.assertEqual(measured["observedTeams"], 200)
+            game.execute("UPDATE kb_bank SET metadata=json_remove(metadata,'$.choiceSignature') WHERE id=?", (scored,))
+            self.assertEqual(catalogue.play(db, game, rule, prompt), (scored, measured))
+            with patch.object(catalogue, "prepare_bank", side_effect=AssertionError("unnecessary compilation")):
+                self.assertEqual(catalogue.play(db, game, rule, prompt), (scored, measured))
+            game.execute("UPDATE kb_pick SET choice='Work 2' WHERE team=1")
+            revised, _ = catalogue.play(db, game, rule, prompt)
+            self.assertNotIn(revised, (first, scored))
+            self.assertEqual(game.execute("SELECT count(*) FROM kb_member WHERE bank=?", (first,)).fetchone()[0],
+                             meta["answerCount"])
+            game.execute("DROP TABLE kb_catalogue_cache")
+            self.assertEqual(catalogue.play(db, game, rule, prompt)[0], revised)
+
     def test_plain_world_questions_include_subclasses_and_occupations_offline(self):
         with closing(sqlite3.connect(self.world)) as world:
             world.executescript("""
