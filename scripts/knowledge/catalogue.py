@@ -17,7 +17,7 @@ from graph import ROOT, digest, folded_spelling, ingest, norm, open_graph, spell
 from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
-FORMAT = 27
+FORMAT = 28
 RULE_REVISION = "source-vocabulary-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
@@ -248,6 +248,7 @@ def import_feed(db, manifest, cache, offline, definition=None):
 
 def build(world, output, feeds, *, offline=False, include_bundled=True, measurements=None, discover_dates=False, discover_names=False):
     import attested_names
+    import attention
     import comparisons
     import taxonomy
     import world_classes
@@ -283,6 +284,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             if world is not None:
                 db.execute("ATTACH DATABASE ? AS world", (world.resolve().as_uri() + "?mode=ro&immutable=1",))
             db.executescript(SCHEMA)
+            db.executescript(attention.SCHEMA)
             db.executescript(comparisons.SCHEMA)
             db.executescript(world_classes.SCHEMA)
             import target_lookup, topic_sources, source_vocabulary
@@ -368,7 +370,8 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                     fingerprint = hashlib.file_digest(data, "sha256").hexdigest()
                 hierarchy = taxonomy.attach(db,taxonomy.location(output.parent),fingerprint)
             name_revision = attested_names.install(db,output.parent,output) if world is not None else None
-            edition = digest([FORMAT, RULE_REVISION, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,name_revision])
+            rank_path, rank_release = attention.source(output.parent, output)
+            edition = digest([FORMAT, RULE_REVISION, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,name_revision,rank_release])
             reuse_world = False
             if output.is_file():
                 with closing(reader(output)) as previous:
@@ -378,6 +381,8 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                     reuse_world = world is not None and previous.execute("""SELECT 1 FROM source,publication
                         WHERE source.id='wikidata5m-catalogue-input' AND source.revision=? AND publication.format BETWEEN 5 AND ?""",
                         (fingerprint, FORMAT)).fetchone() is not None
+            if rank_path:
+                attention.publish(db, rank_path, rank_release)
             if world is not None:
                 db.execute("INSERT INTO source VALUES('wikidata5m-catalogue-input',?,?,unixepoch(),'{}')", (fingerprint, SOURCE))
                 if reuse_world:
@@ -425,6 +430,7 @@ def summary(db):
     return {
         "edition": db.execute("SELECT edition FROM publication").fetchone()[0],
         "format": file_format,
+        "readershipEntities": (db.execute("SELECT n FROM readership_release").fetchone() or (0,))[0] if file_format >= 28 else 0,
         "learnedClasses": db.execute("SELECT count(*) FROM source_vocabulary WHERE token GLOB 'Q*' AND name IS NOT NULL").fetchone()[0] if file_format >= 27 else 0,
         "learnedProperties": db.execute("SELECT count(*) FROM source_vocabulary WHERE token GLOB 'P*' AND name IS NOT NULL").fetchone()[0] if file_format >= 27 else 0,
         "researchedTopics": db.execute("SELECT count(*) FROM source_topic").fetchone()[0] if file_format>=26 else 0,
@@ -1381,6 +1387,11 @@ if __name__ == "__main__":
             if world is not None and not args.world and not args.offline and not world.exists():
                 install(world)
             if world is not None and not args.offline:
+                import attention
+                try:
+                    attention.refresh((args.output or catalogue_path(args.db)).parent)
+                except attention.UPDATE_ERRORS as error:
+                    print(f"Readership update deferred: {error}",flush=True)
                 import date_properties
                 try:
                     date_properties.refresh((args.output or catalogue_path(args.db)).parent)

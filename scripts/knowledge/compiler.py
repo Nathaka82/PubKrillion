@@ -421,7 +421,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     if name_edition is None and name_catalogue is not None and name_catalogue.execute(
         "SELECT 1 FROM sqlite_master WHERE name='attested_name'").fetchone():
         name_edition = name_catalogue.execute("SELECT edition FROM publication").fetchone()[0]
-    version = "kb-" + digest([31, cohort, observed, name_edition,missing_members])[:36]
+    version = "kb-" + digest([32, cohort, observed, name_edition,missing_members])[:36]
     if unnamed_members:
         version = "kb-" + digest([version,unnamed_members])[:36]
     cached = game.execute(
@@ -642,7 +642,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                 else None
             )
             db.execute(
-                "UPDATE result SET depth=?,aliases=?,evidence=?,upper=?,proxy=?,links=max(links,?) WHERE term=?",
+                "UPDATE result SET depth=?,aliases=?,evidence=?,upper=?,proxy=?,links=max(coalesce(links,0),coalesce(?,0)) WHERE term=?",
                 (
                     min(depth, existing["depth"]),
                     json.dumps(aliases),
@@ -677,6 +677,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     ) UPDATE result SET depth=CASE WHEN ranks.high<=0.15 AND links>=10 THEN 1
         WHEN ranks.low<=0.25 THEN 3 ELSE 2 END FROM ranks
         WHERE result.id=ranks.id AND ranks.n>=12 AND result.depth=2 AND result.upper IS NULL""")
+    import attention
+    readership = attention.score(db,name_catalogue,size)
     budget = size // 20
     for bound, num in db.execute(
         "SELECT upper,COUNT(*) FROM result WHERE upper<.02 GROUP BY upper ORDER BY upper"
@@ -881,7 +883,9 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             "Answers must have a directly recorded class and relationship in this Wikidata5M edition."
             if "catalogueKey" in plan else ""
         ),
-        "scoring": "Graph links measure relative familiarity within this bank. First choices from at least 200 teams across three rooms and exact-prompt surveys use an upper confidence bound. At most 5% qualify for the top tier, with at most 1% from two supporting familiarity signals. Missing data earns no rarity bonus.",
+        "scoring": (f"Published Wikimedia readership over 52 weeks covers {readership['coveredAnswers']:,} of {size:,} answer names. "
+                    if readership else "") + "Graph links help estimate relative familiarity. First choices from at least 200 teams across three rooms and exact-prompt surveys use an upper confidence bound. At most 5% qualify for the top tier, with at most 1% from two supporting familiarity signals. Missing data earns no rarity bonus.",
+        "readership": readership,
         "plan": plan,
         "sources": refs,
         "reference": reference,

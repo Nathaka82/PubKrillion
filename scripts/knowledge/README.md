@@ -151,6 +151,8 @@ python scripts/knowledge/worker.py refresh --db storage/quiz.sqlite
 
 ## Capacity and verification
 
+The catalogue builder imports the QRank release identified by its published SHA-256 and size. Each Wikidata ID carries its total readership across Wikimedia projects over 52 weeks. Within a question, the compiler uses the most-read qualifying entity for a shared answer name. Missing observations count against a rarity bonus. Readership can distinguish the middle tiers. Reaching tier four through readership also requires sparse graph links for every qualifying owner of the name. The question preview reports readership coverage, and direct player-choice measurements take precedence. [QRank methodology](https://github.com/brawer/wikidata-qrank/blob/main/doc/design.md)
+
 The independent builder allows a publication up to 50 GB. It stages a new edition on the same volume before replacing the existing file, so allow space for both editions, inputs and temporary indexes. The per-game research graph and its quiz database connection each cap their SQLite files at roughly 8.2 GB. The worker checks local storage and free space before starting. Its feed input has a 2 GB aggregate budget, bounded individual files and a lower limit for formats decoded as a single JSON document. DuckDB uses one thread and a 384 MB memory limit.
 
 Run `npm test`, `npm run test:browser`, `npm run test:knowledge-load` and `python -m unittest discover -s tests` for game, browser, performance and evidence checks. The load test creates an isolated 100,000-member register, reopens its cached preview and submits thirty team answers concurrently.

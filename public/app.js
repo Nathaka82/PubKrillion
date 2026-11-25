@@ -967,11 +967,14 @@ async function suggestQuestions(form, surprise) {
 }
 function previewResearch(job, q) {
   lastResearch = {job,q};
+  const readershipSource = q.readership
+    ? ' <a href="https://qrank.toolforge.org/" target="_blank" rel="noopener noreferrer">How Wikimedia readership is measured</a>.'
+    : '';
   modal("Question preview", '<div class="stack"><h3>'+esc(q.prompt)+'</h3><p>'+esc(q.interpretation)+'</p><p><strong>'+
     q.answerCount.toLocaleString()+' verified answers</strong> · '+esc(q.coverage)+'</p><p>'+
     q.gaps.missing.toLocaleString()+' candidates lack supporting evidence. '+q.gaps.borderline.toLocaleString()+' are borderline.</p>'+
     (q.sourceJudged ? '<p>'+ (q.observedTeams ? 'Rarity calibrated with '+q.observedTeams.toLocaleString()+' verified first choices.' : 'Rarity uses source estimates until enough teams have played.')+' '+q.counts[5].toLocaleString()+' answers earn the top score.</p>' : '')+
-    '<details><summary>Sources and scoring</summary><ul>'+q.sources.map(s=>'<li><a target="_blank" rel="noopener noreferrer" href="'+esc(s.url)+'">'+esc(s.label || s.id)+'</a> · '+esc(s.revision.slice(0,14))+' · loaded '+esc(new Date(s.checked*1000).toLocaleDateString())+'</li>').join("")+'</ul><p>'+esc(q.scoring || "Rarity estimates are fixed when the round opens. The top score requires evidence of unusually low recall.")+'</p></details>'+
+    '<details><summary>Sources and scoring</summary><ul>'+q.sources.map(s=>'<li><a target="_blank" rel="noopener noreferrer" href="'+esc(s.url)+'">'+esc(s.label || s.id)+'</a> · '+esc(s.revision.slice(0,14))+' · loaded '+esc(new Date(s.checked*1000).toLocaleDateString())+'</li>').join("")+'</ul><p>'+esc(q.scoring || "Rarity estimates are fixed when the round opens. The top score requires evidence of unusually low recall.")+readershipSource+'</p></details>'+
     button("Browse answers","preview-members")+button("Save to library","save-generated","primary")+
     (q.plan?.worldSource ? button("Refresh from Wikidata", "refresh-research") : "")+
     button("Edit prompt","revise-prompt","text-btn")+'</div>');
