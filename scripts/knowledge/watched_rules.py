@@ -89,6 +89,17 @@ def follow(storage, key):
         return False
 
 
+def membership_pattern(keys, conditions):
+    cls = conditions[0][0]
+    from places import expression
+    constraints = " ".join(
+        f"?item {expression(prop) if k.startswith('g-') else 'wdt:P'+str(prop)} wd:Q{target} ."
+        + (f" FILTER(?item != wd:Q{target})" if k.startswith("g-") and prop==131 else "")
+        for k,(_,prop,target) in zip(keys,conditions))
+    member="(wdt:P31|wdt:P106)" if all(k.startswith("g-") for k in keys) else "wdt:P31"
+    return f"{constraints} ?item {member}/wdt:P279* wd:Q{cls} ."
+
+
 def capture(key):
     if key.startswith("during:"):
         from dated_links import Rule
@@ -99,15 +110,8 @@ def capture(key):
     conditions = predicates(key)
     if not conditions:
         raise ValueError("Invalid source identifiers for a watched question.")
-    cls = conditions[0][0]
-    from places import expression
     keys=key[4:].split("+") if key.startswith("and:") else [key]
-    constraints = " ".join(
-        f"?item {expression(prop) if k.startswith('g-') else 'wdt:P'+str(prop)} wd:Q{target} ."
-        + (f" FILTER(?item != wd:Q{target})" if k.startswith("g-") and prop==131 else "")
-        for k,(_,prop,target) in zip(keys,conditions))
-    member="(wdt:P31|wdt:P106)" if all(k.startswith("g-") for k in keys) else "wdt:P31"
-    body=f"{constraints} ?item {member}/wdt:P279* wd:Q{cls} ."
+    body=membership_pattern(keys,conditions)
     def pages(checksum):
         after = ""
         while True:

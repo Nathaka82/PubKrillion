@@ -206,12 +206,9 @@ class SourceTopics(unittest.TestCase):
             prompt = cards[0]["prompt"]
             self.assertIn("interactive work", prompt)
             self.assertEqual(catalogue.match_question(db, prompt)["key"], key)
-            with self.assertRaises(catalogue.UnverifiedRule) as missing:
-                catalogue.match_question(db, "Name an œuvre interactive")
-            self.assertEqual(missing.exception.key, "type:Q9100")
-            with self.assertRaises(catalogue.UnverifiedRule) as tagged:
-                catalogue.match_question(db,"Name an interactive work (Q9100)")
-            self.assertEqual(tagged.exception.key,"type:Q9100")
+            for question in ("Name an œuvre interactive","Name an interactive work (Q9100)"):
+                general = catalogue.match_question(db,question)
+                self.assertEqual((general["key"],general["records"],general["complete"]),("type:Q9100",2,False))
             self.assertIsNone(catalogue.match_question(db,"Name a different subject (Q9100)"))
             game.executescript((ROOT / "server/knowledge.sql").read_text())
             bank, _ = catalogue.play(db, game, key, prompt, edition)
@@ -234,6 +231,7 @@ class SourceTopics(unittest.TestCase):
         self.assertNotEqual(self.publish()["edition"], edition)
         with closing(catalogue.reader(self.pub)) as db:
             self.assertFalse(db.execute("SELECT 1 FROM predicate WHERE id=7937").fetchone())
+            self.assertFalse(db.execute("SELECT 1 FROM scope_witness WHERE cls=9100").fetchone())
             self.assertFalse(db.execute("SELECT 1 FROM world_property_name WHERE prop=7937").fetchone())
             with self.assertRaises(catalogue.RuleWithdrawn):
                 ideas.published_suggestions(db, request)

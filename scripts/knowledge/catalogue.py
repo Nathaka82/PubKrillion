@@ -17,7 +17,7 @@ from graph import ROOT, digest, folded_spelling, ingest, norm, open_graph, spell
 from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
-FORMAT = 28
+FORMAT = 29
 RULE_REVISION = "source-vocabulary-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
@@ -249,6 +249,7 @@ def import_feed(db, manifest, cache, offline, definition=None):
 def build(world, output, feeds, *, offline=False, include_bundled=True, measurements=None, discover_dates=False, discover_names=False):
     import attested_names
     import attention
+    import scope_evidence
     import comparisons
     import taxonomy
     import world_classes
@@ -285,6 +286,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 db.execute("ATTACH DATABASE ? AS world", (world.resolve().as_uri() + "?mode=ro&immutable=1",))
             db.executescript(SCHEMA)
             db.executescript(attention.SCHEMA)
+            db.executescript(scope_evidence.SCHEMA)
             db.executescript(comparisons.SCHEMA)
             db.executescript(world_classes.SCHEMA)
             import target_lookup, topic_sources, source_vocabulary
@@ -400,6 +402,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 reuse_links = reuse_world and db.execute("SELECT format FROM prior.publication").fetchone()[0] >= 17
                 world_links.publish(db,reuse_links)
                 source_vocabulary.publish(db)
+                scope_evidence.publish(db)
                 current_questions.publish(db)
                 date_rules.index_questions(db)
                 dated_links.discover(db)
@@ -533,6 +536,9 @@ def current_count(db, key, historical, file_format):
     if file_format >= 17 and key.startswith("w-"):
         from world_links import members
         query,args = members(db,*map(int,key[2:].split("-")))
+        if file_format >= 29:
+            import scope_evidence
+            query,args = scope_evidence.members(db,key,query,args)
         return db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
     return historical
 
@@ -913,6 +919,9 @@ def intersection(db, keys):
                     values=(json.dumps([int(qid[1:]) for qid,_,_ in captured[2]]),)
                 else:
                     query,values = (places.members(cls,prop,target) if geo else members(db,cls,prop,target))
+                    if not geo and db.execute("SELECT format FROM publication").fetchone()[0] >= 29:
+                        import scope_evidence
+                        query,values = scope_evidence.members(db,key,query,values)
             else:
                 row = db.execute("""SELECT c.name,r.name,t.name FROM pattern p JOIN item c ON c.id=p.cls
                 JOIN predicate r ON r.id=p.prop JOIN item t ON t.id=p.target WHERE cls=? AND prop=? AND target=?""",
@@ -1277,6 +1286,9 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
             source["revision"]=digest([source["revision"],hierarchy[0] if hierarchy else None])
         ingest(graph, {**source,
                        "terms": {root: [subject], **{c["target"]: [c["label"]] for c in conditions}}}, records())
+        if linked and file_format >= 29 and key.startswith("w-"):
+            from scope_evidence import add_sources
+            add_sources(db,graph,cls,rule=key,condition=first)
         if related_source:
             r=related_source
             graph.execute("INSERT INTO source VALUES(?,?,?,?,'{}')",(r["source"],r["revision"],r["url"],r["captured"]))
@@ -1361,6 +1373,21 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
             checked=[k for k in keys if live and (not joined or db.execute("SELECT 1 FROM live_rule WHERE key=?",(k,)).fetchone())]
             proof=places.proof_reader(db,checked,None if joined else captured.get("proofs",{}))
             plan["geographicScope"]=places.scope(conditions)
+        if joined and "operandEvidence" in joined:
+            operand_keys = key[4:].split("+")
+            for c in conditions:
+                c["statementProof"] = True
+            provenance = joined["operandEvidence"]
+            plan["historicalOperands"] = any((part,qid) not in provenance
+                for qid,_,_ in joined["rows"] for part in operand_keys)
+            geographic_proof = proof
+            def proof(entity, condition):
+                qid = entity[3:]
+                part = f"{'g' if condition.get('geo') else 'w'}-{cls}-{condition['prop']}-{condition['target'][4:]}"
+                detail = (geographic_proof(entity,condition) if condition.get("geo") else
+                          {"url":f"https://www.wikidata.org/wiki/{qid}#P{condition['prop']}"})
+                return {**detail,"verifiedBy":provenance.get((part,qid),
+                        {"source":"Wikidata5M","revision":world_revision,"url":SOURCE})}
         unnamed=captured["scanned"]-len(captured["rows"]) if "scanned" in captured else 0
         edition = db.execute("SELECT edition FROM publication").fetchone()[0]
         return evaluate(graph, game, prompt, plan, outside_names=outside_names,name_edition=edition,name_catalogue=db,

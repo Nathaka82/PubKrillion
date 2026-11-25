@@ -833,7 +833,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         coverage += f" The source lists {unnamed_members:,} additional {noun} without a usable name."
     if editions:
         coverage += f" Includes {len(editions)} completed finals from {editions[0]} to {editions[-1]}."
-    if any(s.startswith("world5m-") for s in selected):
+    if plan.get("historicalOperands") or any(s.startswith("world5m-") for s in selected):
         coverage += (
             " Includes the Wikidata5M snapshot. Some published facts may have changed."
         )

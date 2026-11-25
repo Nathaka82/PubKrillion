@@ -459,6 +459,60 @@ class CatalogueTests(unittest.TestCase):
                 self.assertEqual(game.execute("SELECT name FROM kb_member WHERE bank=?",(bank,)).fetchone()[0],"Current 44001")
                 self.assertEqual(game.execute("SELECT name FROM kb_member WHERE bank=?",(old,)).fetchone()[0],"Current 2")
 
+    def test_narrower_evidence_extends_its_class_and_operands_and_can_be_joined_by_id(self):
+        import gzip
+        from graph import digest
+        with closing(sqlite3.connect(self.world)) as world:
+            world.executescript("""
+                INSERT INTO property VALUES(50,'author'),(136,'genre');
+                INSERT INTO entity VALUES(13,'Creator'),(14,'Genre');
+                INSERT INTO triple VALUES(1,50,13),(2,136,14);
+            """)
+            world.commit()
+        publisher, author, genre = "w-10-123-11","w-10-50-13","w-10-136-14"
+        def both(a,b):
+            return "and:"+"+".join(sorted((a,b)))
+        def capture(rule, items):
+            watched_rules.follow(self.root,rule)
+            rows = [[f"Q{i}",f"Work {i}",[f"Current name {i}"]] for i in items]
+            payload = dict(key=rule,rows=rows,revision=digest([rule,rows]),captured=1000)
+            path = dict(watched_rules.requests(self.root))[rule]
+            watched_rules.replace(path,gzip.compress(json.dumps(payload).encode()))
+        def play(db, game, rule, prompt):
+            bank,meta = catalogue.play(db,game,rule,prompt)
+            return bank, {r[0]:json.loads(r[1]) for r in game.execute(
+                "SELECT entity,evidence FROM kb_member WHERE bank=?",(bank,))},meta
+        capture(both(publisher,author),[7,55])
+        capture(both(genre,author),[55,65])
+        self.publish()
+        with closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            with closing(catalogue.reader(self.published)) as db:
+                card = catalogue.match_question(db,"Name a work published by Studio")
+                self.assertEqual(card["records"],7)
+                old,answers,_ = play(db,game,card["key"],card["prompt"])
+                self.assertEqual(set(answers), {f"wd:Q{i}" for i in [1,2,3,4,5,7,55]})
+                self.assertTrue(any(p.get("source","").startswith("wikidata-query-witness-") for p in answers["wd:Q55"]))
+                self.assertTrue(any(p.get("source","").startswith("world5m-") for p in answers["wd:Q2"]))
+                card = catalogue.match_question(db,"Name a work")
+                _,all_works,_ = play(db,game,card["key"],card["prompt"])
+                self.assertEqual(set(all_works),{f"wd:Q{i}" for i in [1,2,3,4,5,7,55,65]})
+                self.assertEqual(card["records"],len(all_works))
+                _,joined,meta = play(db,game,both(publisher,genre),"Name a work in the genre Genre published by Studio")
+                self.assertEqual(set(joined),{"wd:Q2","wd:Q55"})
+                self.assertTrue(meta["plan"]["historicalOperands"])
+                self.assertEqual({p["verifiedBy"]["rule"] for p in joined["wd:Q55"] if "verifiedBy" in p},
+                                 {both(publisher,author),both(genre,author)})
+                self.assertTrue(any(p.get("verifiedBy",{}).get("source")=="Wikidata5M" for p in joined["wd:Q2"]))
+            capture(publisher,[])
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                with self.assertRaises(catalogue.RuleWithdrawn):
+                    play(db,game,publisher,"Name a work published by Studio")
+                with self.assertRaises(catalogue.RuleWithdrawn):
+                    play(db,game,both(publisher,genre),"Name a work in the genre Genre published by Studio")
+                self.assertEqual(game.execute("SELECT count(*) FROM kb_member WHERE bank=?",(old,)).fetchone()[0],7)
+
     def test_watched_world_question_republishes_current_members_and_withdrawals(self):
         key = "w-10-123-11"
         watched_rules.follow(self.root, key)

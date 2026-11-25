@@ -79,10 +79,12 @@ def card(db, phrase, *, strict=False):
     else:
         args = (cls, cls) if kinds else (cls,)
         members = KINDS if kinds else MEMBERS
+        witnessed = (" UNION SELECT w.id FROM scope CROSS JOIN scope_witness w ON w.cls=scope.id"
+                     if fmt >= 29 and not kinds else "")
         count = db.execute(
             DESCENDANTS
             + f""" SELECT count(*) FROM (SELECT DISTINCT m.id FROM ({members}) m
-                JOIN item i ON i.id=m.id WHERE length(i.name) BETWEEN 1 AND 140)""",
+                JOIN item i ON i.id=m.id WHERE length(i.name) BETWEEN 1 AND 140{witnessed})""",
             args,
         ).fetchone()[0]
     if not count:
@@ -201,6 +203,9 @@ def play(db, game, key, prompt):
                 {"source": "world5m-membership-" + str(prop), "revision": revision, "url": url},
                 records(prop),
             )
+        if file_format >= 29 and not kinds:
+            from scope_evidence import add_sources
+            add_sources(db,graph,cls)
         if not graph.execute("SELECT 1 FROM entity LIMIT 1").fetchone():
             raise RuleWithdrawn("This edition has no named members of the source class.")
         # Preserve the actual path connecting each source-reported type to the requested class.

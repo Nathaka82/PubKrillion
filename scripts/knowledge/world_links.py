@@ -174,28 +174,43 @@ def current_members(db, key):
 def joined_release(db, keys, query, args):
     """Resolve names from current operands when the combined rule has never been captured."""
     from graph import digest
+    import scope_evidence
 
-    revisions, names, dates = [], {}, []
+    revisions, names, dates, evidence = [], {}, [], {}
+    inherited = False
+    supports_witnesses = db.execute("SELECT format FROM publication").fetchone()[0] >= 29
     for key in keys:
         capture = current_members(db, key)
-        if not capture:
-            continue
-        revision, checked, rows = capture
-        revisions.append((key, revision))
-        dates.append(checked)
-        for qid, name, aliases in rows:
-            if qid in names:
-                names[qid][1].update((name, *aliases))
-            else:
-                names[qid] = (name, set(aliases))
+        captures = [(key,*capture)] if capture else []
+        if not capture and supports_witnesses and key.startswith("w-"):
+            for origin,revision,checked,blob in scope_evidence.origins(db,key):
+                captures.append((origin,revision,checked,json.loads(gzip.decompress(blob))["rows"]))
+                inherited = True
+        for origin,revision,checked,rows in captures:
+            revisions.append((key,origin,revision))
+            dates.append(checked)
+            provenance = {"rule":origin,"revision":revision,"checked":checked}
+            for qid, name, aliases in rows:
+                evidence.setdefault((key,qid),provenance)
+                if qid in names:
+                    names[qid][1].update((name, *aliases))
+                else:
+                    names[qid] = (name, set(aliases))
     if not revisions:
         return None
     result = []
     for (item,) in db.execute(query, args):
         qid = "Q" + str(item)
-        name, aliases = names[qid]
+        if qid in names:
+            name, aliases = names[qid]
+        else:
+            name, forms = db.execute("SELECT name,aliases FROM item WHERE id=?",(item,)).fetchone()
+            aliases = set(forms.split("\t")) - {""}
         result.append((qid, name, sorted(aliases - {name})))
-    return {"revision": digest(revisions), "captured": min(dates), "rows": result, "n": len(result)}
+    joined = {"revision": digest(revisions), "captured": min(dates), "rows": result, "n": len(result)}
+    if inherited:
+        joined["operandEvidence"] = evidence
+    return joined
 
 
 def suggestions(db, phrase, edition):
