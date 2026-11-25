@@ -1,5 +1,6 @@
 """Acquire current, source-attributed Wikidata facts for a resolved question."""
 
+import hashlib
 import json
 import re
 import time
@@ -98,6 +99,49 @@ def identity(value):
     if not re.fullmatch(r"Q[1-9]\d*", item):
         raise ValueError("Unexpected Wikidata item.")
     return item
+
+
+def member_page(query, scope, cursor, page_size):
+    after = f"FILTER(STR(?item)>{json.dumps(cursor)})" if cursor else ""
+    page = query(f"SELECT DISTINCT ?item WHERE {{ {scope} {after} }} ORDER BY STR(?item) LIMIT {page_size}")
+    urls = [row["item"]["value"] for row in page]
+    if (len(urls) > page_size or urls != sorted(set(urls)) or (urls and urls[0] <= cursor)
+            or any(not re.fullmatch(r"https?://www\.wikidata\.org/entity/Q[1-9]\d*", u) for u in urls)):
+        raise ValueError("The Wikidata class page has inconsistent identifiers or ordering.")
+    return page, urls
+
+
+def member_count(query, scope):
+    counts = query(f"SELECT (COUNT(DISTINCT ?item) AS ?n) WHERE {{ {scope} }}")
+    if len(counts) != 1 or not str(counts[0]["n"]["value"]).isdecimal():
+        raise ValueError("Wikidata did not supply the class member count.")
+    return int(counts[0]["n"]["value"])
+
+
+def roster_hash(checksum, urls):
+    # Chain IDs individually so different page sizes produce the same result.
+    for url in urls:
+        checksum = hashlib.sha256(checksum + url.rsplit("/",1)[-1].encode("ascii")).digest()
+    return checksum
+
+
+def verified_member_pages(query, scope, page_size):
+    """Yield the first roster to a staging writer and verify it before that writer publishes."""
+    expected = None
+    for scan in (1, 2):
+        cursor, scanned, checksum = "", 0, bytes(32)
+        while True:
+            page, urls = member_page(query, scope, cursor, page_size)
+            scanned += len(urls)
+            checksum = roster_hash(checksum, urls)
+            if scan == 1:
+                yield page
+            if len(page) < page_size:
+                break
+            cursor = urls[-1]
+        if member_count(query, scope) != scanned or (scan == 2 and expected != (scanned, checksum)):
+            raise ValueError("Wikidata class membership changed during pagination.")
+        expected = scanned, checksum
 
 
 def current(db, source, force):

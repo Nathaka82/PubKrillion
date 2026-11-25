@@ -212,6 +212,7 @@ class WorldQuestions(unittest.TestCase):
                 {
                     "entities": {
                         i: {
+                            "id": i,
                             "labels": {
                                 "en": {"value": "Item " + str(int(i[1:]) - 10000)}
                             },
@@ -234,11 +235,17 @@ class WorldQuestions(unittest.TestCase):
             for i in range(2501)
         ]
         pages = [rows[i : i + 500] for i in range(0, len(rows), 500)]
-        with patch("world_facts.bindings", side_effect=pages):
+        count = [{"n": {"value": str(len(rows))}}]
+        with patch("world_facts.bindings", side_effect=(pages+[count])*2):
             wikidata(self.graph, "device", "Q42")
         self.assertEqual(
             self.graph.execute("SELECT count(*) FROM member").fetchone()[0], 2501
         )
+        changed = [{"item": {"value": "https://www.wikidata.org/entity/Q13000"}}]
+        with patch("world_facts.bindings", side_effect=pages+[count]+pages[:-1]+[changed,count]):
+            with self.assertRaisesRegex(ValueError, "changed during pagination"):
+                wikidata(self.graph, "device", "Q42")
+        self.assertFalse(self.graph.execute("SELECT 1 FROM member WHERE id='wd:Q13000'").fetchone())
         self.assertEqual(
             self.graph.execute(
                 "SELECT id FROM entity_name WHERE term='alias 2500'"

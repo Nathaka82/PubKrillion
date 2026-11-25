@@ -36,6 +36,7 @@ class ComparisonTests(unittest.TestCase):
         def endpoint(url):
             args = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
             self.assertNotIn("languages", args)
+            self.assertEqual(args["redirects"], ["no"])
             queried.append(args["ids"][0])
             if len(queried) == 1:
                 raise sources.DownloadTooLarge("split the batch")
@@ -47,11 +48,14 @@ class ComparisonTests(unittest.TestCase):
                 "Q2": {"labels": {"uk": {"value": "Друга назва"}}, "aliases": {"uk": [{"value": "Назва"}]}},
             }
             qid = args["ids"][0]
-            return json.dumps({"entities": {qid: catalog[qid]}}).encode()
+            return json.dumps({"entities": {qid: {"id": qid, **catalog[qid]}}}).encode()
 
         with patch.object(sources, "fetch", side_effect=endpoint):
             rows = list(sources.named_items(page))
         self.assertEqual(queried, ["Q1|Q2", "Q1", "Q2"])
+        with patch.object(sources, "fetch", return_value=b'{"entities":{"Q1":{"id":"Q3","labels":{}}}}'):
+            with self.assertRaisesRegex(ValueError,"requested entity"):
+                list(sources.named_items(page[:1]))
         self.assertEqual((rows[0][1], set(rows[0][2]), rows[0][3]), ("First", {"ᐃᓄᒃ", "নাম"}, 3))
         self.assertEqual(rows[1], ("Q2", "Друга назва", ["Назва"], 1))
 

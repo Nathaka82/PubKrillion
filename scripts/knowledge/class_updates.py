@@ -10,11 +10,11 @@ import urllib.parse
 from contextlib import closing
 
 from graph import digest
-from sources import fetch, named_record
-from world_facts import bindings
+from sources import fetch, named_items, named_record
+from world_facts import bindings, member_count, member_page, roster_hash
 
 KEY = re.compile(r"(type|kind):(Q[1-9]\d{0,11})")
-CAPTURE_FORMAT = 3
+CAPTURE_FORMAT = 4
 SCHEMA = """
 CREATE TABLE current_class(rule TEXT PRIMARY KEY,revision TEXT,captured INTEGER,n INTEGER,scanned INTEGER);
 CREATE TABLE current_member(rule TEXT,id INTEGER,name TEXT,aliases TEXT,PRIMARY KEY(rule,id)) WITHOUT ROWID;
@@ -64,6 +64,11 @@ def due(file, capture_format=CAPTURE_FORMAT):
 
 def fingerprint(db, key):
     checksum = hashlib.sha256(key.encode("ascii"))
+    if db.execute("PRAGMA user_version").fetchone()[0] >= 4:
+        scans = db.execute("SELECT scanned,checksum FROM scan WHERE finished=1 ORDER BY pass").fetchall()
+        if len(scans) != 2 or scans[0] != scans[1] or len(scans[0][1]) != 32:
+            raise ValueError("The class capture has no matching membership verification.")
+        checksum.update(b"\x00roster-v1\x00" + str(scans[0][0]).encode("ascii") + scans[0][1])
     for row in db.execute("SELECT id,name,aliases FROM member ORDER BY id"):
         checksum.update(json.dumps(list(row), ensure_ascii=False, separators=(",", ":")).encode() + b"\n")
     return checksum.hexdigest()
@@ -103,56 +108,45 @@ def page_names(page):
                 yield record
 
 
+def restart_scan(db):
+    db.execute("DELETE FROM member")
+    db.execute("DELETE FROM scan")
+    db.executemany("INSERT INTO scan VALUES(?,'',0,?,0)", [(n, bytes(32)) for n in (1, 2)])
+
+
 def advance(key, file, *, pages=2, page_size=200):
-    """Commit each whole page. The active snapshot changes only after the last page."""
+    """Persist two ordered scans. Only the first one downloads names."""
     partial = file.with_suffix(".partial")
     file.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(partial)) as db:
-        db.executescript("""CREATE TABLE IF NOT EXISTS progress(rule TEXT PRIMARY KEY,cursor TEXT,scanned INTEGER);
+        db.executescript("""CREATE TABLE IF NOT EXISTS scan(pass INTEGER PRIMARY KEY,cursor TEXT,
+                scanned INTEGER,checksum BLOB,finished INTEGER);
             CREATE TABLE IF NOT EXISTS member(id INTEGER PRIMARY KEY,name TEXT,aliases TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS release(rule TEXT PRIMARY KEY,revision TEXT,captured INTEGER,n INTEGER);""")
         with db:
             if db.execute("PRAGMA user_version").fetchone()[0] != CAPTURE_FORMAT:
-                db.execute("DELETE FROM member")
-                db.execute("DELETE FROM progress")
+                db.execute("DROP TABLE IF EXISTS progress")
                 db.execute("DELETE FROM release")
+                restart_scan(db)
                 db.execute(f"PRAGMA user_version={CAPTURE_FORMAT}")
-            db.execute("INSERT OR IGNORE INTO progress VALUES(?,'',0)", (key,))
-        cursor, scanned = db.execute("SELECT cursor,scanned FROM progress WHERE rule=?", (key,)).fetchone()
         for _ in range(pages):
-            if db.execute("SELECT 1 FROM release WHERE rule=?", (key,)).fetchone():
+            state = db.execute("SELECT pass,cursor,scanned,checksum FROM scan WHERE finished=0 ORDER BY pass LIMIT 1").fetchone()
+            if not state:
                 break
-            after = f"FILTER(STR(?item)>{json.dumps(cursor)})" if cursor else ""
-            page = bindings(
-                f"SELECT DISTINCT ?item WHERE {{ {condition(key)} {after} }} ORDER BY STR(?item) LIMIT {page_size}"
-            )
-            urls = [row["item"]["value"] for row in page]
-            if (
-                len(urls) > page_size
-                or urls != sorted(set(urls))
-                or (urls and urls[0] <= cursor)
-                or any(not re.fullmatch(r"https?://www\.wikidata\.org/entity/Q[1-9]\d*", u) for u in urls)
-            ):
-                raise ValueError("The Wikidata class page has inconsistent identifiers or ordering.")
-            # Fetch all labels before advancing the cursor. A failed label batch leaves this page retryable.
-            names = [
-                (int(qid[1:]), name, json.dumps(sorted(aliases), ensure_ascii=False))
-                for qid, name, aliases, _ in page_names(page)
-            ]
-            scanned += len(page)
+            scan, cursor, scanned, checksum = state
+            scope = condition(key)
+            page, urls = member_page(bindings, scope, cursor, page_size)
+            checksum = roster_hash(checksum, urls)
+            scanned += len(urls)
             cursor = urls[-1] if urls else cursor
-            if len(page) < page_size:
-                counts = bindings(f"SELECT (COUNT(DISTINCT ?item) AS ?n) WHERE {{ {condition(key)} }}")
-                if len(counts) != 1 or not str(counts[0]["n"]["value"]).isdecimal():
-                    raise ValueError("Wikidata did not supply the class member count.")
-                if int(counts[0]["n"]["value"]) != scanned:
+            finished = len(page) < page_size
+            if finished:
+                first = db.execute("SELECT scanned,checksum FROM scan WHERE pass=1").fetchone()
+                if member_count(bindings, scope) != scanned or (scan == 2 and first != (scanned,checksum)):
                     with db:
-                        db.execute("DELETE FROM member")
-                        db.execute("UPDATE progress SET cursor='',scanned=0 WHERE rule=?", (key,))
-                    raise ValueError(
-                        "Membership changed during pagination. The publisher will repeat the class check."
-                    )
-            if not scanned:
+                        restart_scan(db)
+                    raise ValueError("Membership changed during pagination. The publisher will repeat the class check.")
+            if scan == 2 and finished and not scanned:
                 cls = KEY.fullmatch(key)[2]
                 args = urllib.parse.urlencode(
                     {"action": "wbgetentities", "ids": cls, "props": "info", "format": "json"}
@@ -160,13 +154,19 @@ def advance(key, file, *, pages=2, page_size=200):
                 item = json.loads(fetch("https://www.wikidata.org/w/api.php?" + args))["entities"][cls]
                 if item.get("id") != cls or not ("missing" in item or item.get("lastrevid")):
                     raise ValueError("The source could not confirm the empty class.")
+            names = [(int(qid[1:]), name, json.dumps(sorted(aliases), ensure_ascii=False))
+                     for qid, name, aliases, _ in named_items(page)] if scan == 1 else []
+            if scan == 1 and finished and scanned and not names and not db.execute(
+                    "SELECT 1 FROM member LIMIT 1").fetchone():
+                with db:
+                    restart_scan(db)
+                raise ValueError("The source listed class members without usable names.")
             with db:
                 db.executemany("INSERT INTO member VALUES(?,?,?)", names)
-                db.execute("UPDATE progress SET cursor=?,scanned=? WHERE rule=?", (cursor, scanned, key))
-                if len(page) < page_size:
+                db.execute("UPDATE scan SET cursor=?,scanned=?,checksum=?,finished=? WHERE pass=?",
+                           (cursor,scanned,checksum,finished,scan))
+                if scan == 2 and finished:
                     n = db.execute("SELECT count(*) FROM member").fetchone()[0]
-                    if scanned and not n:
-                        raise ValueError("The source listed class members without usable names.")
                     db.execute(
                         "INSERT INTO release VALUES(?,?,?,?)",
                         (key, fingerprint(db, key), int(time.time()), n),
@@ -214,7 +214,10 @@ def refresh(db, storage, offline):
                     or release[3] != saved.execute("SELECT count(*) FROM member").fetchone()[0]
                 ):
                     raise ValueError("The current Wikidata class snapshot failed verification.")
-                scanned = saved.execute("SELECT scanned FROM progress WHERE rule=?",(key,)).fetchone()[0]
+                if saved.execute("PRAGMA user_version").fetchone()[0] >= 4:
+                    scanned = saved.execute("SELECT scanned FROM scan WHERE pass=1").fetchone()[0]
+                else:
+                    scanned = saved.execute("SELECT scanned FROM progress WHERE rule=?",(key,)).fetchone()[0]
                 if scanned<release[3]:
                     raise ValueError("The current Wikidata class has more names than source members.")
                 db.execute("INSERT INTO current_class VALUES(?,?,?,?,?)", (*release,scanned))

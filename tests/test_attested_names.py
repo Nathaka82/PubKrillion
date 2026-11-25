@@ -128,14 +128,14 @@ class RecordedNames(unittest.TestCase):
         key, file = next(class_updates.registered(self.root))
         page = [{"item": {"value": "http://www.wikidata.org/entity/Q900"}}]
         with (
-            patch.object(class_updates, "bindings", side_effect=[page, [{"n": {"value": "1"}}]]),
+            patch.object(class_updates, "bindings", side_effect=[page, [{"n": {"value": "1"}}]] * 2),
             patch.object(
                 class_updates,
-                "page_names",
+                "named_items",
                 return_value=[("Q900", "Another work", ["Local gallery name"], 1)],
             ),
         ):
-            class_updates.advance(key, file, pages=1)
+            class_updates.advance(key, file, pages=2)
         self.publish()
         second, _ = self.bank()
         self.assertEqual(self.answer(second, "Local gallery name"), (None,))

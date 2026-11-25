@@ -612,6 +612,7 @@ def named_items(page):
                 "action": "wbgetentities",
                 "ids": "|".join(batch),
                 "props": "labels|aliases",
+                "redirects": "no",
                 "format": "json",
             }
         )
@@ -626,6 +627,8 @@ def named_items(page):
             return
         for item in batch:
             entity = entities[item]
+            if entity.get("id") != item or "missing" in entity:
+                raise ValueError("The Wikidata names no longer belong to the requested entity.")
             labels = {lang:v["value"] for lang,v in entity.get("labels",{}).items()}
             aliases = {lang:[v["value"] for v in values] for lang,values in entity.get("aliases",{}).items()}
             if record := named_record(item,labels,aliases):
@@ -644,7 +647,7 @@ def wikidata(db, term, qid=None, export=None, relation=None, target=None, kinds=
     # Direct instances and subclasses are candidates; web result snippets never establish membership.
     if relation:
         return relation_source(db, term, qid, relation, target, export)
-    from world_facts import bindings as query_page, membership_scope
+    from world_facts import bindings as query_page, membership_scope, verified_member_pages
 
     try:
         from wordfreq import zipf_frequency
@@ -653,17 +656,15 @@ def wikidata(db, term, qid=None, export=None, relation=None, target=None, kinds=
     import hashlib
 
     scope = membership_scope(qid, kinds)
-    after = ""
     fingerprint = hashlib.sha256()
     count = 0
     seen_members = False
     with tempfile.TemporaryFile(mode="w+t", encoding="utf8") as staged:
-        while True:
-            cursor_filter = f"FILTER(STR(?item)>{json.dumps(after)})" if after else ""
-            query = f"""SELECT DISTINCT ?item WHERE {{ {scope}
-                    {cursor_filter} }} ORDER BY STR(?item) LIMIT 500"""
-            page = query_page(query)
-            seen_members |= any(r["item"]["value"].rsplit("/", 1)[-1] != qid for r in page)
+        for page in verified_member_pages(query_page, scope, 500):
+            for row in page:
+                item = row["item"]["value"].rsplit("/", 1)[-1]
+                seen_members |= item != qid
+                fingerprint.update(b"\x00" + item.encode("ascii") + b"\n")
             for eid, name, aliases, langs in named_items(page):
                 if eid == qid:
                     continue
@@ -685,12 +686,6 @@ def wikidata(db, term, qid=None, export=None, relation=None, target=None, kinds=
                 staged.write(line)
                 fingerprint.update(line.encode())
                 count += 1
-            if len(page) < 500:
-                break
-            cursor = page[-1]["item"]["value"]
-            if cursor <= after:
-                raise ValueError("Wikidata did not advance its class results page.")
-            after = cursor
         if not count and allow_empty and not seen_members:
             # An empty query can represent a withdrawn scope. Cross-check that
             # the entity service can account for this class before replacing it.

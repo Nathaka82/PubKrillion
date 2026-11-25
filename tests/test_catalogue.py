@@ -142,6 +142,45 @@ class CatalogueTests(unittest.TestCase):
             self.assertEqual(catalogue.match_question(db,"Name a Q91")["records"],1)
             self.assertIsNone(catalogue.match_question(db,"Name an illustrator who won an unrecorded prize"))
 
+    def test_class_reverification_upgrades_old_files_and_checks_unnamed_members(self):
+        key = "type:Q10"
+        watched_rules.follow(self.root,key)
+        _, file = next(class_updates.registered(self.root))
+        file.parent.mkdir(parents=True)
+        for path in (file,file.with_suffix(".partial")):
+            with closing(sqlite3.connect(path)) as old:
+                old.executescript("""PRAGMA user_version=3;
+                    CREATE TABLE progress(rule TEXT PRIMARY KEY,cursor TEXT,scanned INTEGER);
+                    CREATE TABLE member(id INTEGER PRIMARY KEY,name TEXT,aliases TEXT NOT NULL);
+                    CREATE TABLE release(rule TEXT PRIMARY KEY,revision TEXT,captured INTEGER,n INTEGER);
+                    INSERT INTO member VALUES(98,'Old name','[]');""")
+                old.execute("INSERT INTO progress VALUES(?,'old',1)",(key,))
+                old.execute("INSERT INTO release VALUES(?,?,1000,1)",(key,class_updates.fingerprint(old,key)))
+                old.commit()
+        previous = self.publish()["edition"]
+        def scan(ids, *, size, final=False, names=()):
+            rows = [{"item":{"value":f"http://www.wikidata.org/entity/Q{i}"}} for i in ids]
+            results = [rows, [{"n":{"value":"2"}}]] if final else [rows]
+            with patch.object(class_updates,"bindings",side_effect=results),patch.object(
+                class_updates,"named_items",return_value=names
+            ) as labels:
+                class_updates.advance(key,file,pages=1,page_size=size)
+                return labels.call_count
+        for attempt in range(2):
+            self.assertEqual(scan([101,106],size=2,names=[("Q101","One",[],1)]),1)
+            scan([],size=2,final=True)
+            self.assertEqual(self.publish()["edition"],previous)
+            if attempt == 0:
+                with self.assertRaisesRegex(ValueError,"changed during pagination"):
+                    scan([101,107],size=8,final=True)
+            else:
+                self.assertEqual(scan([101,106],size=8,final=True),0)
+        with closing(sqlite3.connect(file)) as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0],class_updates.CAPTURE_FORMAT)
+            self.assertEqual(db.execute("SELECT id FROM member").fetchall(),[(101,)])
+            self.assertEqual(db.execute("SELECT scanned,length(checksum),finished FROM scan").fetchall(),[(2,32,1)]*2)
+        self.assertNotEqual(self.publish()["edition"],previous)
+
     def test_watched_class_pages_are_atomic_and_can_resume_after_an_outage(self):
         key = "type:Q10"
         watched_rules.follow(self.root,key)
@@ -157,13 +196,18 @@ class CatalogueTests(unittest.TestCase):
                 if qid!="Q106":
                     yield qid,"New "+qid,["Alias "+qid],1
         def run(pages):
-            with patch.object(class_updates,"bindings",side_effect=pages),patch.object(class_updates,"page_names",side_effect=names):
+            with patch.object(class_updates,"bindings",side_effect=pages),patch.object(class_updates,"named_items",side_effect=names):
                 class_updates.advance(key,cache,pages=1,page_size=2)
         run([page(101,102)])
         self.assertFalse(cache.exists())
         self.publish()
         with closing(catalogue.reader(self.published)) as db:
             self.assertEqual(catalogue.match_question(db,"Name a work")["records"],6)
+        with self.assertRaisesRegex(OSError,"offline"):
+            run([OSError("offline")])
+        run([page(103),count(3)])
+        self.assertFalse(cache.exists())
+        run([page(101,102)])
         with self.assertRaisesRegex(OSError,"offline"):
             run([OSError("offline")])
         run([page(103),count(3)])
@@ -188,6 +232,15 @@ class CatalogueTests(unittest.TestCase):
             self.assertEqual(catalogue.match_question(db,"Name a work"),current)
         run([page(102,104)])
         run([page(),count(2)])
+        # Equal counts also need equal identities, even across restarts of the verifier.
+        run([page(102,105)])
+        with self.assertRaisesRegex(ValueError,"changed during pagination"):
+            run([page(),count(2)])
+        self.assertEqual(self.publish()["edition"],current["edition"])
+        run([page(102,104)])
+        run([page(),count(2)])
+        run([page(102,104)])
+        run([page(),count(2)])
         self.publish()
         with closing(catalogue.reader(self.published)) as db:
             new = catalogue.match_question(db,"Name a work")
@@ -195,9 +248,12 @@ class CatalogueTests(unittest.TestCase):
             self.assertNotEqual(new["edition"],current["edition"])
         with patch.object(class_updates,"fetch",return_value=b'{"entities":{"Q10":{"id":"Q10","lastrevid":1}}}'):
             run([page(),count(0)])
+            run([page(),count(0)])
         self.publish()
         with closing(catalogue.reader(self.published)) as db,self.assertRaises(catalogue.RuleWithdrawn):
             catalogue.match_question(db,"Name a work")
+        run([page(101,106)])
+        run([page(),count(2)])
         run([page(101,106)])
         run([page(),count(2)])
         self.publish()
@@ -221,6 +277,8 @@ class CatalogueTests(unittest.TestCase):
             if "P87654" in sparql:
                 return [{"item": item(qid), "place": item("Q990"), "name": {"value": "Gallery"}}
                         for qid in sorted(linked) if "wd:" + qid in sparql]
+            if "COUNT(DISTINCT ?item)" in sparql:
+                return [{"n":{"value":str(len(members))}}]
             return [{"item": item(qid)} for qid in sorted(members)]
         def api(url):
             args = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
