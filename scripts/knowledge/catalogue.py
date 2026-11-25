@@ -271,6 +271,7 @@ def import_feed(db, manifest, cache, offline, definition=None):
 
 
 def build(world, output, feeds, *, offline=False, include_bundled=True, measurements=None, discover_dates=False, discover_names=False):
+    from compiler import BANK_FORMAT
     import attested_names
     import entity_labels
     import attention
@@ -409,7 +410,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             if world is not None:
                 watched.append(("entity-labels",entity_labels.publish(db,output.parent,output)))
             rank_path, rank_release = attention.source(output.parent, output)
-            edition = digest([FORMAT, RULE_REVISION, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,name_revision,rank_release])
+            edition = digest([FORMAT, RULE_REVISION, BANK_FORMAT, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,name_revision,rank_release])
             reuse_world = False
             if output.is_file():
                 with closing(reader(output)) as previous:

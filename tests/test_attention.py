@@ -23,6 +23,63 @@ class ReadershipTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
 
+    def test_readership_cannot_promote_a_shared_title_past_a_survey_of_one_owner(self):
+        prompt = "Name a film"
+        with closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            shared = {1:"Shared A", 101:"Shared A", 102:"Shared A", 2:"Shared B", 103:"Shared B"}
+            films = [{"id":f"wd:Q{i}", "name":shared.get(i,f"Film {i}"), "types":["film"],
+                      "graph_recognition":[0,3]} for i in range(1,104)]
+            for i in (1,103):  # Exercise both orders of measured and unmeasured owners.
+                films[i-1]["recall"] = [{"prompt":prompt,"count":200,"participants":1000}]
+            ingest(graph,{"source":"world5m-films","revision":"1","url":"https://example.org",
+                          "terms":{"film":[]}}, films)
+            graph.executescript(attention.SCHEMA)
+            graph.execute("INSERT INTO readership_release VALUES('one','https://example.org',103)")
+            graph.executemany("INSERT INTO readership VALUES(?,?)",
+                              ((i,1 if i in shared else i) for i in range(1,104)))
+            bank, _ = evaluate(graph,game,prompt,name_catalogue=graph)
+            tiers = dict(game.execute("SELECT name,depth FROM kb_member WHERE bank=?", (bank,)))
+            self.assertEqual(tiers["Shared A"],2)
+            self.assertEqual(tiers["Shared B"],2)
+            self.assertEqual(tiers["Film 3"],4)
+
+    def test_counts_entity_surveys_separately_and_team_choices_once_for_shared_titles(self):
+        prompt = "Name a film"
+        with closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            films = [{"id":f"wd:Q{i}", "name":f"Film {i}", "types":["film"]} for i in range(1,101)]
+            films.append({"id":"wd:Q101","name":"FILM 1","types":["film"]})
+            survey = [{"prompt":prompt,"count":6,"participants":1000}]
+            films[0]["recall"] = films[-1]["recall"] = survey
+            source = {"source":"films","revision":"1","url":"https://example.org","terms":{"film":[]}}
+            ingest(graph,source,films)
+            def compile():
+                bank,meta = evaluate(graph,game,prompt)
+                tier, = game.execute("SELECT depth FROM kb_member WHERE bank=? AND lower(name)='film 1'",(bank,)).fetchone()
+                return tier,meta
+            # Each film clears the two-percent threshold individually. Either film can
+            # prompt the same playable answer, so those estimates cannot certify tier five.
+            self.assertEqual(compile()[0],4)
+            del films[0]["recall"], films[-1]["recall"]
+            ingest(graph,{**source,"revision":"2"},films)
+            _, meta = compile()
+            game.execute("CREATE TABLE rounds(id INTEGER PRIMARY KEY,phase TEXT)")
+            game.executemany("INSERT INTO rounds VALUES(?,'locked')",[(1,),(2,),(3,)])
+            cohort = meta["cohort"]
+            choices = ["Film 1"]*3 + ["FILM 1"]*3 + [f"Film {2+n%99}" for n in range(994)]
+            game.executemany("INSERT INTO kb_pick(cohort,team,room,round,choice) VALUES(?,?,?,?,?)",
+                             ((cohort,n,str(n%3),1+n%3,choice) for n,choice in enumerate(choices)))
+            game.execute("INSERT INTO kb_calibration VALUES(?,?)",(cohort,len(choices)))
+            tier,meta = compile()
+            self.assertEqual(meta["observedTeams"],1000)
+            self.assertEqual(tier,5)
+            # Twelve distinct teams used the name. Splitting the casing into two
+            # six-pick counts would incorrectly keep it in the top tier.
+            game.executemany("UPDATE kb_pick SET choice=? WHERE cohort=? AND team=?",
+                             ((name,cohort,n) for n,name in enumerate(["Film 1","FILM 1"]*3, start=6)))
+            self.assertEqual(compile()[0],4)
+
     def download(self, rows, *, wrong_digest=False):
         data = gzip.compress(("Entity,QRank\n" + rows).encode())
         checksum = "0"*64 if wrong_digest else hashlib.sha256(data).hexdigest()

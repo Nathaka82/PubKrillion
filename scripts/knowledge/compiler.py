@@ -6,7 +6,7 @@ import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
-BANK_FORMAT = 32
+BANK_FORMAT = 33
 
 
 def noun(text):
@@ -288,6 +288,16 @@ def upper_recall(count, population):
     )) / (1 + z*z/population)
 
 
+def recall_depth(upper):
+    if upper >= .35:
+        return 1
+    if upper >= .15:
+        return 2
+    if upper >= .05:
+        return 3
+    return 4
+
+
 def class_paths(db, cls, sources, include_measured):
     """Find a shortest recorded subclass path from each contributing type."""
     from collections import defaultdict, deque
@@ -418,6 +428,10 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     cohort = digest(["source-name-decisions-v2", prompt, plan, [(s, sources[s]["revision"]) for s in sorted(dependencies)]])
     observed = observed_choices(game, cohort)
     population = sum(observed.values())
+    name_picks = {}
+    for name, count in observed.items():
+        term = spelling(name)
+        name_picks[term] = name_picks.get(term, 0) + count
     # Another group in the publication may introduce a conflicting alias while
     # this question's own qualifying records and recall cohort stay the same.
     if name_catalogue is None and plan.get("catalogueKey"):
@@ -448,7 +462,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         for state, n in db.execute("SELECT outcome,count(*) FROM measure_decision WHERE outcome<>'accepted' GROUP BY outcome"):
             gaps[state] += n
     db.executescript("""DROP TABLE IF EXISTS temp.result; CREATE TEMP TABLE result(
-        id TEXT PRIMARY KEY, name TEXT, depth INTEGER, aliases TEXT, evidence TEXT, upper REAL, proxy REAL, term TEXT UNIQUE, links INTEGER);""")
+        id TEXT PRIMARY KEY, name TEXT, depth INTEGER, aliases TEXT, evidence TEXT, upper REAL, proxy REAL,
+        term TEXT UNIQUE, links INTEGER, survey_total REAL NOT NULL);""")
     db.executescript("""DROP TABLE IF EXISTS temp.qualified;
         CREATE TEMP TABLE qualified(id TEXT PRIMARY KEY, owner TEXT NOT NULL) WITHOUT ROWID;
         DROP TABLE IF EXISTS temp.spellings;
@@ -605,30 +620,22 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         primary = rows[0]["name"]
         aliases = [name for name in names if name != primary]
         depth = min(4, min((r["depth"] for r in rows if r["depth"] is not None), default=2))
-        upper = None
+        term = spelling(primary)
+        survey_total = 0
         for sample in db.execute(
             "SELECT n,population,source FROM recall WHERE id=? AND prompt=?",
             (eid, prompt),
         ):
             n, p = sample[0], sample[1]
             bound = upper_recall(n, p)
-            upper = max(upper or 0, bound)
+            survey_total = max(survey_total, bound)
             selected.add(sample[2])
         # An eligible answer selected zero times in a measured cohort has the
         # same denominator as every other eligible answer in that edition.
-        picks = observed.get(primary, 0)
-        if population:
-            upper = max(upper or 0, upper_recall(picks, population))
+        choice_bound = upper_recall(name_picks.get(term, 0), population) if population else 0
+        upper = max(survey_total, choice_bound) or None
         if upper is not None:
-            depth = (
-                1
-                if upper >= 0.35
-                else 2
-                if upper >= 0.15
-                else 3
-                if upper >= 0.05
-                else 4
-            )
+            depth = recall_depth(upper)
         signal = db.execute(
             "SELECT frequency,languages FROM familiarity WHERE id=? ORDER BY frequency DESC LIMIT 1",
             (eid,),
@@ -657,7 +664,6 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                 proxy = round(frequency + math.log10(1 + incoming), 3)
             if upper is None and not signal and not (frequency or incoming):
                 depth = min(depth, 2)
-        term = spelling(primary)
         existing = db.execute("SELECT * FROM result WHERE term=?", (term,)).fetchone()
         db.execute("INSERT INTO qualified VALUES(?,?)", (eid, existing["id"] if existing else eid))
         if existing:
@@ -667,18 +673,24 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                 - {existing["name"]}
             )
             evidence += json.loads(existing["evidence"])
+            # Entity surveys may describe different respondents. Bound the chance
+            # of recalling any owner. In-game choices already count the shared name once.
+            survey_total = min(1.0, survey_total + existing["survey_total"])
             upper = (
-                max(upper, existing["upper"])
+                max(survey_total, choice_bound)
                 if upper is not None and existing["upper"] is not None
                 else None
             )
+            if upper is not None:
+                depth = min(depth, recall_depth(upper))
             proxy = (
                 max(proxy, existing["proxy"])
                 if proxy is not None and existing["proxy"] is not None
                 else None
             )
             db.execute(
-                "UPDATE result SET depth=?,aliases=?,evidence=?,upper=?,proxy=?,links=max(coalesce(links,0),coalesce(?,0)) WHERE term=?",
+                """UPDATE result SET depth=?,aliases=?,evidence=?,upper=?,proxy=?,
+                    links=max(coalesce(links,0),coalesce(?,0)),survey_total=? WHERE term=?""",
                 (
                     min(depth, existing["depth"]),
                     json.dumps(aliases),
@@ -686,12 +698,13 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                     upper,
                     proxy,
                     links,
+                    survey_total,
                     term,
                 ),
             )
         else:
             db.execute(
-                "INSERT INTO result VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO result VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     eid,
                     primary,
@@ -702,6 +715,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                     proxy,
                     term,
                     links,
+                    survey_total,
                 ),
             )
     size = db.execute("SELECT COUNT(*) FROM result").fetchone()[0]
@@ -715,6 +729,10 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         WHERE result.id=ranks.id AND ranks.n>=12 AND result.depth=2 AND result.upper IS NULL""")
     import attention
     readership = attention.score(db,name_catalogue,size)
+    # A partial survey can cap the bonus that indirect signals give a shared name.
+    partial = db.execute("SELECT id,survey_total FROM result WHERE upper IS NULL AND survey_total>0")
+    db.executemany("UPDATE result SET depth=min(depth,?) WHERE id=?",
+                   ((recall_depth(total), item) for item,total in partial))
     budget = size // 20
     for bound, num in db.execute(
         "SELECT upper,COUNT(*) FROM result WHERE upper<.02 GROUP BY upper ORDER BY upper"
