@@ -133,18 +133,37 @@ def add(
 
     fav.update(map(norm, split(COMMON.get(pack, ""))))
     deep.update(map(norm, split(DEEP.get(pack, ""))))
-    # Familiarity in English is a starting point; editors can override individual tiers.
-    ordered = sorted(by_name, key=lambda k: (-zipf_frequency(k, "en"), k))
-    tiers = {k: 1 + min(4, 5 * i // len(ordered)) for i, k in enumerate(ordered)}
+    # Use the most familiar written name, not the obscurity of one spelling.
+    # Identical evidence earns identical automatic scores, including unseen words.
+    frequency = {}
+    for k, (_, variants) in by_name.items():
+        spellings = {k}
+        for variant in variants:
+            alias = norm(variant)
+            if len(alias) > 3 and ownership[alias] == {k}:
+                spellings.add(alias)
+        frequency[k] = max(zipf_frequency(v, "en") for v in spellings)
+    frequencies = sorted(frequency.values(), reverse=True)
+    first_rank = {}
+    for i, value in enumerate(frequencies):
+        first_rank.setdefault(value, i)
+    tiers = {}
+    for k, value in frequency.items():
+        rank = first_rank[value] / len(frequencies)
+        tiers[k] = 1 if rank < .35 else 2 if rank < .70 else 3 if rank < .90 else 4
     for k in fav & tiers.keys():
         tiers[k] = 1
-    for k in deep & tiers.keys():
-        tiers[k] = 5
     for tier, labels in (groups or {}).items():
         for name in split(labels):
             if norm(name) not in tiers:
                 raise ValueError(f"{key}: unknown rarity choice {name}")
             tiers[norm(name)] = tier
+    # Top scores require an editorial nomination. Never fill a quota with
+    # ordinary answers. The order resolves equally uncommon editorial picks.
+    nominees = sorted(((deep | {k for k in tiers if tiers[k] == 5}) & tiers.keys()) - fav,
+                      key=lambda k: (frequency[k], k))
+    for i, k in enumerate(nominees):
+        tiers[k] = 5 if i < max(1, len(tiers) // 20) else 4
     answers = []
     for k, (name, variants) in sorted(by_name.items()):
         variants = sorted(
@@ -161,7 +180,7 @@ def add(
     q = dict(
         id=pack + "-" + key,
         title=title,
-        topic=PACKS[pack],
+        topic="Sport" if pack == "ultimate" else PACKS[pack],
         prompt=prompt,
         source=source,
         coverage=coverage,

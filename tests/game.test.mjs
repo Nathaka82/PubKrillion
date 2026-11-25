@@ -97,7 +97,7 @@ test("all starter categories, aliases, typos and ambiguous examples", async () =
   assert.equal(new Set(pack.map((x) => x.id)).size, 20);
   for (const raw of pack) {
     const q = validateQuestion(raw, raw.id);
-    assert.equal(new Set(q.answers.map((a) => a.depth)).size, 5);
+    assert.ok(q.answers.filter((a) => a.depth === 5).length <= Math.max(1, Math.floor(q.answers.length / 20)));
     for (const a of q.answers)
       for (const name of [a.name, ...a.aliases])
         assert.deepEqual(matchAnswer(name, q.answers), {
@@ -209,8 +209,8 @@ test("bulk import, paging, semantic receipts and immutable large rounds", async 
   const sample = await ok(host("/packs/sample"));
   assert.equal((await team("/packs/sample")).status, 401);
   assert.deepEqual(await ok(host(root + "/packs", "POST", sample)), {
-    added: 2,
-    skipped: 0,
+    added: 1,
+    skipped: 1,
   });
   const q = {
     id: "large",
@@ -247,7 +247,7 @@ test("bulk import, paging, semantic receipts and immutable large rounds", async 
   });
   assert.equal(failed.status, 409);
   assert.equal((await host(root + "/library/rollback")).status, 404);
-  assert.equal((await ok(host(root + "/library"))).length, 1022);
+  assert.equal((await ok(host(root + "/library"))).length, 1198);
   const part = await ok(
     host(root + "/library/large/answers?depth=5&offset=40"),
   );
@@ -387,7 +387,7 @@ test(
     const created = await hs();
     assert.equal(created.round, null);
     const pack = await ok(host(root + "/library"));
-    assert.equal(pack.length, 20);
+    assert.equal(pack.length, 197);
     assert.equal((await anon(root + "/library")).status, 401);
     const teams = Array.from({ length: 30 }, () => client(f));
     await Promise.all(

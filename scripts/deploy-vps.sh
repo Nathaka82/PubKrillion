@@ -28,7 +28,7 @@ compatible() {
 activate() {
   local dir=$1 origin expected body
   expected=$(revision "$dir")
-  compose "$dir" up -d --no-build --pull never --wait --wait-timeout 100 app || return 1
+  compose "$dir" up -d --no-build --pull never --wait --wait-timeout 100 || return 1
   origin=$(compose "$dir" exec -T app node -p 'process.env.PUBLIC_ORIGIN') || return 1
   # Caddy may briefly cache the replaced container's address.
   for attempt in {1..10}; do

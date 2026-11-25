@@ -82,7 +82,7 @@ def build():
         (
             "best-picture",
             "Best Picture nominees",
-            "a Best Picture nominee",
+            "a film nominated for Best Picture",
             "BEST PICTURE",
             "Film",
             False,
@@ -122,7 +122,7 @@ def build():
         (
             "animation",
             "Oscar animation",
-            "an Animated Feature nominee",
+            "a film nominated for Best Animated Feature",
             "ANIMATED FEATURE FILM",
             "Film",
             False,
@@ -132,7 +132,7 @@ def build():
         (
             "international",
             "World cinema",
-            "an International Feature or Foreign Language Film winner",
+            "a film that won Best International Feature Film, formerly Best Foreign Language Film,",
             "INTERNATIONAL FEATURE FILM",
             "Film",
             True,
@@ -142,7 +142,7 @@ def build():
         (
             "docs",
             "True stories",
-            "a Documentary Feature nominee",
+            "a film nominated for Best Documentary Feature",
             "DOCUMENTARY (Feature)",
             "Film",
             False,
@@ -152,7 +152,7 @@ def build():
         (
             "vfx",
             "Movie magic",
-            "a competitive Visual Effects winner",
+            "a film that won Best Visual Effects",
             "VISUAL EFFECTS",
             "Film",
             True,
@@ -170,6 +170,7 @@ def build():
             97,
         ),
     ]
+    ceremony_year = {1: 1929, 9: 1937, 29: 1957, 50: 1978, 72: 2000, 74: 2002}
     for key, label, what, cat, col, won, lo, hi in specs:
         vals = [
             v
@@ -185,11 +186,7 @@ def build():
             label,
             "Name "
             + what
-            + " at Academy Awards ceremonies "
-            + str(lo)
-            + "–"
-            + str(hi)
-            + (" (2000–2025)." if lo == 72 else " inclusive."),
+            + f" at the Oscars between {ceremony_year[lo]} and 2025.",
             OS,
             [person(v) if col == "Nominees" else film(v) for v in vals],
             "All qualifying competitive records in the Academy database transcription. Ceremony numbers refer to presentation years, not a film’s release year.",
@@ -227,7 +224,7 @@ def build():
             studio + " features",
             "Name a "
             + studio
-            + " feature in its main released-film list by the end of 2025.",
+            + " feature film released by the end of 2025.",
             wiki(page),
             films,
             "Uses the main feature-film table and its release dates. Future releases and television spin-offs are excluded.",
@@ -275,7 +272,7 @@ def build():
         "screen",
         "ghibli",
         "Studio Ghibli at the cinema",
-        "Name a film in Studio Ghibli’s main feature-film table through 2023.",
+        "Name a Studio Ghibli feature film released by the end of 2023.",
         wiki(page),
         [
             film(r[1])
@@ -298,7 +295,7 @@ def build():
         "screen",
         "blue-peter",
         "Here’s one I made earlier",
-        "Name a numbered Blue Peter presenter who started by the end of 2025.",
+        "Name a regular Blue Peter presenter who joined the show by the end of 2025.",
         wiki(page),
         vals,
         "All qualifying numbered presenters in the past and present tables.",
@@ -317,7 +314,7 @@ def build():
         "screen",
         "bake-off",
         "In the Bake Off tent",
-        "Name a baker who competed in series 1–15 of the main UK Great British Bake Off.",
+        "Name a baker who competed in one of the first 15 series of The Great British Bake Off.",
         wiki(page),
         vals,
         "Ages and series identify competition rows. Holiday specials and celebrity spin-offs are separate.",
@@ -332,7 +329,7 @@ def build():
         "screen",
         "strictly",
         "On the Strictly dance floor",
-        "Name a celebrity contestant from series 1–22 of the main UK Strictly Come Dancing competition.",
+        "Name a celebrity who competed in one of the first 22 series of the UK’s Strictly Come Dancing.",
         wiki(page),
         vals,
         "Celebrity contestants in the main-series table; excludes Christmas specials and professional partners.",
@@ -374,7 +371,7 @@ def build():
         else:
             vals = [r["character"]["name"] for r in records]
             prompt = (
-                "Name a character credited in TVmaze’s main cast list for "
+                "Name a character credited to a main-cast performer in "
                 + label
                 + "."
             )
@@ -417,7 +414,7 @@ def build():
             "screen",
             key,
             "The cast of " + name,
-            "Name an actor in TVmaze’s main cast credits for " + name + ".",
+            "Name an actor in the main cast of " + name + ".",
             url,
             [person(r["person"]["name"]) for r in js(url)],
             "Every credited performer in the archived main cast, including actors sharing a role; guest-only credits are separate.",

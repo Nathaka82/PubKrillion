@@ -25,7 +25,18 @@ PARIS = "https://www.kaggle.com/api/v1/datasets/download/piterfm/paris-2024-olym
 
 def build():
     def q(k, t, p, url, rows, c, common="", rare=""):
-        return add("general", k, t, p, url, rows, c, common, rare)
+        question = add("general", k, t, p, url, rows, c, common, rare)
+        if k in {"paris-events", "paris-venues", "f1", "wimbledon", "world-final", "chess"}:
+            question["topic"] = "Sport"
+        elif k in {"parks", "heritage", "currencies"}:
+            question["topic"] = "Geography"
+        elif k in {"booker", "booker-authors", "nobel-literature", "bible"}:
+            question["topic"] = "Books & Literature"
+        elif k in {"elements", "stars", "nobel-physics", "gemstones"}:
+            question["topic"] = "Science"
+        elif k in {"cheese", "pasta", "cocktails"}:
+            question["topic"] = "Food & Drink"
+        return question
 
     elements = "https://raw.githubusercontent.com/Bowserinator/Periodic-Table-JSON/master/PeriodicTableJSON.json"
     q(
@@ -89,7 +100,7 @@ def build():
     q(
         "paris-venues",
         "Where Paris played",
-        "Name a venue in the Paris 2024 Olympic venues file.",
+        "Name a venue that hosted an event at the Paris 2024 Olympics.",
         PARIS,
         [r["venue"] for r in venues],
         "Every named venue in the Paris 2024 venue index, including venues outside Paris.",
@@ -177,7 +188,7 @@ def build():
     q(
         "prime-ministers",
         "Number Ten",
-        "Name a British prime minister in the main list from Robert Walpole to Keir Starmer.",
+        "Name a British prime minister who held office between 1721 and 2025.",
         wiki(page),
         vals,
         "Distinct office-holders in the principal chronological table. Repeat ministries count once.",
@@ -219,7 +230,7 @@ def build():
     q(
         "chess",
         "Grandmasters at the board",
-        "Name a listed chess grandmaster born before 1950.",
+        "Name a chess grandmaster born before 1950.",
         wiki(page),
         [
             person(" ".join(reversed(r[0].split(", ", 1))))
@@ -253,7 +264,7 @@ def build():
     q(
         "parks",
         "America’s national parks",
-        "Name a US national park in the source’s designated national parks list.",
+        "Name a national park in the United States or its territories.",
         wiki(page),
         [
             record(title_clean(r[0]), title_clean(r[0]) + " National Park")
@@ -267,7 +278,7 @@ def build():
     q(
         "heritage",
         "World heritage",
-        "Name an inscribed World Heritage Site in the UK and its overseas territories from the source list.",
+        "Name a UNESCO World Heritage Site in the UK or one of its overseas territories.",
         wiki(page),
         [
             title_clean(r[0])
@@ -304,17 +315,13 @@ def build():
         map(bible_book, books),
         "All 39 Old Testament books and 27 New Testament books in the King James Version.",
     )
-    sample = json.loads((ROOT / "data/pub-sampler.json").read_text("utf8"))[
-        "questions"
-    ][1]
-    q(
-        "currencies",
-        "Foreign exchange",
-        sample["prompt"],
-        sample["source"],
-        [record(a["name"], *a["aliases"]) for a in sample["answers"]],
-        "The 162 entries in the archived en-GB currency list. Names and three-letter codes count.",
-    )
+    import currencies
+    import finals
+    import food
+
+    currencies.build()
+    finals.build()
+    food.build()
     seed = json.loads((ROOT / "data/questions.json").read_text("utf8"))
     for key in ["tube-lines", "moonwalkers", "allergens", "greek", "national-parks"]:
         s = next(s for s in seed if s["id"] == key)
@@ -326,7 +333,7 @@ def build():
     q(
         "lego",
         "Brick by brick",
-        "Name a top-level LEGO theme in the Rebrickable theme index.",
+        "Name a main LEGO theme. Give the name of the range.",
         url,
         [r["name"] for r in rows if not r["parent_id"]],
         "Top-level themes have no parent ID. Subthemes alone are outside the scope.",
@@ -359,8 +366,6 @@ def build():
     from animals import wordnet_rows
 
     for key, label, lemma in [
-        ("cheese", "Cheese board", "cheese"),
-        ("pasta", "Pasta shapes", "pasta"),
         ("tools", "In the toolbox", "hand_tool"),
         ("gemstones", "Precious stones", "gem"),
     ]:
@@ -377,7 +382,7 @@ def build():
                 "tools": "hand tool",
                 "gemstones": "gemstone",
             }[key]
-            + " in WordNet’s English classification.",
+            + " listed in the WordNet dictionary.",
             "https://wordnet.princeton.edu/",
             vals,
             "All named subtypes under the selected dictionary noun sense. Synonyms count together.",

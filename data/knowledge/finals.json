@@ -1,0 +1,205 @@
+[
+  {
+    "key": "women-world-final",
+    "title": "Women's World Cup finalists",
+    "subject": "a national side that reached the FIFA Women’s World Cup final",
+    "url": "https://www.fifa.com/en/tournaments/womens/womensworldcup/articles/every-final-highlights",
+    "competition": "FIFA Women's World Cup final",
+    "event_aliases": [
+      "Women's World Cup final",
+      "FIFA Women's World Cup"
+    ],
+    "participant": "national side",
+    "participant_aliases": [
+      "country",
+      "national team",
+      "team"
+    ],
+    "expected": [
+      1991,
+      1995,
+      1999,
+      2003,
+      2007,
+      2011,
+      2015,
+      2019,
+      2023
+    ],
+    "editions": [
+      [
+        1991,
+        "United States",
+        "Norway"
+      ],
+      [
+        1995,
+        "Norway",
+        "Germany"
+      ],
+      [
+        1999,
+        "United States",
+        "China"
+      ],
+      [
+        2003,
+        "Germany",
+        "Sweden"
+      ],
+      [
+        2007,
+        "Germany",
+        "Brazil"
+      ],
+      [
+        2011,
+        "Japan",
+        "United States"
+      ],
+      [
+        2015,
+        "United States",
+        "Japan"
+      ],
+      [
+        2019,
+        "United States",
+        "Netherlands"
+      ],
+      [
+        2023,
+        "Spain",
+        "England"
+      ]
+    ],
+    "aliases": {
+      "United States": [
+        "USA",
+        "US",
+        "USWNT"
+      ],
+      "China": [
+        "China PR",
+        "PR China",
+        "中国"
+      ],
+      "Germany": [
+        "Deutschland"
+      ],
+      "Spain": [
+        "España"
+      ],
+      "Japan": [
+        "日本",
+        "Nippon"
+      ],
+      "Brazil": [
+        "Brasil"
+      ],
+      "Netherlands": [
+        "Nederland",
+        "The Netherlands"
+      ]
+    },
+    "common": "United States|Germany|Spain|England"
+  },
+  {
+    "key": "women-wimbledon",
+    "title": "Women's Wimbledon finalists",
+    "subject": "a player who reached the Wimbledon women’s singles final",
+    "url": "https://wtafiles.wtatennis.com/pdf/matchnotes/2025/904_F.pdf",
+    "competition": "Wimbledon women's singles final",
+    "event_aliases": [
+      "women's Wimbledon final",
+      "Wimbledon women's final"
+    ],
+    "participant": "tennis player",
+    "participant_aliases": [
+      "player",
+      "tennis player"
+    ],
+    "expected": [
+      2012,
+      2013,
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2021,
+      2022,
+      2023,
+      2024
+    ],
+    "editions": [
+      [
+        2012,
+        "Serena Williams",
+        "Agnieszka Radwańska"
+      ],
+      [
+        2013,
+        "Marion Bartoli",
+        "Sabine Lisicki"
+      ],
+      [
+        2014,
+        "Petra Kvitová",
+        "Eugenie Bouchard"
+      ],
+      [
+        2015,
+        "Serena Williams",
+        "Garbiñe Muguruza"
+      ],
+      [
+        2016,
+        "Serena Williams",
+        "Angelique Kerber"
+      ],
+      [
+        2017,
+        "Garbiñe Muguruza",
+        "Venus Williams"
+      ],
+      [
+        2018,
+        "Angelique Kerber",
+        "Serena Williams"
+      ],
+      [
+        2019,
+        "Simona Halep",
+        "Serena Williams"
+      ],
+      [
+        2021,
+        "Ashleigh Barty",
+        "Karolína Plíšková"
+      ],
+      [
+        2022,
+        "Elena Rybakina",
+        "Ons Jabeur"
+      ],
+      [
+        2023,
+        "Markéta Vondroušová",
+        "Ons Jabeur"
+      ],
+      [
+        2024,
+        "Barbora Krejčíková",
+        "Jasmine Paolini"
+      ]
+    ],
+    "aliases": {
+      "Ashleigh Barty": [
+        "Ash Barty"
+      ]
+    },
+    "common": "Serena Williams|Venus Williams|Ashleigh Barty"
+  }
+]

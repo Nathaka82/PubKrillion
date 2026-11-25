@@ -98,6 +98,13 @@ try {
       const round = room + "/rounds/" + start.data.id;
       const field = team.getByLabel("Your team’s answer");
       await field.fill("Bakerloo");
+      const originalViewport = team.viewportSize();
+      await team.setViewportSize({ width: 320, height: 568 });
+      await team.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+      assert.ok(await team.evaluate(() =>
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+      await team.evaluate(() => { document.documentElement.style.fontSize = ""; });
+      await team.setViewportSize(originalViewport);
       await field.evaluate((input) => {
         input.focus();
         input.setSelectionRange(2, 5);
@@ -127,7 +134,7 @@ try {
         };
       });
       await field.fill("Bakerlooo");
-      await team.getByRole("button", { name: "Submit answer" }).click();
+      await team.getByRole("button", { name: "Dive — submit answer" }).click();
       await team.getByText("Did you mean: Bakerloo?").waitFor();
       await team.getByRole("button", { name: "Submit Bakerloo" }).click();
       await team.getByText("Answer locked in", { exact: true }).waitFor();
@@ -176,18 +183,45 @@ try {
       await team.waitForResponse((res) => res.url().includes("/state"));
       assert.equal(attempts, 0);
       assert.equal(await team.locator("#answer-feedback").count(), 0);
-      await team.getByRole("button", { name: "Submit answer" }).click();
+      await field.press("Enter");
       await team.getByText("Did you mean: Goalkeeper?").waitFor();
+      assert.equal(await team.evaluate(() => document.activeElement.id), "answer-feedback");
+      await team.keyboard.press("Tab");
+      assert.equal(await team.evaluate(() => document.activeElement.dataset.action), "confirm-suggestion");
       await team.getByRole("button", { name: "Edit answer" }).click();
       assert.equal(await field.inputValue(), "the player in goal");
       assert.equal((await admin(room + "/state?view=host")).data.received, 0);
-      await team.getByRole("button", { name: "Submit answer" }).click();
+      await team.getByRole("button", { name: "Dive — submit answer" }).click();
       await team.getByRole("button", { name: "Submit Goalkeeper" }).click();
       await team
         .locator("[data-saved-answer]")
         .getByText("Goalkeeper", { exact: true })
         .waitFor();
       assert.equal((await admin(room + "/state?view=host")).data.received, 1);
+      const prior = room + "/rounds/" + next.data.id;
+      await admin(prior + "/lock", "POST", {});
+      await admin(prior + "/reveal", "POST", {});
+      const currency = await admin(room + "/start", "POST", {
+        questionId: "general-currencies", previous: next.data.id, seconds: 0,
+      });
+      const current = room + "/rounds/" + currency.data.id;
+      await field.fill("Review this currency");
+      await field.press("Enter");
+      await team.locator("#answer-feedback").waitFor();
+      await admin(current + "/lock", "POST", {});
+      const review = host.getByText("Correct a ruling", { exact: true });
+      await review.waitFor();
+      if (!(await review.evaluate((el) => el.parentElement.open))) await review.click();
+      await host.locator(".review-line").filter({ hasText: "Review this currency" }).getByRole("button", { name: "Correct" }).click();
+      await host.getByLabel("Search answers or aliases").fill("DEM");
+      await host.getByRole("option", { name: /German Mark/ }).waitFor();
+      await host.getByLabel("Ruling", { exact: true }).selectOption("unlisted");
+      assert.equal(await host.getByLabel("Unlisted answer", { exact: true }).inputValue(), "Review this currency");
+      await host.getByLabel("Rarity for this round").selectOption("2");
+      await host.getByRole("button", { name: "Save ruling" }).click();
+      await host.getByRole("dialog").waitFor({ state: "hidden" });
+      const added = (await admin(current + "/answers?q=Review%20this%20currency")).data;
+      assert.equal(added.answers[0].depth, 2);
       assert.deepEqual(errors, []);
       console.log(
         device +

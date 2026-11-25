@@ -31,7 +31,7 @@ def build():
     q(
         "throws",
         "Ways to throw a disc",
-        "Name a throw in this collection of ultimate release techniques. Variants of a release score together.",
+        "Name a way to release the disc in ultimate frisbee. High and low versions of the same throw count together.",
         ROB,
         "Forehand~Flick~Sidearm~Side arm~High-release forehand~High release flick~Low-release forehand~Inside-out forehand~Outside-in flick~Off-hand forehand|Backhand~High-release backhand~Low-release backhand~Air bounce~Airbounce~Inside-out backhand~Outside-in backhand~Off-hand backhand~Around-the-back backhand|Hammer~Overhead hammer~Helix hammer|Scoober~Scoobie~Helix scoober|Thumber~Helix thumber|Push pass~Push throw|Overhand wrist flip~Chicken wing~Chickenwing~Wrist flip~Overhand wristflip|Reverse overhand wrist flip~Reverse wrist flip~Blind overhand wrist flip|Upside-down backhand~Inverted backhand|Sky hook~Skyhook",
         "Ten release families from USA Ultimate’s beginner terminology and Ultimate Rob’s uncommon-throws collection. Release height, throwing hand and curve share a family. Distance, tactical purpose and trick routines are outside this question.",
@@ -85,7 +85,7 @@ def build():
     q(
         "catches",
         "Hands on the disc",
-        "Name a standard catching technique taught in USA Ultimate’s Skills & Drills manual.",
+        "Name a standard technique for catching the disc in ultimate frisbee.",
         COACH,
         "Pancake catch~Pancake~Clap catch~Sandwich catch~Two-handed clap catch|Two-handed rim grab~Two handed rim catch~Two hand rim catch~Two-handed claw|One-handed rim grab~One handed rim catch~One hand catch~One-handed catch",
         "All three techniques in Standard Catches, pp. 11–13.",
@@ -94,7 +94,7 @@ def build():
     q(
         "cuts",
         "Lose your defender",
-        "Name a cutting technique described in USA Ultimate’s cutting and handler sections.",
+        "In ultimate frisbee, name a cut a player can make to get free for a pass.",
         COACH,
         "Straight cut~Straight line cut|Full cut~Full cuts|Two-step juke~Juke~Two step fake|Double cut~Double cuts",
         "The three illustrated changes of direction and the straight cut named in the handler section.",
@@ -102,7 +102,7 @@ def build():
     q(
         "offence",
         "Seven on the line",
-        "Name one of the three person-to-person offensive positions in the USA Ultimate coaching manual.",
+        "Name one of the three attacking roles in ultimate frisbee against a person-to-person defence.",
         COACH,
         "Handler~Handlers|Middle~Middles|Long~Longs~Deep~Deeps~Deep cutter",
         "The manual’s Positions section groups players by their role on offence.",
@@ -111,7 +111,7 @@ def build():
     q(
         "forces",
         "Setting the force",
-        "Name a force illustrated in the manual’s person-to-person defence section.",
+        "In ultimate frisbee, name a force used in person-to-person defence.",
         COACH,
         "Force forehand~Force flick~Forehand~Flick|Force backhand~Backhand|Force middle~Middle~Forcing middle|Straight up~Straight-up force~Force straight up~Flat mark",
         "All four illustrated schemes, figures 9a–9d.",
@@ -119,7 +119,7 @@ def build():
     q(
         "zone",
         "Inside the zone",
-        "Name a defensive position in the manual’s three-person-cup zone.",
+        "In ultimate frisbee, name a defensive position in a zone with a three-player cup.",
         COACH,
         "Point~Points~Point defender|Middle-middle~Middle middle|Wing~Wings|Short deep~Short-deep|Deep-deep~Deep deep",
         "All five role names in the manual’s zone positioning diagrams; the two points and wings each share one answer.",
@@ -127,7 +127,7 @@ def build():
     q(
         "pass-purpose",
         "Reading a pass",
-        "Name the USA Ultimate glossary term for a long pass, a lateral pass across the field, a reset pass, or a pass through the force.",
+        "In ultimate frisbee, what do players call a long pass, a pass across the field, a reset, or a pass through the force? Give any one term.",
         USA,
         "Huck~Deep throw~Long throw|Swing~Swing pass|Dump~Dump pass~Reset~Reset pass|Breakmark~Break mark~Break throw~Break pass",
         "One named pass for each of the four descriptions in the prompt.",
@@ -143,7 +143,7 @@ def build():
     q(
         "mark",
         "On the mark",
-        "Name a marking infraction in section 18.1 of the WFDF 2025–2028 rules.",
+        "In ultimate frisbee, name a marking infraction under the 2025–2028 WFDF rules.",
         RULES,
         "Fast count~Fast counting|Straddle~Straddling|Disc space~Discspace|Wrapping~Wrap|Double team~Double teaming|Vision~Vision blocking",
         "All six named marking infractions.",
@@ -152,7 +152,7 @@ def build():
     q(
         "live-turns",
         "Live turnovers",
-        "Name a turnover under WFDF rule 13.1 that transfers possession without a stoppage.",
+        "Under WFDF ultimate rules, name a turnover after which play continues immediately.",
         RULES,
         "Down~Grounded disc~Incomplete pass~Dropped pass|Interception~Intercepted pass~Intercept|Out-of-bounds~Out of bounds~OB|Dropped pull~Drop the pull~Muffed pull",
         "The four cases in 13.1. The pull must have been touched by the receiving team.",
@@ -160,7 +160,7 @@ def build():
     q(
         "stopped-turns",
         "Turnovers that stop play",
-        "Name a turnover in WFDF rule 13.2 that stops play.",
+        "Under WFDF ultimate rules, name a turnover that stops play.",
         RULES,
         "Accepted offensive receiving foul~Offensive receiving foul|Stall-out~Stall~Stalled out|Handover~Hand-off~Hand off|Deflection~Intentional deflection|Self-catch~Self catch|Team-mate assisted catch~Assisted catch~Team assisted catch|Equipment-assisted catch~Using equipment to catch~Object assisted catch",
         "All seven cases in 13.2, including the two distinct forms of assistance.",
@@ -168,7 +168,7 @@ def build():
     q(
         "fouls",
         "Making the call",
-        "Name a foul heading in section 17 of the WFDF rules.",
+        "Name a type of foul in ultimate frisbee under WFDF rules.",
         RULES,
         "Dangerous play|Receiving foul~Receiving|Strip foul~Strip|Blocking foul~Blocking~Block|Force-out foul~Force out|Defensive throwing foul~Marking foul|Offensive throwing foul~Thrower foul|Indirect foul~Indirect|Offsetting fouls~Offsetting foul",
         "All nine headings in section 17, including dangerous play.",
@@ -176,7 +176,7 @@ def build():
     q(
         "signals",
         "Say it with your hands",
-        "Name a signal on WFDF’s January 2025 hand signals sheet.",
+        "Name a call or decision that has an official WFDF hand signal in ultimate frisbee.",
         SIGNALS,
         "Foul|Violation|Goal~Score|Contest~Contested|Accepted~Uncontested|Retracted~Retract|In or out-of-bounds~In~Out~Out of end zone|Disc down~Down|Disc up~Up|Pick|Travel|Marking infraction|Turnover~Turn|Timing violation|Offside or false start~Offside~False start|Time-out~Timeout|Spirit stoppage|Stoppage|Male-matching ratio~Male matching|Female-matching ratio~Female matching|Play has stopped~Stopped play|Who made the call~Who called it|Did not affect the play~No effect|Match point~Game point",
         "All 24 numbered signals. The shared in/out gesture counts once.",
@@ -201,7 +201,7 @@ def build():
     q(
         "definitions",
         "The rules glossary",
-        "Name a defined term in the glossary at the end of WFDF’s 2025–2028 ultimate rules.",
+        "Name a playing term formally defined in the 2025–2028 WFDF rules for ultimate frisbee.",
         RULES,
         [record(term, *aliases.get(term, [])) for term in glossary],
         "Defined terms in the rules glossary, as printed in the 2025–2028 edition.",
@@ -209,7 +209,7 @@ def build():
     q(
         "lines",
         "Marking out a pitch",
-        "Name a type of boundary line shown in the WFDF playing-field diagram.",
+        "Name a type of line that marks the playing area or an end zone on an ultimate frisbee field.",
         RULES,
         "Sideline~Side line~Sidelines|Endline~End line~Endlines|Goal line~Goal lines~Goalline",
         "Figure 1. The brick mark is a point on the field.",
@@ -217,7 +217,7 @@ def build():
     q(
         "check",
         "Checking the disc in",
-        "Name a reason for a stoppage listed in WFDF rule 10.1 that requires a check to restart.",
+        "In ultimate frisbee, name a reason play stops and the disc must be checked before play resumes.",
         RULES,
         "Foul|Violation|Contested turnover~Disputed turnover|Specified turnover~Specified turnover under rule 13.2|Contested goal~Disputed goal|Stoppage~Injury stoppage~Technical stoppage|Discussion~Rules discussion|End of a time-out~Timeout~Time out",
         "The eight listed reasons in rule 10.1.",
@@ -225,7 +225,7 @@ def build():
     q(
         "safety",
         "Stopping for safety",
-        "Name one of the two stoppage headings in section 19.",
+        "In ultimate frisbee, name one of the two safety stoppages recognised under WFDF rules.",
         RULES,
         "Injury stoppage~Injury|Technical stoppage~Technical",
         "Section 19 covers injuries and technical issues affecting safety.",
@@ -233,7 +233,7 @@ def build():
     q(
         "good-spirit",
         "Showing good Spirit",
-        "Name one of rule 1.5’s five examples of good Spirit.",
+        "Name an action the WFDF recognises as an example of good Spirit of the Game.",
         RULES,
         "Retract an incorrect call~Retract a call~Retraction|Check in with an opponent~Check in after a disagreement|Compliment an opponent~Compliment good play~Compliment good spirit|Introduce yourself~Introductions|React calmly~Stay calm~Calm reaction",
         "Five example actions identified in rule 1.5.",
@@ -241,7 +241,7 @@ def build():
     q(
         "poor-spirit",
         "Crossing the Spirit line",
-        "Name behaviour listed in WFDF rule 1.6 as a breach of Spirit.",
+        "Name a behaviour that breaches Spirit of the Game under WFDF rules.",
         RULES,
         "Dangerous or aggressive play~Dangerous play~Aggressive behaviour|Deliberate rule breach~Intentional foul~Intentional fouling|Intimidation~Taunting|Disrespectful celebration~Disrespectful celebrating|Retaliatory call~Revenge call|Calling for an opponent’s pass~Calling for a pass from the opposition|Win-at-all-costs behaviour~Win at all costs",
         "All seven examples in rule 1.6.",
@@ -249,7 +249,7 @@ def build():
     q(
         "team-spirit",
         "Team responsibilities",
-        "Name a team duty for upholding Spirit under rule 1.7.",
+        "Under WFDF rules, name a responsibility teams share for upholding Spirit of the Game.",
         RULES,
         "Teach rules and Spirit~Teach the rules~Teach spirit|Discipline poor Spirit~Discipline team-mates|Give constructive feedback~Feedback to other teams|Call a Spirit stoppage~Spirit timeout~Spirit stoppage",
         "All four team duties in 1.7.",
@@ -257,7 +257,7 @@ def build():
     q(
         "bad-check",
         "An invalid restart",
-        "Name a reason to call a check violation in rule 10.7.",
+        "In ultimate frisbee, what can an opponent do at a restart that allows you to call a check violation?",
         RULES,
         "Pass without a valid check~No check|Restart without verification~No verification|Move before the check~Early movement|Start in the wrong position~Incorrect position~Wrong position",
         "The four opponent actions in 10.7.1–10.7.4.",
@@ -266,7 +266,7 @@ def build():
     q(
         "sideline",
         "Sideline vocabulary",
-        "Name a term defined in USA Ultimate’s spectator glossary.",
+        "Name an ultimate frisbee term a commentator might use for a throw, a tactic, a player’s role or a moment on the field.",
         USA,
         glossary[glossary.index("Bid") : glossary.index("Swing") + 1],
         "Every entry in Ultimate Terminology, from Bid through Swing.",
@@ -334,7 +334,7 @@ def build():
         q(
             "clubs-" + div,
             "UKU Nationals · " + div.title(),
-            "Name a club team in the " + div + " division of the 2026 UKU Nationals.",
+            "Name a club team in the " + ("women’s" if div == "women" else div) + " division of the 2026 UKU Nationals.",
             url,
             [record(n, re.sub(r" (Open|Women|Mixed)$", "", n)) for n in teams],
             "All eight entries in the tournament’s division directory. Numbered squads count separately.",

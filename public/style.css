@@ -1015,7 +1015,39 @@ dialog[open]:has(.question-picker) {
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
+.picker-filters,
+.picker-filters summary {
+  margin: 0;
+}
+.picker-filters > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+}
+.picker-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+.picker-filters input {
+  width: auto;
+}
 @container picker (max-height: 300px) {
+  .question-picker > div:first-child {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px;
+    position: relative;
+  }
+  .picker-filters[open] > div {
+    position: absolute;
+    inset: 100% 0 auto;
+    z-index: 1;
+    background: var(--panel);
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+  }
   #dialog-content .dialog-head {
     margin-bottom: 6px;
   }
@@ -1484,6 +1516,54 @@ details summary {
   overflow: hidden;
   border-color: #375566;
 }
+.board-head h2,
+.answer-panel .question,
+#answer-feedback button {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#answer-feedback:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+#listed-ruling select[size] {
+  height: auto;
+  width: 100%;
+}
+@media (max-width: 570px), (max-height: 800px) {
+  #app:has(.answer-panel) .room-scene {
+    min-height: 0;
+    padding-block: 8px;
+  }
+  #app:has(.answer-panel) .room-scene h1 {
+    font-size: 1.55rem;
+  }
+  #app:has(.answer-panel) .scene-hud {
+    bottom: 6px;
+  }
+  #app:has(.answer-panel) .question {
+    font-family: var(--sans);
+    font-size: clamp(1.15rem, 4vw, 1.65rem);
+    line-height: 1.25;
+  }
+}
+@media (max-width: 570px) {
+  .mast-inner {
+    height: auto;
+    min-height: 62px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .mast-controls {
+    flex-wrap: wrap;
+  }
+  .answer-entry {
+    flex-wrap: wrap;
+  }
+  .answer-panel .answer-entry input {
+    flex-basis: 7rem;
+  }
+}
 .prompt-water {
   position: relative;
   padding: clamp(17px, 3vw, 28px);
@@ -1596,7 +1676,7 @@ details summary {
   padding: 0;
   list-style: none;
 }
-.answer-bank li {
+.answer-bank > li {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1608,7 +1688,7 @@ details summary {
   height: 18px;
   image-rendering: pixelated;
 }
-.answer-bank li > div {
+.answer-bank > li > div {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -1617,7 +1697,7 @@ details summary {
   display: block;
   color: var(--muted);
 }
-.answer-bank li > b {
+.answer-bank > li > b {
   white-space: nowrap;
   font: 1.2rem var(--pixel);
 }
@@ -1672,6 +1752,14 @@ dialog:has(.fleet-dive) {
   background: #132438;
   color: #a9c2ce;
   font: 1rem/1.05 var(--pixel);
+}
+@media (max-width: 450px) {
+  .fleet-table:has(thead th:nth-child(4):last-child) { table-layout: fixed; }
+  .fleet-table:has(thead th:nth-child(4):last-child) :is(thead th, tfoot td):not(.fleet-axis) {
+    min-width: 0;
+    padding-inline: 4px;
+    overflow-wrap: anywhere;
+  }
 }
 .crew-name {
   display: block;
@@ -1810,7 +1898,7 @@ dialog:has(.fleet-dive) {
 .lane-answer {
   display: block;
   width: max-content;
-  max-width: 14ch;
+  max-width: min(14ch, 100%);
   margin: 2px auto;
   overflow-wrap: anywhere;
   font-size: 0.8rem;
@@ -1920,66 +2008,17 @@ dialog:has(.fleet-dive) {
   }
 }
 
-.pack-list,
-.pack-prompts {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.pack-list {
-  display: grid;
-  gap: 0.6rem;
-  margin-block: 0.75rem;
-}
-.pack-card {
-  display: grid;
-  gap: 0.25rem;
-  width: 100%;
-  text-align: start;
-  padding: 0.8rem 1rem;
-}
-.pack-card small,
-.pack-prompts small {
-  color: var(--aqua, #6edbd8);
-}
-.pack-card span,
 .pack-scope {
   font-size: 0.87rem;
-  font-weight: normal;
   line-height: 1.45;
-}
-.pack-preview {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.pack-prompts {
-  max-height: 47dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.pack-prompts li {
-  border-bottom: 1px solid var(--line, #293c50);
-}
-.pack-prompts summary {
-  cursor: pointer;
-  padding: 0.8rem 0.25rem;
-}
-.pack-prompts small {
-  margin-inline-start: 0.5rem;
-  white-space: nowrap;
-}
-.pack-prompts p {
-  margin: 0.3rem 0.3rem 0.8rem;
 }
 .pack-scope a {
   white-space: nowrap;
   color: var(--aqua, #6edbd8);
 }
-.pack-actions {
-  display: grid;
-  gap: 0.35rem;
-  padding-top: 0.7rem;
+.category-heading {
+  justify-content: space-between;
+  align-items: center;
 }
 .picker-tools {
   flex-wrap: wrap;
@@ -2007,3 +2046,10 @@ dialog:has(.fleet-dive) {
 .example-editor input {
   width: 100%;
 }
+.draft-card {
+  border: 1px solid currentColor;
+  border-radius: .75rem;
+  padding: 1rem;
+}
+.draft-card h3 { margin: 0; overflow-wrap: anywhere; }
+.draft-card p { margin: .5rem 0; }

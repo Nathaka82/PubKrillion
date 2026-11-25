@@ -32,37 +32,37 @@ def birds():
         (
             "british-list",
             "The British List",
-            "Name a bird species on the British List, categories A–C.",
+            "Name a wild bird species recorded in Britain. Established introduced species count.",
             [],
         ),
         (
             "wildfowl",
             "Ducks, geese and swans",
-            "Name a duck, goose or swan on the British List.",
+            "Name a duck, goose or swan recorded in the wild in Britain.",
             ["Anatidae"],
         ),
         (
             "waders",
             "Sandpipers and allies",
-            "Name a bird in the sandpiper family recorded on the British List.",
+            "Name a bird in the sandpiper family recorded in the wild in Britain.",
             ["Scolopacidae"],
         ),
         (
             "gulls",
             "Gulls and terns",
-            "Name a member of the gull and tern family on the British List.",
+            "Name a member of the gull and tern family recorded in the wild in Britain.",
             ["Laridae"],
         ),
         (
             "raptors",
             "Daytime birds of prey",
-            "Name a hawk, eagle, osprey or falcon family member on the British List.",
+            "Name a bird from the hawk, osprey or falcon families recorded in the wild in Britain.",
             ["Accipitridae", "Pandionidae", "Falconidae"],
         ),
         (
             "songbirds",
             "Perching birds",
-            "Name a passerine on the British List.",
+            "Name a perching bird species recorded in the wild in Britain.",
             ["Passeriformes"],
         ),
     ]:
@@ -102,13 +102,13 @@ def mammals():
         (
             "canids",
             "Dogs, foxes and wolves",
-            "a living canid species",
+            "a living species in the dog family",
             lambda r: r["family"] == "Canidae",
         ),
         (
             "cetaceans",
             "Whales, dolphins and porpoises",
-            "a living cetacean species",
+            "a living species of whale, dolphin or porpoise",
             lambda r: (
                 r["infraorder"] in ("Mysticeti", "Odontoceti")
                 or r["order"] == "Cetacea"
@@ -123,7 +123,7 @@ def mammals():
         (
             "bats",
             "Bats of Europe",
-            "a bat species whose recorded distribution includes Europe",
+            "a bat species found in Europe",
             lambda r: (
                 r["order"] == "Chiroptera" and "Europe" in r["continentDistribution"]
             ),
@@ -131,7 +131,7 @@ def mammals():
         (
             "monotremes",
             "Egg-laying mammals",
-            "a living monotreme species",
+            "a species of egg-laying mammal alive today",
             lambda r: r["order"] == "Monotremata",
         ),
         (
@@ -179,7 +179,7 @@ def mammals():
             "animals",
             key,
             title,
-            "Name " + desc + " in the Mammal Diversity Database snapshot.",
+            "Name " + desc + ".",
             MDD,
             [naming(r) for r in rows if test(r)],
             "All matching species marked extant in the archived MDD checklist. Scientific names and unambiguous listed common names count.",
@@ -269,7 +269,7 @@ def dictionary():
             title,
             "Name a kind of "
             + label
-            + " listed in WordNet’s English animal classification.",
+            + " listed in the WordNet dictionary.",
             WN,
             rows,
             "All named descendants of the WordNet 3.1 noun sense "

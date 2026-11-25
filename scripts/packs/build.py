@@ -6,8 +6,11 @@
 
 import argparse
 import importlib
+from pathlib import Path
 
-from common import PACKS, ROOT, json, packs, sources
+from common import PACKS, ROOT, json, norm, packs, sources
+from picker import picker_context
+from recall import apply_recall
 
 OUT = ROOT / "data" / "packs"
 DESCRIPTIONS = {
@@ -53,9 +56,15 @@ def output(path, value, check):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--recall-data", type=Path,
+                        help="Optional per-question blind recall counts for this release")
     args = parser.parse_args()
+    samples = json.loads(args.recall_data.read_text("utf8")) if args.recall_data else {}
+    if not isinstance(samples, dict):
+        parser.error("--recall-data must map question IDs to recall samples")
     index = []
     outputs = {}
+    starters = {q["id"]: q for q in json.loads((ROOT / "data/questions.json").read_text("utf8"))}
     # Published counts catch truncated pages and accidental merging of identities.
     census = {
         "general-elements": 118,
@@ -89,9 +98,22 @@ def main():
             len(questions)
             == len({q["id"] for q in questions})
             == len({q["prompt"] for q in questions})
-            == 30
+            == (32 if key == "general" else 30)
         ), key
         for question in questions:
+            equivalent = {"music-abba-albums": "abba", "geography-germany": "german-borders"}.get(question["id"])
+            if equivalent:
+                original = {norm(a["name"]): a for a in starters[equivalent]["answers"]}
+                assert original.keys() == {norm(a["name"]) for a in question["answers"]}
+                for answer in question["answers"]:
+                    shared = original[norm(answer["name"])]
+                    answer["depth"] = shared["depth"]
+                    answer["aliases"] = sorted(set(answer["aliases"] + shared["aliases"]))
+            if notes := picker_context(question):
+                question["context"] = notes
+            if question["id"] in samples:
+                apply_recall(question, samples.pop(question["id"]))
+            assert sum(a["depth"] == 5 for a in question["answers"]) <= max(1, len(question["answers"]) // 20), question["id"]
             if question["id"] in census:
                 assert len(question["answers"]) == census[question["id"]], question[
                     "id"
@@ -111,11 +133,19 @@ def main():
                 answers=sum(counts),
             )
         )
+    if samples:
+        raise ValueError("Unknown generated question IDs in recall data: " + ", ".join(samples))
     from vocabulary import build as build_vocabulary
 
     outputs[ROOT / "data" / "vocabulary.json"] = build_vocabulary()
     outputs[OUT / "sources.json"] = dict(sorted(sources.items()))
     outputs[OUT / "index.json"] = index
+    sample_path = ROOT / "data/pub-sampler.json"
+    sample = json.loads(sample_path.read_text("utf8"))
+    currency = next(q for q in packs["general"] if q["id"] == "general-currencies")
+    sample["questions"][1] = {**currency, "id": "sampler-world-currencies", "title": "Change from your travels"}
+    sample["attribution"] = "Currency names and tender records from Unicode CLDR 47. © Unicode, Inc. https://www.unicode.org/license.txt"
+    outputs[sample_path] = sample
     for path, value in outputs.items():
         output(path, value, args.check)
 

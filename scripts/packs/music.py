@@ -123,9 +123,9 @@ def build():
         q(
             key,
             act.title() if key == "beatles" else act,
-            "Name a song in the main recordings table for "
+            "Name a song recorded by "
             + act
-            + " released by the end of 2025.",
+            + " and released by the end of 2025.",
             wiki(page),
             vals,
             "The main song table supplies the complete scope. Separate archival, guest-only and unreleased-song tables are outside this round.",
@@ -185,7 +185,7 @@ def build():
     q(
         "hall",
         "Rock & Roll Hall of Fame",
-        "Name an act inducted in the Hall of Fame’s Performers category through 2025.",
+        "Name an artist or band inducted into the Rock & Roll Hall of Fame as a performer by the end of 2025.",
         wiki(page),
         [
             title(r[2])
@@ -198,7 +198,7 @@ def build():
     q(
         "best-sellers",
         "Multi-platinum in Britain",
-        "Name an album in the source’s ranked list of UK best-selling albums.",
+        "Name an album that ranked among the UK’s 70 all-time best-sellers in 2026.",
         wiki(page),
         [
             title(r[1])
@@ -225,7 +225,7 @@ def build():
     q(
         "bond-music",
         "The sound of Bond",
-        "Name an opening title song or instrumental listed for an Eon Bond film through No Time to Die.",
+        "Name a song or instrumental played over the opening titles of an Eon James Bond film, from Dr. No to No Time to Die.",
         wiki(page),
         [
             record(
@@ -264,11 +264,11 @@ def build():
             t,
             "Name "
             + (
-                "an Original Song winner"
+                "a song that won the Oscar for Best Original Song"
                 if k == "oscar-songs"
-                else "a credited Original Score winner"
+                else "a composer who won the Oscar for Best Original Score"
             )
-            + " at the Academy Awards through the 97th ceremony (2025).",
+            + " by the end of the 2025 ceremony.",
             OS,
             vals,
             "Winners in the database’s canonical category. Each individually credited composer counts.",
@@ -282,7 +282,7 @@ def build():
         q(
             key,
             desc.capitalize() + "s",
-            "Name a kind of " + desc + " in WordNet’s English music classification.",
+            "Name a " + ("musical style" if key == "styles" else "type of " + desc) + " listed in the WordNet dictionary.",
             "https://wordnet.princeton.edu/",
             wordnet_rows(root, 0),
             "Includes every named subtype of the primary WordNet 3.1 noun sense. Synonyms share a score.",

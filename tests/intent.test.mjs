@@ -23,7 +23,7 @@ test("short names are indexed by answer identity within each round", () => {
   );
   const match = (guess) =>
     resolveAnswer(guess, players.answers, players.matching);
-  assert.equal(match("Nadal").exact, true);
+  assert.equal(match("Nadal").exact, false);
   assert.equal(match("Nadal").answer.name, "Rafael Nadal");
   assert.equal(match("Williams"), null);
   const edited = players.answers.map((a) => ({
@@ -42,12 +42,12 @@ test("short names are indexed by answer identity within each round", () => {
   );
   assert.equal(resolveAnswer("Pitt", pitt.answers, "names"), null);
   for (const term of ["Younger", "Pitt Younger"])
-    assert.equal(matchAnswer(term, pitt.answers, "names").exact, true);
+    assert.equal(matchAnswer(term, pitt.answers, "names").exact, false);
   for (const term of ["Yonger", "Young"])
     assert.equal(matchAnswer(term, pitt.answers, "names").exact, false);
   assert.equal(
     matchAnswer("Pitt", pitt.answers.slice(0, 1), "names").exact,
-    true,
+    false,
   );
 });
 

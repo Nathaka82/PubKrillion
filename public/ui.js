@@ -181,7 +181,7 @@ export function closeModal() {
 export function how() {
   modal(
     "How to play",
-    '<ol class="how"><li><strong>Join a crew</strong><p>Use the host’s room code and choose a team name. One phone is enough for your whole team.</p></li><li><strong>Think of a rare answer</strong><p>Tap Dive to lock in your answer. If you see “Did you mean?”, tap the suggested answer to confirm it. Your first accepted answer is final. Leaving the round unanswered earns a miss.</p></li><li><strong>Watch the dive</strong><p>Teams start side by side with their current scores and dive together. A rare answer takes your crew deeper and adds more points. A miss stays at the surface.</p></li></ol><button class="primary wide" data-close>Got it</button>',
+    '<ol class="how"><li><strong>Join a crew</strong><p>Use the host’s room code and choose a team name. One phone is enough for your whole team.</p></li><li><strong>Think of a rare answer</strong><p>Tap Dive to lock in your answer. If you see “Did you mean?”, tap the suggested answer to confirm it. Your first accepted answer is final. If a name is missing, select Ask host to review. The host can also check your last submitted guess.</p></li><li><strong>Watch the dive</strong><p>Teams start side by side with their current scores and dive together. Answers share five rarity bands. Several answers can tie. Scores are set before play using recall data or estimates of how familiar a name is. A miss stays at the surface.</p></li></ol><button class="primary wide" data-close>Got it</button>',
   );
 }
 export const splitHosting =
@@ -230,7 +230,7 @@ export async function api(
       },
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(
-        method !== "GET" && /\/(?:packs|library(?:\/[\w-]+)?)$/.test(path)
+        method !== "GET" && /\/(?:packs|drafts|library(?:\/[\w-]+)?)$/.test(path)
           ? 120000
           : 10000,
       ),

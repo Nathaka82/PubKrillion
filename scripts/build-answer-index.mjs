@@ -1,10 +1,10 @@
 // Compile trusted release data for offline, first-round semantic search.
 import { Worker } from "node:worker_threads";
 import { once } from "node:events";
-import { readFile, rename, rm } from "node:fs/promises";
+import { rename, rm } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { catalogue, catalogueQuestions } from "../server/catalogue.ts";
+import { builtInQuestions } from "../server/catalogue.ts";
 const dest = fileURLToPath(
   new URL("../data/minilm/catalogue.sqlite", import.meta.url),
 );
@@ -14,31 +14,14 @@ const worker = new Worker(
   { workerData: { cache: temp, build: true } },
 );
 try {
-  const groups = [
-    [
-      "starter",
-      JSON.parse(
-        await readFile(
-          new URL("../data/questions.json", import.meta.url),
-          "utf8",
-        ),
-      ),
-    ],
-    ...catalogue.map((pack) => [pack.id, catalogueQuestions(pack.id)]),
-  ];
-  const seen = new Set();
-  for (const [name, questions] of groups) {
-    for (const q of questions) {
-      if (seen.has(q.id)) continue;
-      seen.add(q.id);
-      const ready = once(worker, "message");
-      worker.postMessage({ type: "prepare", key: q.id, q });
-      const [message] = await ready;
-      if (message.prepared !== q.id)
-        throw Error(message.failed ?? "Unexpected worker reply");
-      worker.postMessage({ type: "drop", key: q.id });
-    }
-    console.log("Indexed " + name);
+  for (const q of builtInQuestions.values()) {
+    if (q.matching === "full") continue;
+    const ready = once(worker, "message");
+    worker.postMessage({ type: "prepare", key: q.id, q });
+    const [message] = await ready;
+    if (message.prepared !== q.id)
+      throw Error(message.failed ?? "Unexpected worker reply");
+    worker.postMessage({ type: "drop", key: q.id });
   }
   await worker.terminate();
   const db = new DatabaseSync(temp);

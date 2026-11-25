@@ -214,7 +214,7 @@ export function review(r) {
     ...(r.review ?? []),
     ...(r.missedTeams ?? []).map((t) => ({
       ...t,
-      raw: t.name + " · missed submission",
+      raw: t.name + (t.lastGuess ? " · “" + t.lastGuess + "”" : " · missed submission"),
       count: 1,
       teamId: t.id,
     })),
@@ -284,7 +284,7 @@ function timing(r) {
 function teamStatus(s) {
   if (!s.roster) return "";
   function group(title, submitted) {
-    const teams = s.roster.filter((t) => t.submitted === submitted);
+    const teams = s.roster.filter((t) => submitted === "review" ? t.requested : t.submitted === submitted && !t.requested);
     return (
       "<section><h3>" +
       title +
@@ -304,6 +304,7 @@ function teamStatus(s) {
     s.round.id +
     '"><summary>Team status</summary>' +
     group(s.round.phase === "open" ? "Still thinking" : "Missed", false) +
+    (s.roster.some(t=>t.requested) ? group("Asked for review", "review") : "") +
     group("Submitted", true) +
     "</details>"
   );
@@ -375,8 +376,7 @@ function roundPanel(s, host, draft, unseenDive) {
       results(r, s.team?.id) +
       (s.mine
         ? '<p class="fine top-gap">You submitted “' +
-          esc(s.mine.canonical ?? s.mine.raw) +
-          "”.</p>"
+          esc(s.mine.raw) + "”." + (s.mine.canonical ? " Scored as “"+esc(s.mine.canonical)+"”." : "") + "</p>"
         : "") +
       (host
         ? '<div class="actions">' +
@@ -412,7 +412,7 @@ function roundPanel(s, host, draft, unseenDive) {
             : "All submissions are ready to reveal.") +
           "</p>" +
           '<div class="actions">' +
-          button(icon("waves") + " Reveal dive", "reveal", "primary") +
+          button(icon("waves") + " Reveal answers", "reveal", "primary") +
           "</div>") +
       teamStatus(s) +
       (r.phase === "locked" && (r.review?.length || r.missedTeams?.length)
@@ -423,18 +423,14 @@ function roundPanel(s, host, draft, unseenDive) {
       "</section>"
     );
   }
-  if (r.phase === "locked")
+  if (r.phase === "locked" && !s.mine)
     return (
       '<section class="panel">' +
       top +
       '<p class="inline-note">Answers locked. The host is preparing the reveal.</p>' +
-      (s.mine
-        ? '<p class="fine top-gap">Your saved answer: ' +
-          esc(s.mine.canonical ?? s.mine.raw) +
-          "</p>"
-        : s.eligibleForRound
-          ? '<p class="fine top-gap">No answer was submitted. Your result will appear at the reveal.</p>'
-          : "") +
+      (s.eligibleForRound && !r.sourceJudged
+          ? '<p class="fine top-gap">No answer was locked in. The host can review your last submitted guess.</p>'
+        : "") +
       "</section>"
     );
   const saved = s.mine?.canonical ?? s.mine?.raw;
@@ -448,7 +444,7 @@ function roundPanel(s, host, draft, unseenDive) {
     timing(r) +
     '</div><h2 class="question">' +
     esc(r.prompt) +
-    '</h2><p class="depth-hint">Rarer answers sink deeper</p></div><div class="answer-deck">' +
+    '</h2>' + (r.playerRule ? '<details class="fine"><summary>What counts?</summary><p>'+esc(r.playerRule)+'</p></details>' : "") + '<p class="depth-hint">Rarer answers sink deeper</p></div><div class="answer-deck">' +
     (saved
       ? '<div role="status" class="answer-receipt" data-saved-answer>' +
         icon("check") +
@@ -461,11 +457,12 @@ function roundPanel(s, host, draft, unseenDive) {
           "<div><small>Awaiting confirmation</small><strong>" +
           esc(pending.text) +
           '</strong></div></div><p class="answer-help">Keep this page open. Your answer will retry if the signal drops.</p>'
-        : '<form id="answer-form"><label class="sr" for="team-answer">Your team’s answer</label><div class="answer-entry"><input id="team-answer" name="answer" required maxlength="140" autocomplete="off" enterkeyhint="send" spellcheck="false" placeholder="Type your answer…" aria-describedby="answer-help" value="' +
+        : '<form id="answer-form"><label class="sr" for="team-answer">Your team’s answer</label><div class="answer-entry"><input id="team-answer" name="answer" required maxlength="280" autocomplete="off" enterkeyhint="send" placeholder="Type your answer…" aria-describedby="answer-help' +
+          (draft?.feedback ? " answer-feedback" : "") + '" value="' +
           esc(draft?.text ?? "") +
-          '"><button class="primary" aria-label="Submit answer">Dive <span aria-hidden="true">▼</span></button></div><p class="error" role="alert"></p></form>') +
+          '"><button class="primary" aria-label="Dive — submit answer">Dive <span aria-hidden="true">▼</span></button></div><p class="error" role="alert"></p></form>') +
     (!saved && !pending && draft?.feedback
-      ? '<div id="answer-feedback" class="inline-note top-gap" role="status">' +
+      ? '<div id="answer-feedback" class="inline-note top-gap" role="status" tabindex="-1">' +
         (draft.feedback.suggestion
           ? "Did you mean: <strong>" +
             esc(draft.feedback.suggestion) +
@@ -478,6 +475,7 @@ function roundPanel(s, host, draft, unseenDive) {
             button("Edit answer", "edit-answer") +
             "</div>"
           : esc(draft.feedback.message)) +
+        (r.sourceJudged ? "" : s.appeal === draft.text.trim() ? '<p>Sent to the host for review.</p>' : button("Ask host to review","request-review","secondary")) +
         "</div>"
       : "") +
     (!saved && !pending

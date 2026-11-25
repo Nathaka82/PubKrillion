@@ -433,6 +433,11 @@ async function sendPending(p = draft()?.pending) {
           : null;
       setDraft({ ...latest, pending: null, feedback });
       renderRoom();
+      if (feedback && !$("#modal").open && document.activeElement === document.body) {
+        const target = feedback.suggestion ? $("#answer-feedback") : $("#team-answer");
+        target?.focus({ preventScroll: true });
+        target?.scrollIntoView({ block: "nearest" });
+      }
     } else {
       setDraft({ ...draft(), pending: null });
       await refreshNow().catch(() => {});
@@ -465,9 +470,9 @@ function openHistory(r) {
             "secondary",
             'data-round="' + r.id + '" data-from="history"',
           ) +
-          '<details class="top-gap"><summary>Correct a ruling</summary>' +
+          (r.sourceJudged ? "" : '<details class="top-gap"><summary>Correct a ruling</summary>' +
           review(r) +
-          "</details>" +
+          "</details>") +
           audit(r)
         : ""),
   );
@@ -484,32 +489,16 @@ function showJudge(id, key, teamId) {
   const round = environmentOfRound(id);
   const missed = teamId && round?.missedTeams?.find((t) => t.id === teamId);
   const row = missed
-    ? { ...missed, raw: missed.name + " · missed submission", count: 1 }
+    ? { ...missed, raw: missed.name + (missed.lastGuess ? " · “" + missed.lastGuess + "”" : " · missed submission"), count: 1 }
     : round?.review?.find((x) => x.key === key);
   if (!row) return;
   const current = row.depth ? row.canonical : "";
-  const control = round.accepted
-    ? '<select name="name"><option value="">Miss · 0 points</option>' +
-      round.accepted
-        .map(
-          (a) =>
-            '<option value="' +
-            esc(a.name) +
-            '"' +
-            (a.name === current ? " selected" : "") +
-            ">" +
-            esc(a.name) +
-            " · " +
-            round.pointValues[a.depth] +
-            " pts · " +
-            depthLabel(a.depth) +
-            "</option>",
-        )
-        .join("") +
-      "</select>"
-    : '<input name="name" maxlength="140" list="ruling-options" placeholder="Search accepted answers" value="' +
-      esc(current) +
-      '"><datalist id="ruling-options"></datalist><small>Leave blank to score a miss.</small>';
+  const option = (answer) => new Option(
+    answer.name + " · " + round.pointValues[answer.depth] + " pts",
+    answer.name,
+    false,
+    answer.name === current,
+  );
   modal(
     "Judge answer",
     '<p class="helptext">“' +
@@ -517,45 +506,75 @@ function showJudge(id, key, teamId) {
       "” · " +
       row.count +
       (row.count === 1 ? " team" : " teams") +
-      '</p><form id="judge-form" class="stack top-gap" data-round="' +
+      "</p>" + (missed?.reviewEvidence ? JSON.parse(missed.reviewEvidence).map(e=>'<p><a target="_blank" rel="noopener noreferrer" href="'+esc(e.url)+'">'+esc(e.label)+'</a></p>').join("") : "") +
+    '<form id="judge-form" class="stack top-gap" data-round="' +
       id +
       (missed
         ? '" data-team="' + teamId + '" data-previous="' + missed.previous
         : '" data-key="' + esc(key)) +
-      '"><label>Score as' +
-      control +
-      '</label><button class="primary">Save ruling</button></form>',
+      '"><label><span id="ruling-mode-label">Ruling</span><select name="ruling" aria-labelledby="ruling-mode-label"><option value="listed">Use a listed answer</option><option value="unlisted">Award an unlisted answer</option><option value="miss">Miss · 0 points</option></select></label>' +
+      '<div class="stack" id="listed-ruling">' +
+      (round.accepted ? "" : '<label>Search answers or aliases<input type="search" id="ruling-search" maxlength="140"></label>') +
+      '<label><span id="ruling-name-label">Score as</span><select required name="name" aria-labelledby="ruling-name-label"' + (round.accepted ? "" : ' size="5"') + '></select></label>' +
+      (round.accepted ? "" : '<div class="bank-pages"><button type="button" id="ruling-prev">Previous</button><span id="ruling-count" role="status"></span><button type="button" id="ruling-next">Next</button></div>') +
+      '</div><div class="stack" id="unlisted-ruling" hidden><label>Unlisted answer<input name="newName" maxlength="140" required disabled></label>' +
+      '<label>Rarity for this round<select name="newDepth" disabled>' +
+      round.pointValues.map((score, i) => i && (!round.unlistedDepth || i === round.unlistedDepth) ? '<option value="'+i+'">'+depthNames[i]+' · '+score+' points</option>' : "").join("") +
+      '</select></label><p class="fine">Teams with the same submitted guess receive the same ruling.</p></div><button class="primary">Save ruling</button></form>',
   );
-  const options = $("#ruling-options");
-  if (options) {
-    const field = $("#judge-form input");
-    let timer;
-    field.oninput = () => {
-      clearTimeout(timer);
-      const term = field.value;
-      timer = setTimeout(async () => {
-        if (!options.isConnected) return;
-        try {
-          const part = await api(
-            endpoint(
-              "/rounds/" + id + "/answers?q=" + encodeURIComponent(term),
-            ),
-          );
-          if (options.isConnected && field.value === term)
-            options.replaceChildren(
-              ...part.answers.map((a) => new Option(a.name, a.name)),
-            );
-        } catch (e) {
-          if (options.isConnected) showError(e);
-        }
-      }, 150);
-    };
-    field.oninput();
+  const form = $("#judge-form");
+  const field = form.elements.namedItem("name");
+  form.elements.newName.value = missed?.lastGuess ?? "";
+  const mode = form.elements.ruling;
+  mode.onchange = () => {
+    $("#listed-ruling").hidden = field.disabled = mode.value !== "listed";
+    $("#unlisted-ruling").hidden = form.elements.newName.disabled =
+      form.elements.newDepth.disabled = mode.value !== "unlisted";
+  };
+  if (round.accepted) {
+    field.replaceChildren(new Option("Choose an answer", ""), ...round.accepted.map(option));
+    field.value = current;
+    return;
   }
+  const search = $("#ruling-search"), count = $("#ruling-count");
+  const prev = $("#ruling-prev"), next = $("#ruling-next");
+  let offset = 0, ticket = 0, timer;
+  function load(start, delay = 0) {
+    const request = ++ticket;
+    clearTimeout(timer);
+    field.replaceChildren();
+    prev.disabled = next.disabled = true;
+    count.textContent = "Searching…";
+    timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q: search.value, offset: start });
+        const part = await api(endpoint("/rounds/" + id + "/answers?" + params));
+        if (!field.isConnected || ticket !== request) return;
+        field.replaceChildren(...part.answers.map(option));
+        if (!part.answers.some((a) => a.name === current)) field.selectedIndex = -1;
+        offset = part.offset;
+        count.textContent = part.filtered ? (offset + 1) + "–" + (offset + part.answers.length) + " of " + part.filtered : "No matching answers";
+        prev.disabled = !offset;
+        next.disabled = offset + part.answers.length >= part.filtered;
+      } catch (e) {
+        if (field.isConnected && request === ticket) {
+          count.textContent = "Search unavailable. Edit your search to retry.";
+          showError(e);
+        }
+      }
+    }, delay);
+  }
+  search.value = current;
+  search.oninput = () => load(0, 150);
+  prev.onclick = () => load(offset - 40);
+  next.onclick = () => load(offset + 40);
+  load(0);
 }
 let pickerMode = "pick";
 let pickerPosition = null;
 let questionPage = 0;
+let pickerCategory = "";
+let omitSpecialist = false, omitExplicit = false;
 async function acceptedAnswers(path, scale, back, trigger) {
   const parent = trigger.closest("dialog");
   const first = await api(path);
@@ -594,9 +613,11 @@ async function acceptedAnswers(path, scale, back, trigger) {
     timer;
   function paintPage(part) {
     current = part;
+    const spellings = names => names.map(name => "<bdi>" + esc(name) + "</bdi>").join(", ");
     rows.innerHTML = part.answers
-      .map(
-        (a) =>
+      .map(a => {
+        const longList = a.aliases.length > 4 || a.aliases.join(", ").length > 100;
+        return (
           '<li data-rarity="' +
           a.depth +
           '" class="tier-' +
@@ -609,10 +630,19 @@ async function acceptedAnswers(path, scale, back, trigger) {
           depthNames[a.depth] +
           " · " +
           depthLabel(a.depth) +
-          (a.aliases.length
-            ? " · Also accepts " + esc(a.aliases.join(", "))
+          (a.needsDetail?.includes(a.name) ? " · This name alone is ambiguous" : "") +
+          (a.aliases.length && !longList
+            ? " · Also accepts " + spellings(a.aliases)
             : "") +
           "</small>" +
+          (longList ? "<details><summary>Also accepts " + a.aliases.length + " alternate " +
+            (a.aliases.length === 1 ? "name" : "names") + "</summary><p>" + spellings(a.aliases) + "</p></details>" : "") +
+          (a.needsDetail?.length || a.sharedNames?.length
+            ? "<details><summary>Other recorded names</summary>" +
+              (a.needsDetail?.length ? "<p>Use a more specific name for " + spellings(a.needsDetail) + ".</p>" : "") +
+              (a.sharedNames || []).map(shared => "<p><bdi>" + esc(shared.name) + "</bdi> identifies multiple eligible answers and scores " +
+                scale[shared.depth] + " pts.</p>").join("") + "</details>" : "") +
+          evidenceLinks(a.evidence) +
           (a.examples?.length
             ? "<details><summary>Suggested examples</summary><small>" +
               esc(a.examples.join(", ")) +
@@ -620,8 +650,8 @@ async function acceptedAnswers(path, scale, back, trigger) {
             : "") +
           "</div><b>" +
           scale[a.depth] +
-          " pts</b></li>",
-      )
+          " pts</b></li>");
+      })
       .join("");
     rows.scrollTop = 0;
     rows.querySelectorAll("[data-tier]").forEach(drawSpecies);
@@ -671,42 +701,93 @@ async function acceptedAnswers(path, scale, back, trigger) {
   paintPage(first);
 }
 function listEntries(filter = "") {
-  const entries = library.filter((q) =>
-    (q.title + " " + q.topic + " " + q.prompt)
-      .toLowerCase()
-      .includes(filter.toLowerCase()),
-  );
-  return entries.length
-    ? entries
-        .slice(questionPage * 50, (questionPage + 1) * 50)
-        .map(
-          (q) =>
-            "<li>" +
-            button(
-              "<strong>" +
-                esc(q.title) +
-                "</strong><small>" +
-                esc(q.topic) +
-                " · " +
-                (q.plays ? q.plays + " played" : "Unused") +
-                "</small>",
-              pickerMode === "pick" ? "configure" : "edit",
-              "item-main",
-              'data-id="' + esc(q.id) + '"',
-            ) +
-            button(
-              "Answers",
-              "bank-answers",
-              "text-btn",
-              'data-id="' +
-                esc(q.id) +
-                '" aria-label="Accepted answers for ' +
-                esc(q.title) +
-                '"',
-            ) +
-            "</li>",
-        )
-        .join("") +
+  const query = filter.trim().toLocaleLowerCase("en-GB");
+  const available = library.filter((q) => {
+    const notes = (q.context ?? "").split(" · ");
+    return !(omitSpecialist && notes.includes("Specialist")) &&
+      !(omitExplicit && notes.includes("Explicit titles"));
+  });
+  if (!pickerCategory && !query) {
+    const counts = new Map();
+    for (const q of available)
+      counts.set(q.topic, (counts.get(q.topic) ?? 0) + 1);
+    return [...counts]
+      .sort(([a], [b]) => {
+        if (a === b) return 0;
+        if (a === "General Knowledge") return -1;
+        if (b === "General Knowledge") return 1;
+        return a.localeCompare(b, "en-GB");
+      })
+      .map(
+        ([topic, count]) =>
+          "<li>" +
+          button(
+            "<strong>" +
+              esc(topic) +
+              "</strong><small>" +
+              count +
+              (count === 1 ? " question" : " questions") +
+              "</small>",
+            "choose-category",
+            "item-main",
+            'data-topic="' + esc(topic) + '"',
+          ) +
+          "</li>",
+      )
+      .join("");
+  }
+  const entries = available
+    .filter(
+      (q) =>
+        (!pickerCategory || q.topic === pickerCategory) &&
+        [q.title, q.topic, q.prompt, q.context].join(" ")
+          .toLocaleLowerCase("en-GB")
+          .includes(query),
+    )
+    .sort(
+      (a, b) => a.plays - b.plays || a.title.localeCompare(b.title, "en-GB"),
+    );
+  const header = pickerCategory
+    ? '<li class="category-heading"><strong>' +
+      esc(pickerCategory) +
+      "</strong>" +
+      button("All categories", "all-categories", "text-btn") +
+      "</li>"
+    : "";
+  return (
+    header +
+    (entries.length
+      ? entries
+          .slice(questionPage * 50, (questionPage + 1) * 50)
+          .map(
+            (q) =>
+              "<li>" +
+              button(
+                "<strong>" +
+                  esc(q.title) +
+                  "</strong><small>" +
+                  esc(q.topic) +
+                  " · " +
+                  (q.context ? esc(q.context) + " · " : "") +
+                  (q.plays ? q.plays + " played" : "Unused") +
+                  "</small>",
+                pickerMode === "pick" ? "configure" : q.generated ? "regenerate" : "edit",
+                "item-main",
+                'data-id="' + esc(q.id) + '"',
+              ) +
+              button(
+                "Answers",
+                "bank-answers",
+                "text-btn",
+                'data-id="' +
+                  esc(q.id) +
+                  '" aria-label="Accepted answers for ' +
+                  esc(q.title) +
+                  '"',
+              ) +
+              "</li>",
+          )
+          .join("") +
         (entries.length > 50
           ? '<li class="bank-pages">' +
             (questionPage ? button("Previous 50", "previous-questions") : "") +
@@ -720,9 +801,48 @@ function listEntries(filter = "") {
               : "") +
             "</li>"
           : "")
-    : '<li class="empty">No matching questions.</li>';
+      : '<li class="empty">No matching questions.</li>')
+  );
 }
-const formatCount = new Intl.NumberFormat("en-GB");
+function evidenceLinks(evidence) {
+  if (!evidence?.length) return "";
+  const items = new Set();
+  const link = (url, label) => '<li><a target="_blank" rel="noopener noreferrer" href="' + esc(url) + '">' + label + '</a></li>';
+  for (const record of evidence) {
+    if (record.relationshipLabel && record.targetLabel && record.url) {
+      items.add(link(record.url, esc(record.relationshipLabel) + " · <bdi>" + esc(record.targetLabel) + "</bdi>"));
+      continue;
+    }
+    if (record.nameProperty && record.url) {
+      items.add(link(record.url, esc(record.nameProperty) + " · " + '<bdi lang="' + esc(record.language) + '">' + esc(record.name) + '</bdi>'));
+      continue;
+    }
+    if (record.dates?.length) {
+      for (const claim of record.dates) {
+        const value = claim.value;
+        let display = value;
+        if (/^\d{4}-\d{2}(?:-\d{2})?$/.test(value)) {
+          const exactDay = value.length === 10;
+          const instant = new Date((exactDay ? value : value + "-01") + "T00:00:00Z");
+          if (Number.isFinite(instant.getTime())) {
+            display = instant.toLocaleDateString(undefined, {
+              year: "numeric", month: "long", ...(exactDay ? { day: "numeric" } : {}), timeZone: "UTC",
+            });
+          }
+        }
+        items.add(link(claim.url, esc(record.relation || "Recorded date") + " · " +
+          '<time datetime="' + esc(value) + '">' + esc(display) + '</time>'));
+      }
+      continue;
+    }
+    if (!record.url) continue;
+    const unit = {length:"cm",mass:"g",year:"years"}[record.property];
+    const label = unit ? record.basis+" "+record.low+(record.high!==record.low?"–"+record.high:"")+" "+unit : record.source;
+    const readable = label?.startsWith("wikidata-query-") ? "Wikidata source record" : label;
+    items.add(link(record.url,esc(readable || "Source record")));
+  }
+  return items.size ? '<details><summary>Evidence</summary><ul>'+[...items].join("")+'</ul></details>' : "";
+}
 function coverageNote(question) {
   if (!question.coverage) return "";
   return (
@@ -736,69 +856,6 @@ function coverageNote(question) {
     "</p>"
   );
 }
-async function browsePacks(trigger) {
-  const packs = await api("/catalogue");
-  if (!trigger.isConnected || !$("#modal").open) return;
-  modal(
-    "Question packs",
-    '<ul class="pack-list" aria-label="Available packs">' +
-      packs
-        .map(
-          (pack) =>
-            "<li>" +
-            button(
-              "<strong>" +
-                esc(pack.title) +
-                "</strong><small>" +
-                pack.count +
-                " questions · " +
-                formatCount.format(pack.answers) +
-                " answers</small><span>" +
-                esc(pack.description) +
-                "</span>",
-              "preview-pack",
-              "pack-card",
-              'data-id="' + esc(pack.id) + '"',
-            ) +
-            "</li>",
-        )
-        .join("") +
-      "</ul>" +
-      button("Back to questions", "back-to-questions", "text-btn"),
-  );
-}
-async function previewQuestions(trigger) {
-  const id = trigger.dataset.id;
-  const questions = await api("/catalogue/" + id);
-  if (!trigger.isConnected || !$("#modal").open) return;
-  modal(
-    trigger.querySelector("strong").textContent,
-    '<div class="pack-preview"><p class="fine">Tap a question to see its scope and source.</p><ul class="pack-prompts">' +
-      questions
-        .map(
-          (q) =>
-            "<li><details><summary><strong>" +
-            esc(q.title) +
-            "</strong><small>" +
-            formatCount.format(q.count) +
-            " answers</small></summary><p>" +
-            esc(q.prompt) +
-            "</p>" +
-            coverageNote(q) +
-            "</details></li>",
-        )
-        .join("") +
-      '</ul><div class="pack-actions">' +
-      button(
-        "Add " + questions.length + " questions to room",
-        "install-pack",
-        "primary",
-        'data-id="' + esc(id) + '"',
-      ) +
-      button("Back to packs", "browse-packs", "text-btn") +
-      "</div></div>",
-  );
-}
 function fitQuestionPicker() {
   const viewport = window.visualViewport;
   const dialog = $("#modal");
@@ -809,23 +866,172 @@ function fitQuestionPicker() {
     viewport.offsetTop + viewport.height / 2 + "px",
   );
 }
+let lastResearch;
+function generateForm(prompt = "") {
+  modal("Generate a question",
+    '<form class="stack" id="generate-form"><label>Question for players<textarea name="prompt" maxlength="450" required placeholder="Name a film directed by Akira Kurosawa">'+esc(prompt)+'</textarea></label>'+
+    '<p>Ask for a subject, or narrow it with a relationship such as “with publisher Nintendo”.</p>'+
+    '<label><input type="checkbox" name="research"> Check live Wikidata for updates</label>'+
+    '<button class="primary">Preview answers</button>'+
+    button("Draft questions from an idea", "draft-idea")+
+    button("Back to questions","back-to-questions","text-btn")+'</form>');
+}
+
+function ideaForm(idea, completeOnly = false) {
+  modal("Draft questions from an idea",
+    '<form class="stack" id="idea-form"><label>Your idea<textarea name="idea" maxlength="450" required placeholder="Japanese cinema for a mixed-age table">'+esc(idea)+'</textarea></label>'+
+    '<label><input type="checkbox" name="completeOnly"'+(completeOnly ? ' checked' : '')+'> Only use complete source registers</label>'+
+    (state?.questionDrafts ? '<label><input type="checkbox" name="useModel"> Ask OpenAI for wording if the catalogue has no match</label>' : '')+
+    '<button class="primary">Suggest questions</button><button type="submit" value="surprise" formnovalidate>Surprise me</button>'+button("Enter a question directly", "generate", "text-btn")+'</form>');
+}
+
+async function suggestQuestions(form, surprise) {
+  const idea = form.elements.idea.value;
+  const completeOnly = form.elements.completeOnly.checked;
+  const useModel = !!form.elements.useModel?.checked;
+  const dialog = $("#modal");
+  const current = () => form.isConnected && dialog.open && idea === form.elements.idea.value &&
+    completeOnly === form.elements.completeOnly.checked && useModel === !!form.elements.useModel?.checked;
+  const status = document.createElement("p");
+  status.setAttribute("role", "status");
+  status.textContent = "Looking for questions in the sources…";
+  form.append(status);
+  try {
+    const request = { idea, completeOnly, surprise, prepareOnSelect: true, waitForSource: true, useModel };
+    let drafts = await api(endpoint("/drafts"), "POST", request);
+    while (drafts.awaitingEdition && current()) {
+      status.textContent = "The builder is checking the source. Questions will appear here when the result is published.";
+      await new Promise(resolve => {
+        function done() {
+          clearTimeout(timer);
+          form.removeEventListener("input",done);
+          dialog.removeEventListener("close",done);
+          resolve();
+        }
+        const timer = setTimeout(done,5000);
+        form.addEventListener("input",done,{once:true});
+        dialog.addEventListener("close",done,{once:true});
+      });
+      if (!current()) return;
+      const { edition } = await api(endpoint("/drafts/edition"));
+      if (current() && edition && edition !== drafts.awaitingEdition)
+        drafts = await api(endpoint("/drafts"),"POST",request);
+    }
+    if (!current()) return;
+    const { jobs, note } = drafts;
+    modal("Choose a question", '<div class="stack" id="draft-options">'+
+      (note ? '<p role="status">'+esc(note)+'</p>' : '')+
+      jobs.map(j => '<section class="draft-card" data-job="'+esc(j.id)+'"><h3>'+esc(j.prompt)+'</h3>'+
+        [...new Set(Array.from(j.prompt.matchAll(/\((Q[1-9]\d{0,11})\)/g),match=>match[1]))]
+          .map(id=>'<p><a target="_blank" rel="noopener noreferrer" href="https://www.wikidata.org/wiki/'+id+'">View Wikidata entry '+id+'</a></p>').join("")+
+        (j.records ? '<p>'+j.records.toLocaleString()+(j.complete ? ' entries in the complete register' : ' matching records in the source edition')+'</p>' : '')+
+        (j.deferred ? button("Preview this round", "prepare-draft", "primary") :
+          '<p data-progress role="status">Preparing playable answers…</p>')+'</section>').join("")+
+      button("Edit your idea", "draft-idea", "text-btn", 'data-idea="'+esc(idea)+'" data-complete="'+completeOnly+'"')+'</div>');
+    const list = $("#draft-options");
+    const pending = new Map(jobs.filter(j => !j.deferred).map(j => [j.id, j]));
+    while (pending.size && list.isConnected && $("#modal").open) {
+      await Promise.all([...pending.keys()].map(async id => {
+        const result = await api(endpoint("/generate/"+id));
+        if (!list.isConnected || !$("#modal").open) return;
+        const card = list.querySelector('[data-job="'+CSS.escape(id)+'"]');
+        const info = card.querySelector("[data-progress]");
+        if (result.status === "ready") {
+          const q = result.preview;
+          info.textContent = q.answerCount.toLocaleString()+" source-backed answers"+
+            (q.examples?.length ? " · "+q.examples.join(", ") : "");
+          const open = document.createElement("button");
+          open.className = "primary";
+          open.textContent = "Preview this round";
+          open.onclick = () => previewResearch(id, q);
+          card.append(open);
+        } else if (result.status === "waiting_source") {
+          info.textContent = result.message;
+          return;
+        } else if (result.status === "choose_topic") {
+          info.textContent = result.message;
+          const select = document.createElement("button");
+          select.textContent = "See matching questions";
+          select.onclick = () => { ideaForm(result.prompt); $("#idea-form").requestSubmit(); };
+          card.append(select);
+        } else if (result.status === "failed") {
+          info.textContent = result.message;
+        } else return;
+        pending.delete(id);
+      }));
+      if (pending.size) await new Promise(done => setTimeout(done, 800));
+    }
+  } finally {
+    status.remove();
+  }
+}
+function previewResearch(job, q) {
+  lastResearch = {job,q};
+  modal("Question preview", '<div class="stack"><h3>'+esc(q.prompt)+'</h3><p>'+esc(q.interpretation)+'</p><p><strong>'+
+    q.answerCount.toLocaleString()+' verified answers</strong> · '+esc(q.coverage)+'</p><p>'+
+    q.gaps.missing.toLocaleString()+' candidates lack supporting evidence. '+q.gaps.borderline.toLocaleString()+' are borderline.</p>'+
+    (q.sourceJudged ? '<p>'+ (q.observedTeams ? 'Rarity calibrated with '+q.observedTeams.toLocaleString()+' verified first choices.' : 'Rarity uses source estimates until enough teams have played.')+' '+q.counts[5].toLocaleString()+' answers earn the top score.</p>' : '')+
+    '<details><summary>Sources and scoring</summary><ul>'+q.sources.map(s=>'<li><a target="_blank" rel="noopener noreferrer" href="'+esc(s.url)+'">'+esc(s.label || s.id)+'</a> · '+esc(s.revision.slice(0,14))+' · loaded '+esc(new Date(s.checked*1000).toLocaleDateString())+'</li>').join("")+'</ul><p>'+esc(q.scoring || "Rarity estimates are fixed when the round opens. The top score requires evidence of unusually low recall.")+'</p></details>'+
+    button("Browse answers","preview-members")+button("Save to library","save-generated","primary")+
+    (q.plan?.worldSource ? button("Refresh from Wikidata", "refresh-research") : "")+
+    button("Edit prompt","revise-prompt","text-btn")+'</div>');
+}
+async function generate(f, prompt = f.elements.prompt.value, research = f.elements.research.checked) {
+  return awaitPreview(f, () => api(endpoint("/generate"), "POST", {prompt, research}));
+}
+async function awaitPreview(f, start) {
+  const status=document.createElement("p");
+  status.setAttribute("role","status");
+  status.textContent="Checking sources and compiling answers…";
+  f.append(status);
+  try {
+    const job=await start();
+    while (f.isConnected && $("#modal").open) {
+      const result=await api(endpoint("/generate/"+job.id));
+      if(!f.isConnected || !$("#modal").open) return;
+      if(result.status==="ready") {
+        const preview=result.preview;
+        return previewResearch(job.id,result.worldNotice ? {...preview,coverage:preview.coverage+" "+result.worldNotice} : preview);
+      }
+      if(result.status==="failed") throw new Error(result.message);
+      if(result.status==="choose_topic") {
+        ideaForm(result.prompt);
+        $("#idea-form").requestSubmit();
+        return;
+      }
+      if(result.status==="waiting_source") {
+        status.textContent=result.message;
+        await new Promise(done=>setTimeout(done,5000));
+        continue;
+      }
+      status.textContent=result.installingWorld ? "Preparing the cross-domain knowledge index for first use. Your question is queued…" :
+        result.status==="queued" ? "Waiting for the research worker…" : "Checking evidence and scoring answers…";
+      await new Promise(done=>setTimeout(done,600));
+    }
+  } finally {status.remove();}
+}
 async function picker(mode, restore = false) {
   const stamp = page;
   if (!restore || mode !== pickerMode) pickerPosition = null;
   questionPage = pickerPosition?.page ?? 0;
+  pickerCategory = pickerPosition?.category ?? "";
   pickerMode = mode;
   const entries = await api(endpoint("/library"));
   if (!during(stamp)) return;
   library = entries;
   modal(
     mode === "pick" ? "Start a round" : "Question library",
-    '<div class="stack question-picker"><label><span>Find a question</span><input class="filter" id="question-filter" placeholder="Search by topic or title"></label><ul class="menu-list" id="question-list" aria-label="Questions">' +
+    '<div class="stack question-picker"><div><label><span>Find a question</span><input class="filter" id="question-filter" placeholder="Search by title, topic, region or era"></label>' +
+      '<details class="picker-filters"><summary>Filters' + (omitSpecialist || omitExplicit ? " (active)" : "") + '</summary><div>' +
+      '<label><input type="checkbox" id="omit-specialist"' + (omitSpecialist ? " checked" : "") + '>Hide specialist rounds</label>' +
+      '<label><input type="checkbox" id="omit-explicit"' + (omitExplicit ? " checked" : "") + '>Hide explicit titles</label></div></details></div>' +
+      '<ul class="menu-list" id="question-list" aria-label="Questions">' +
       listEntries(pickerPosition?.filter) +
       "</ul>" +
       '<div class="picker-tools">' +
-      button("Browse packs", "browse-packs", "primary") +
+      button("Generate from a prompt", "generate") +
       button(icon("add") + " New question", "new") +
-      (mode === "library" ? button("Import pack", "import-pack") : "") +
+      (mode === "library" ? button("Import questions", "import-pack") : "") +
       "</div>" +
       "</div>",
   );
@@ -849,6 +1055,7 @@ function configure(id, seconds = "0", previous = state.round?.id ?? "") {
     "Start round " + ((state.round?.seq ?? 0) + 1),
     '<form class="stack" id="start-form" data-id="' +
       esc(id) +
+      (q.generated ? '" data-revision="' + esc(q.revision) : "") +
       '" data-previous="' +
       esc(previous) +
       '"><p class="kicker">' +
@@ -856,12 +1063,14 @@ function configure(id, seconds = "0", previous = state.round?.id ?? "") {
       "</p><h3>" +
       esc(q.prompt) +
       "</h3>" +
+      (q.sourceNotice ? '<p role="status">'+esc(q.sourceNotice)+'</p>' : '') +
+      (q.context ? '<p class="fine">' + esc(q.context) + "</p>" : "") +
       (q.plays
-        ? '<p class="inline-note">This category has already been played ' +
+        ? '<p class="inline-note">This question has already been played ' +
           q.plays +
           " time(s).</p>"
         : "") +
-      '<label>Countdown<select name="seconds"><option value="0">Host locks manually</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="90">90 seconds</option><option value="120">2 minutes</option><option value="180">3 minutes</option></select></label><button class="primary">Open question</button>' +
+      '<label>Countdown<select name="seconds"><option value="0">No time limit</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="90">90 seconds</option><option value="120">2 minutes</option><option value="180">3 minutes</option></select></label><button class="primary"'+(q.sourceNotice ? " disabled" : "")+'>Open question</button>' +
       button(
         "Accepted answers",
         "bank-answers",
@@ -952,7 +1161,7 @@ async function editor(id) {
     ? await api(endpoint("/library/" + id))
     : {
         title: "",
-        topic: "",
+        topic: pickerCategory,
         prompt: "",
         source: "",
         answers: [{ name: "", depth: 1, aliases: [] }],
@@ -964,15 +1173,22 @@ async function editor(id) {
     id ? "Edit question" : "New question",
     '<form id="edit-form" class="editor stack"><label>Picker title<input name="title" maxlength="100" required value="' +
       esc(q.title) +
-      '"></label><label>Topic<input name="topic" maxlength="60" required value="' +
+      '"></label><label>Category<input list="question-categories" name="topic" maxlength="60" required value="' +
       esc(q.topic) +
-      '"></label><label>Prompt<textarea name="prompt" rows="2" maxlength="400" required>' +
+      '"></label><datalist id="question-categories">' +
+      [...new Set(library.map((entry) => entry.topic))]
+        .sort()
+        .map((topic) => '<option value="' + esc(topic) + '"></option>')
+        .join("") +
+      '</datalist><label>Prompt<textarea name="prompt" rows="2" maxlength="400" required>' +
       esc(q.prompt) +
       '</textarea></label><label>Source URL (optional)<input type="url" name="source" value="' +
       esc(q.source) +
+      '"></label><label>Picker notes (region, era or content)<input name="context" maxlength="200" value="' +
+      esc(q.context ?? "") +
       '"></label><label>Coverage (optional)<textarea name="coverage" rows="2" maxlength="900">' +
       esc(q.coverage ?? "") +
-      '</textarea></label><label>Answer matching<select name="matching"><option value="categories">Categories · recognise specific examples</option><option value="names">Names and titles · aliases and spelling</option></select></label><div><h3>Accepted answers</h3><p class="fine">Use British display names. Separate alternative names with a vertical bar ( | ).</p></div><div class="editor-rows"></div><div class="bank-pages" id="edit-pages"></div>' +
+      '</textarea></label><label>Answer matching<select name="matching"><option value="categories">Categories · recognise specific examples</option><option value="names">Names and titles · allow shortened names</option><option value="full">Full names or codes · allow spelling corrections</option></select></label><div><h3>Accepted answers</h3><p class="fine">Use British display names. Separate alternative names with a vertical bar ( | ).</p></div><div class="editor-rows"></div><div class="bank-pages" id="edit-pages"></div>' +
       button("+ Add answer", "add-row") +
       '<button class="primary">Save question</button></form>',
   );
@@ -1001,10 +1217,14 @@ document.addEventListener("input", (e) => {
   if (t.name === "answer" && state?.round) {
     setDraft({ ...draft(), text: t.value, feedback: null });
     $("#answer-feedback")?.remove();
+    t.setAttribute("aria-describedby", "answer-help");
   }
-  if (t.id === "question-filter") {
+  if (["question-filter", "omit-specialist", "omit-explicit"].includes(t.id)) {
+    omitSpecialist = $("#omit-specialist").checked;
+    omitExplicit = $("#omit-explicit").checked;
+    $(".picker-filters summary").textContent = omitSpecialist || omitExplicit ? "Filters (active)" : "Filters";
     questionPage = 0;
-    $("#question-list").innerHTML = listEntries(t.value);
+    $("#question-list").innerHTML = listEntries($("#question-filter").value);
     $("#question-list").scrollTop = 0;
   }
   if (t.form?.id === "delete-form")
@@ -1022,6 +1242,7 @@ async function action(el) {
       filter: $("#question-filter").value,
       scrollTop: list.scrollTop,
       page: questionPage,
+      category: pickerCategory,
       id: el.dataset.id,
       action: a,
     };
@@ -1033,27 +1254,21 @@ async function action(el) {
       list.scrollTop = 0;
       list.querySelector("button")?.focus({ preventScroll: true });
       return;
-    case "browse-packs":
-      return browsePacks(el);
-    case "preview-pack":
-      return previewQuestions(el);
-    case "install-pack": {
-      const result = await api(endpoint("/packs/" + el.dataset.id), "POST", {});
-      if (el.isConnected && $("#modal").open) {
-        await picker(pickerMode);
-        notice(
-          result.added + " added · " + result.skipped + " already in this room",
-        );
-      }
+    case "choose-category":
+    case "all-categories":
+      pickerCategory = el.dataset.topic ?? "";
+      questionPage = 0;
+      $("#question-filter").value = "";
+      list.innerHTML = listEntries();
+      list.scrollTop = 0;
+      list.querySelector("button")?.focus({ preventScroll: true });
       return;
-    }
     case "import-pack":
       return modal(
-        "Import a question pack",
-        '<form id="pack-form" class="stack"><p>Choose a JSON pack from your phone. Each question includes its accepted answers and rarity tiers.</p>' +
+        "Import questions",
+        '<form id="pack-form" class="stack"><p>Choose a JSON file from your device. Each question includes its accepted answers and rarity tiers.</p>' +
           '<label>Question pack<input name="pack" type="file" accept=".json,application/json" required></label><small>Up to 16 MiB per file. Identical questions are skipped.</small>' +
-          '<button class="primary">Import questions</button><div><h3>Try the sample pack</h3><p class="fine">Gaming accessories and 162 world currencies.</p></div>' +
-          button("Add sample questions", "sample-pack") +
+          '<button class="primary">Import questions</button>' +
           (splitHosting
             ? button("Download example JSON", "download-sample", "text-btn")
             : '<a class="text-btn" href="/api/packs/sample" download>Download example JSON</a>') +
@@ -1067,12 +1282,6 @@ async function action(el) {
       a.download = "pub-sampler.json";
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 30000);
-      return;
-    }
-    case "sample-pack": {
-      const data = await api("/packs/sample");
-      if (el.isConnected && $("#modal").open)
-        return importQuestions(data, $("#pack-form"));
       return;
     }
     case "confirm-suggestion": {
@@ -1148,6 +1357,35 @@ async function action(el) {
       return picker(a);
     case "back-to-questions":
       return picker(pickerMode, true);
+    case "generate": return generateForm();
+    case "draft-idea": return ideaForm(el.dataset.idea ?? el.form?.elements.prompt?.value ?? "", el.dataset.complete === "true");
+    case "prepare-draft": {
+      const card = el.closest("[data-job]");
+      // Keep selection and status together, including for screen readers and small displays.
+      modal("Prepare question", '<div class="stack" id="selected-draft"><h3>'+esc(card.querySelector("h3").textContent)+'</h3></div>');
+      const id = card.dataset.job;
+      return awaitPreview($("#selected-draft"), () => api(endpoint("/generate/"+id+"/prepare"), "POST", {}));
+    }
+    case "regenerate": return generateForm(library.find(q=>q.id===el.dataset.id)?.prompt);
+    case "preview-members": return acceptedAnswers(endpoint("/generate/"+lastResearch.job+"/answers"),points,button("Back to preview","research-preview"),el);
+    case "research-preview": return previewResearch(lastResearch.job,lastResearch.q);
+    case "refresh-research": return generate(el.closest(".stack"), lastResearch.q.prompt, true);
+    case "revise-prompt": return generateForm(lastResearch.q.prompt);
+    case "save-generated": {
+      const saved=await api(endpoint("/generate/"+lastResearch.job+"/save"),"POST",{});
+      await picker(pickerMode);
+      if (pickerMode==="pick") configure(saved.id);
+      else notice("Generated question saved.");
+      return;
+    }
+    case "request-review": {
+      const raw=draft()?.text.trim();
+      if (!raw || !state.round) return;
+      const result=await api(endpoint("/rounds/"+state.round.id+"/appeal"),"POST",{answer:raw});
+      state.appeal=result.raw;
+      renderRoom();
+      return;
+    }
     case "new":
       return editor();
     case "edit":
@@ -1362,15 +1600,19 @@ document.addEventListener("submit", async (e) => {
         location.hash = "/host/" + out.code;
         break;
       }
+      case "generate-form": await generate(f); break;
+      case "idea-form": await suggestQuestions(f, e.submitter?.value === "surprise"); break;
       case "answer-form": {
         const answer = values.answer.trim();
         if (!answer) throw new Error("Enter an answer.");
+        if (Array.from(answer).length > 140) throw new Error("Enter an answer of 140 characters or fewer.");
         await queueAnswer(answer, state.mine?.revision ?? 0);
         break;
       }
       case "start-form":
         await api(endpoint("/start"), "POST", {
           questionId: f.dataset.id,
+          ...(f.dataset.revision ? {revision:Number(f.dataset.revision)} : {}),
           previous: Number(f.dataset.previous) || null,
           seconds: Number(values.seconds),
         });
@@ -1398,8 +1640,9 @@ document.addEventListener("submit", async (e) => {
                 previous: Number(f.dataset.previous),
               }
             : { key: f.dataset.key }),
-          name: values.name,
-          ...(values.name ? {} : { depth: 0 }),
+          ...(values.ruling === "miss" ? { depth: 0 } :
+            values.ruling === "unlisted" ? { name: values.newName, depth: Number(values.newDepth), unlisted: true } :
+            { name: values.name }),
         });
         closeModal();
         await refreshNow();

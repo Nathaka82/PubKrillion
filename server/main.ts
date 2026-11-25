@@ -8,8 +8,16 @@ import { dirname, resolve, extname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
 import QRCode from "qrcode";
-import { catalogue, catalogueQuestions, previewPack } from "./catalogue.ts";
+import {
+  catalogue,
+  catalogueQuestions,
+  previewPack,
+  samplePack,
+} from "./catalogue.ts";
 import { publishWebAssets } from "./web-assets.ts";
+import { indexed, indexedPage, Research } from "./knowledge.ts";
+import { discoverDrafts } from "./question-drafts.ts";
+import type { Question } from "./rules.ts";
 import { SemanticMatcher } from "./semantic.ts";
 import { Game, UnmatchedGuess, digest, secret } from "./store.ts";
 import { Fault, demand, answerPage } from "./rules.ts";
@@ -21,6 +29,8 @@ const hostPasswordDigest = Buffer.from(digest(password), "hex");
 const dbPath = process.env.DB_PATH || "storage/quiz.sqlite";
 const game = new Game(dbPath);
 const semantic = new SemanticMatcher(dbPath);
+const research = new Research(game.db,dbPath);
+function prepare(q: Question) { if (!indexed(q)) semantic.prepare(q); }
 const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const origin = process.env.PUBLIC_ORIGIN
   ? new URL(process.env.PUBLIC_ORIGIN).origin
@@ -300,15 +310,7 @@ const server = createServer(async (req, res) => {
         "Content-Disposition",
         'attachment; filename="pub-sampler.json"',
       );
-      send(
-        res,
-        JSON.parse(
-          await readFile(
-            new URL("../data/pub-sampler.json", import.meta.url),
-            "utf8",
-          ),
-        ),
-      );
+      send(res, samplePack);
       return;
     }
     const catalogueRoute = path.match(/^\/api\/catalogue(?:\/([a-z]+))?$/);
@@ -367,7 +369,7 @@ const server = createServer(async (req, res) => {
       else demand(team, 401, "Join or recover your team to continue.");
       const fresh = game.one("SELECT version FROM rooms WHERE code=?", code)!;
       const etag =
-        '"' + fresh.version + "-" + (hostView ? "host" : team!.id) + '"';
+        '"' + fresh.version + "-" + (hostView ? (process.env.OPENAI_API_KEY?.trim() ? "host-ai" : "host") : team!.id) + '"';
       res.setHeader("ETag", etag);
       if (req.headers["if-none-match"] === etag) {
         res.writeHead(304, { "Cache-Control": "no-store" });
@@ -376,8 +378,8 @@ const server = createServer(async (req, res) => {
       }
       const state = game.state(r, hostView, hostView ? undefined : team);
       if (state.round?.phase === "open")
-        semantic.prepare(game.roundBank(game.round(code, state.round.id)));
-      send(res, state);
+        prepare(game.roundBank(game.round(code, state.round.id)));
+      send(res, hostView ? { ...state, questionDrafts: Boolean(process.env.OPENAI_API_KEY?.trim()) } : state);
       return;
     }
     if (
@@ -389,9 +391,9 @@ const server = createServer(async (req, res) => {
       requireHost(req);
       const q =
         action === "rounds"
-          ? game.roundBank(game.round(code, Number(id)))
+          ? game.judgingBank(game.round(code, Number(id)))
           : game.question(code, id);
-      send(res, answerPage(q, url.searchParams));
+      send(res, indexed(q) ? indexedPage(game.db,q,url.searchParams,action==="rounds"?Number(id):undefined) : answerPage(q, url.searchParams));
       return;
     }
     if (action === "rounds" && id && !op && method === "GET") {
@@ -406,6 +408,11 @@ const server = createServer(async (req, res) => {
       send(res, game.detail(round, hostView));
       return;
     }
+    if (action === "rounds" && op === "appeal" && method === "POST") {
+      demand(team,401,"Join the room to request review.");
+      send(res,game.tx(()=>game.appeal(r,game.round(code,Number(id)),team,body.answer)));
+      return;
+    }
     if (action === "rounds" && op === "answer" && method === "POST") {
       demand(team, 401, "Rejoin or recover your team to answer.");
       const round = game.round(code, Number(id));
@@ -415,7 +422,19 @@ const server = createServer(async (req, res) => {
           game.tx(() => game.submit(r, round, team, body)),
         );
       } catch (error) {
-        if (!(error instanceof UnmatchedGuess)) throw error;
+        // Keep the last submitted wording for a missed team's host review.
+        // Record arrival order before semantic inference can yield to another guess.
+        if (error instanceof Fault && error.status === 422) {
+          const edition = game.roundBank(round);
+          if (indexed(edition) && edition.sourceJudged) game.observe(round, team, null);
+          else game.run("INSERT INTO review_guesses(round,team,raw) VALUES(?,?,?) ON CONFLICT(round,team) DO UPDATE SET raw=excluded.raw",
+            round.id, team.id, body.answer.trim());
+        }
+        if (
+          !(error instanceof UnmatchedGuess) ||
+          error.question.matching === "full"
+        )
+          throw error;
         const suggestion = await semantic.suggest(error.question, error.raw);
         // No transaction spans model inference. A lock, transfer or concurrent
         // submission can change who is eligible while we await the worker.
@@ -439,8 +458,61 @@ const server = createServer(async (req, res) => {
       return;
     }
     requireHost(req);
+    if (action === "drafts" && id === "edition" && method === "GET") {
+      send(res,{edition:research.syncCatalogue() ?? null});
+      return;
+    }
+    if (action === "drafts" && !id && method === "POST") {
+      demand(!r.finished, 409, "This game has finished.");
+      limit("drafts:" + code, 6, 60000);
+      limit("all-drafts", 24, 60000);
+      const drafts = await discoverDrafts(dbPath, code, body.idea, body.completeOnly === true, body.useModel === true, body.surprise === true, body.waitForSource === true);
+      demand(!game.room(code).finished, 409, "This game has finished.");
+      if (drafts.awaitingEdition) {
+        send(res,{awaitingEdition:drafts.awaitingEdition,jobs:[],note:""},202);
+        return;
+      }
+      const jobs = drafts.questions.map((prompt, i) => {
+        const rule = drafts.rules[i];
+        return { prompt, ...research.request(code, { prompt }, true, rule, body.prepareOnSelect === true),
+          ...(rule ? { records: rule.records, complete: rule.complete } : {}) };
+      });
+      send(res, { questions: drafts.questions, note: drafts.note, jobs });
+      return;
+    }
+    if (action==="generate") {
+      if (!id && method==="POST") {
+        demand(!r.finished,409,"This game has finished.");
+        limit("research:"+code,40,60000);
+        send(res,research.request(code,body),202);
+      } else {
+        demand(id,404,"Research job not found.");
+        const job=research.status(code,id);
+        if (!op && method==="GET") send(res,job);
+        else if (op==="prepare" && method==="POST") {
+          demand(!r.finished,409,"This game has finished.");
+          send(res,research.prepare(code,id),202);
+        }
+        else if (op==="answers" && method==="GET" && job.preview)
+          send(res,indexedPage(game.db,job.preview,url.searchParams));
+        else if (op==="save" && method==="POST" && job.preview && !r.finished) {
+          const rule = job.preview.plan?.catalogueKey;
+          const currentEdition = rule && research.syncCatalogue(true);
+          demand(!currentEdition || !job.edition || currentEdition===job.edition,409,"The sources changed while this preview was open. Generate it again.");
+          const questionId="generated-"+digest(rule ? JSON.stringify([rule,job.preview.prompt]) : job.preview.prompt).slice(0,32);
+          const content=JSON.stringify({...job.preview,id:questionId});
+          game.tx(()=>{
+            game.run("INSERT INTO library(room,id,content) VALUES(?,?,?) ON CONFLICT(room,id) DO UPDATE SET content=excluded.content,revision=revision+1 WHERE content<>excluded.content",code,questionId,content);
+            game.run("DELETE FROM kb_catalogue_entry WHERE room=? AND entry=?",code,questionId);
+            game.bump(code);
+          });
+          send(res,{id:questionId});
+        } else throw new Fault(409,"This research result is unavailable.");
+      }
+      return;
+    }
     if (action === "library" && id && op === "prepare" && method === "POST") {
-      semantic.prepare(game.question(code, id));
+      prepare(game.question(code, id));
       send(res, { ok: true });
       return;
     }
@@ -461,9 +533,11 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (action === "library" && method === "GET") {
+      research.syncCatalogue(true);
       send(res, id ? game.question(code, id) : game.library(code));
       return;
     }
+    if (action === "start" && method === "POST") research.syncCatalogue(true);
     const result = game.tx(() => {
       if (action === "packs" && id && !op && method === "POST" && !r.finished)
         return game.importPack(
@@ -544,7 +618,7 @@ const server = createServer(async (req, res) => {
       throw new Fault(404, "Action unavailable.");
     });
     if (action === "start" && result && "id" in result)
-      semantic.prepare(game.roundBank(game.round(code, Number(result.id))));
+      prepare(game.roundBank(game.round(code, Number(result.id))));
     send(res, result);
   } catch (e) {
     if (!(e instanceof Fault)) console.error(e);
@@ -580,6 +654,7 @@ server.listen(
   },
 );
 function stop() {
+  research.close();
   server.close(() => {
     void semantic.close();
     game.db.close();

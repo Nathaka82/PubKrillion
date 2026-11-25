@@ -53,6 +53,10 @@ def build():
             c["name"]["official"],
             code,
             c["cca2"],
+            *(s for native in c["name"].get("native", {}).values()
+              for s in native.values() if s and len(s) <= 140),
+            *(s for s in c.get("altSpellings", []) if len(s) <= 140),
+            *(["Nippon", "Nihon", "日本"] if code == "JPN" else []),
             *alternatives.get(code, []),
         )
 
@@ -78,10 +82,10 @@ def build():
         subset(
             key,
             region + " on the map",
-            "Name a UN member state classified in "
+            "Name a UN member state in "
             + ("the " if key == "americas" else "")
             + region
-            + " by the Countries atlas.",
+            + ".",
             [c for c in states if c["region"] == region],
         )
     subset(
@@ -93,13 +97,13 @@ def build():
     subset(
         "no-borders",
         "No land neighbours",
-        "Name a UN member state with no land border listed in the Countries atlas.",
+        "Name a UN member state that shares no land border with another country.",
         [c for c in states if not c["borders"]],
     )
     subset(
         "one-neighbour",
         "One neighbour",
-        "Name a UN member state with exactly one land neighbour in the Countries atlas.",
+        "Name a UN member state that shares a land border with exactly one country.",
         [c for c in states if len(c["borders"]) == 1],
     )
     subset(
@@ -117,7 +121,7 @@ def build():
     subset(
         "french",
         "Francophone world",
-        "Name a UN member state that lists French as an official language in the Countries atlas.",
+        "Name a UN member state where French is an official language.",
         [c for c in states if "fra" in c["languages"]],
     )
     subset(
@@ -155,7 +159,7 @@ def build():
             "geography",
             key,
             title,
-            "Name a listed capital of "
+            "Name a capital city of "
             + ("an African " if region else "a ")
             + "UN member state.",
             url,
@@ -171,7 +175,7 @@ def build():
         "geography",
         "languages",
         "Languages on the map",
-        "Name an official language listed for at least one UN member state in the Countries atlas.",
+        "Name an official language of a UN member state.",
         url,
         [v for c in states for v in c["languages"].values()],
         "Repeated languages count once; uses the atlas’s language fields.",
@@ -204,7 +208,7 @@ def build():
         "geography",
         "uk-cities",
         "City status",
-        "Name a city on GOV.UK’s 2022 list for England, Scotland, Wales or Northern Ireland.",
+        "Name a place in the UK that officially held city status by the end of 2022.",
         cityurl,
         [record(x, *city_alias.get(x, [])) for x in cities],
         "Includes the Platinum Jubilee awards. Either Bangor scores as Bangor. Crown Dependencies and Overseas Territories are outside this round.",
@@ -257,7 +261,7 @@ def build():
     sourced(
         "islands",
         "Island giants",
-        "Name one of the world's 100 largest islands by area in the ranked source table.",
+        "Name one of the world's 100 largest islands by area.",
         "List of islands by area",
         1,
         lambda r: (
@@ -279,7 +283,7 @@ def build():
     sourced(
         "peaks",
         "A mountain above the rest",
-        "Name one of the top 100 mountains by topographic prominence in the source ranking.",
+        "Name one of the world’s 100 most prominent mountain peaks.",
         "List of mountain peaks by prominence",
         0,
         ranked,
@@ -288,7 +292,7 @@ def build():
     sourced(
         "rivers",
         "Great river systems",
-        "Name the leading river in one of the first 100 ranked river systems by length.",
+        "Name the main river in one of the world’s 100 longest river systems.",
         "List of rivers by length",
         1,
         lambda r: (
@@ -302,7 +306,7 @@ def build():
     sourced(
         "us-cities",
         "Big American cities",
-        "Name one of the 100 most populous US municipalities in the source’s 2025 estimates.",
+        "Name one of the 100 largest US cities by estimated population in 2025.",
         "List of United States cities by population",
         1,
         lambda r: (
@@ -415,7 +419,7 @@ def build():
         "geography",
         "atlantic",
         "Atlantic shores",
-        "Name a UN member listed around the Atlantic or its marginal seas, including the Mediterranean, Baltic, Black Sea and Caribbean.",
+        "Name a UN member state with a coast on the Atlantic Ocean or one of its seas, such as the Mediterranean or Caribbean.",
         wiki(atl),
         atlrows,
         "Uses the regional coastal lists; overseas dependencies are not separate scoring countries. Russia qualifies through Kaliningrad.",
@@ -423,7 +427,7 @@ def build():
     sourced(
         "lakes",
         "Great lakes of the world",
-        "Name a lake in the main ranked table of the world’s largest lakes by area.",
+        "Name one of the world’s 47 largest lakes by surface area.",
         "List of lakes by area",
         1,
         lambda r: (

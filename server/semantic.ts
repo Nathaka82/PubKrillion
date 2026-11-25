@@ -33,7 +33,12 @@ export class SemanticMatcher {
     this.worker = undefined;
   }
   prepare(q: Question) {
-    if (this.failed || process.env.QUIZ_SEMANTIC === "off") return;
+    if (
+      q.matching === "full" ||
+      this.failed ||
+      process.env.QUIZ_SEMANTIC === "off"
+    )
+      return;
     try {
       if (!this.worker) {
         const worker = (this.worker = new Worker(

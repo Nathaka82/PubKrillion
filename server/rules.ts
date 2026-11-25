@@ -13,7 +13,7 @@ export type Answer = {
   wordnetSenses?: number[];
   depth: number;
 };
-export type Matching = "names" | "categories";
+export type Matching = "names" | "categories" | "full";
 export type Question = {
   id: string;
   title: string;
@@ -21,6 +21,7 @@ export type Question = {
   prompt: string;
   source: string;
   coverage?: string;
+  context?: string;
   matching: Matching;
   answers: Answer[];
 };
@@ -43,8 +44,9 @@ export function demand(
 export function clean(value: unknown, max: number, label: string, min = 1) {
   demand(typeof value === "string", 400, "Enter a valid " + label + ".");
   const s = value.trim().replace(/\s+/gu, " ");
+  const length = Array.from(s).length;
   demand(
-    s.length >= min && s.length <= max,
+    length >= min && length <= max,
     400,
     label + " must be " + min + "–" + max + " characters.",
   );
@@ -80,7 +82,7 @@ export function validateQuestion(raw: any, id: string): Question {
   const seen = new Map<string, number>();
   const matching: Matching = raw.matching ?? "categories";
   demand(
-    matching === "names" || matching === "categories",
+    matching === "names" || matching === "categories" || matching === "full",
     400,
     "Choose a matching mode.",
   );
@@ -164,6 +166,7 @@ export function validateQuestion(raw: any, id: string): Question {
     topic: clean(raw.topic, 60, "topic"),
     prompt: clean(raw.prompt, 400, "prompt"),
     source,
+    ...(raw.context ? { context: clean(raw.context, 200, "picker notes") } : {}),
     ...(raw.coverage ? { coverage: clean(raw.coverage, 900, "coverage") } : {}),
     matching,
     answers,
@@ -238,7 +241,9 @@ function indexBank(bank: Answer[], mode: Matching) {
       // proper names such as a full athlete's name, keeping common nouns scoped.
       if (
         key.includes(" ") &&
-        (mode === "names" || /^(?:\p{Lu}\p{L}+\s+)+\p{Lu}\p{L}+$/u.test(name))
+        (mode === "names" ||
+          (mode === "categories" &&
+            /^(?:\p{Lu}\p{L}+\s+)+\p{Lu}\p{L}+$/u.test(name)))
       ) {
         for (const word of new Set(meaningfulWords(key))) {
           if (
@@ -318,18 +323,25 @@ export function answerPage(q: Question, params: URLSearchParams) {
   );
   const search = normal(clean(params.get("q") ?? "", 140, "search", 0));
   const counts = [0, 0, 0, 0, 0, 0];
+  const relevance = new Map<Answer, number>();
   const matches = q.answers
     .filter((a) => {
       counts[a.depth]++;
-      return (
-        (!depth || a.depth === depth) &&
-        (!search ||
-          [a.name, ...a.aliases, ...(a.examples ?? [])].some((v) =>
-            normal(v).includes(search),
-          ))
-      );
+      if (depth && a.depth !== depth) return false;
+      if (!search) return true;
+      let best = 3;
+      for (const term of [a.name, ...a.aliases, ...(a.examples ?? [])]) {
+        const key = normal(term);
+        if (key === search) { best = 0; break; }
+        if (key.startsWith(search)) best = 1;
+        else if (key.includes(search)) best = Math.min(best, 2);
+      }
+      relevance.set(a, best);
+      return best < 3;
     })
-    .sort((a, b) => a.depth - b.depth || britishOrder.compare(a.name, b.name));
+    .sort((a, b) =>
+      (relevance.get(a) ?? 0) - (relevance.get(b) ?? 0) ||
+      a.depth - b.depth || britishOrder.compare(a.name, b.name));
   const start = Math.min(
     offset,
     Math.max(0, Math.floor((matches.length - 1) / 40) * 40),
@@ -374,7 +386,7 @@ export function resolveAnswer(
       if (found && found !== answer) return null;
       found = answer;
     }
-    if (found) return { answer: found, exact: true };
+    if (found) return { answer: found, exact: found === literal };
   }
   if (literal) return { answer: literal, exact: true };
   if (index.examples.has(key)) {
@@ -430,6 +442,12 @@ export function resolveAnswer(
     len++
   ) {
     for (const candidate of index.byLength.get(len) ?? []) {
+      if (
+        mode === "full" &&
+        (candidate.length <= 3 ||
+          candidate.split(" ").length !== spelling.split(" ").length)
+      )
+        continue;
       // A whole token omitted from a name is a fragment, not a spelling error.
       if (
         candidate.length > spelling.length &&

@@ -84,13 +84,26 @@ async function checkQuestionPicker(host) {
   const list = host.locator("#question-list");
   const search = host.getByRole("textbox", { name: "Find a question" });
   try {
+    const filters = host.locator(".picker-filters summary");
+    await filters.click();
+    await search.fill("ultimate frisbee");
+    assert.ok(await list.locator("[data-action=configure]").count() > 0);
+    await host.getByLabel("Hide specialist rounds").check();
+    await host.getByText("No matching questions.").waitFor();
+    await host.getByLabel("Hide specialist rounds").uncheck();
+    await search.fill("explicit titles");
+    assert.ok(await list.locator("[data-action=configure]").count() > 0);
+    await host.getByLabel("Hide explicit titles").check();
+    await host.getByText("No matching questions.").waitFor();
+    await host.getByLabel("Hide explicit titles").uncheck();
+    await filters.click();
     await host.setViewportSize({ width: 320, height: 280 });
     await list.waitFor();
     await host.waitForFunction(() => {
       const dialog = document.querySelector("#modal");
       return Math.abs(dialog.getBoundingClientRect().height - 256) < 2;
     });
-    await search.fill("name");
+    await search.fill("Music");
     const fits = await list.evaluate((el) => {
       const dialog = el.closest("dialog");
       const bounds = dialog.getBoundingClientRect();
@@ -122,7 +135,7 @@ async function checkQuestionPicker(host) {
       await last.click();
       await host.getByRole("button", { name: "Back to questions" }).click();
       await last.waitFor();
-      assert.equal(await search.inputValue(), "name");
+      assert.equal(await search.inputValue(), "Music");
       assert.ok(
         Math.abs((await list.evaluate((el) => el.scrollTop)) - atBottom) <= 2,
       );
@@ -134,7 +147,7 @@ async function checkQuestionPicker(host) {
         [id, action],
       );
     }
-    await search.fill("summer olympic");
+    await search.fill("summer olympic cities");
     assert.equal(await list.locator("li").count(), 1);
     assert.equal(await list.evaluate((el) => el.scrollTop), 0);
   } finally {
@@ -333,7 +346,7 @@ async function fullRoomReveal(f, host, team) {
     seconds: 12,
   });
   const r = root + "/rounds/" + round.id;
-  await team.getByRole("button", { name: "Submit answer" }).waitFor();
+  await team.getByRole("button", { name: "Dive — submit answer" }).waitFor();
   await team.emulateMedia({ reducedMotion: "no-preference" });
   await request(team, r + "/answer", {
     answer: bank.answers[0].name,
@@ -366,7 +379,7 @@ async function fullRoomReveal(f, host, team) {
     ),
   );
   await host
-    .getByRole("button", { name: "Reveal dive" })
+    .getByRole("button", { name: "Reveal answers" })
     .waitFor({ timeout: 16000 });
   assert.deepEqual(await team.evaluate(() => window.effectProbe.ticks), [
     "0:03",
@@ -539,8 +552,8 @@ try {
       await host.getByRole("button", { name: "Start round" }).click();
       await checkQuestionPicker(host);
       await host
-        .getByPlaceholder("Search by topic or title")
-        .fill("summer olympic");
+        .getByPlaceholder("Search by title, topic, region or era")
+        .fill("summer olympic cities");
       await host
         .getByRole("button", { name: /Summer Olympic cities/ })
         .first()
@@ -556,14 +569,14 @@ try {
       assert.equal(await host.getByLabel("Countdown").inputValue(), "60");
       await host.getByRole("button", { name: "Back to questions" }).click();
       await host
-        .getByPlaceholder("Search by topic or title")
+        .getByPlaceholder("Search by title, topic, region or era")
         .fill("first 36 elements");
       await host.locator('#question-list [data-action="configure"]').click();
       assert.equal(await host.getByLabel("Countdown").inputValue(), "0");
       await host.getByRole("button", { name: "Back to questions" }).click();
       await host
-        .getByPlaceholder("Search by topic or title")
-        .fill("summer olympic");
+        .getByPlaceholder("Search by title, topic, region or era")
+        .fill("summer olympic cities");
       await host.locator('#question-list [data-action="configure"]').click();
       await host.getByLabel("Countdown").selectOption("60");
       await host
@@ -597,9 +610,9 @@ try {
       await team
         .getByRole("textbox", { name: "Your team’s answer" })
         .fill("Not a city");
-      await team.getByRole("button", { name: "Submit answer" }).click();
+      await team.getByRole("button", { name: "Dive — submit answer" }).click();
       await team
-        .getByText("That answer isn’t in this category. Try another answer.")
+        .getByText("We don’t recognise that answer. Try another spelling or ask the host to review it.")
         .waitFor();
       await host.getByText("0 / 1 teams submitted").waitFor();
       await team
@@ -609,7 +622,7 @@ try {
         path: "test-results/" + name + "-question.png",
         fullPage: true,
       });
-      await team.getByRole("button", { name: "Submit answer" }).click();
+      await team.getByRole("button", { name: "Dive — submit answer" }).click();
       await team.getByText("Did you mean: Barcelona?").waitFor();
       await team.reload();
       await team.getByRole("button", { name: "Edit answer" }).click();
@@ -618,7 +631,7 @@ try {
         0,
       );
       await team
-        .getByRole("button", { name: "Submit answer", exact: true })
+        .getByRole("button", { name: "Dive — submit answer", exact: true })
         .click();
       await team.getByText("Did you mean: Barcelona?").waitFor();
       const beforeRetry = await team.evaluate(() => window.effectProbe.notes);
@@ -671,8 +684,8 @@ try {
         .filter({ hasText: "Submitted" })
         .getByText("Lanternfish", { exact: true })
         .waitFor();
-      await host.getByRole("button", { name: "Lock answers" }).click();
-      await host.getByRole("button", { name: "Reveal dive" }).click();
+      assert.equal(await host.locator('[data-action="lock"]').count(), 0);
+      await host.getByRole("button", { name: "Reveal answers" }).click();
       await team.getByText("Barcelona", { exact: true }).waitFor();
       await team
         .locator(".reveal-line.mine")
@@ -701,28 +714,23 @@ try {
       await host
         .getByRole("button", { name: "Questions", exact: true })
         .click();
-      await host.getByRole("button", { name: "Browse packs" }).click();
-      await host.getByRole("button", { name: /Ultimate Frisbee/ }).click();
-      const preview = host.getByRole("dialog");
-      await preview.getByText("Ways to throw a disc", { exact: true }).click();
-      await preview.getByRole("link", { name: "View source" }).waitFor();
-      assert.equal(await preview.locator("details").count(), 30);
-      assert.ok(
-        await preview.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
-      );
-      await preview
-        .getByRole("button", { name: "Add 30 questions to room" })
-        .click();
-      await host.getByText("30 added · 0 already in this room").waitFor();
-      await host.getByRole("button", { name: "Import pack" }).click();
+      await host.getByRole("button", { name: /^Sport \d+ questions$/ }).click();
+      const category = host.locator("#question-list");
+      await category
+        .getByRole("button", { name: /Ways to throw a disc/ })
+        .first()
+        .waitFor();
+      await category
+        .getByRole("button", { name: /Formula One champions/ })
+        .first()
+        .waitFor();
+      await category.getByRole("button", { name: "All categories" }).click();
+      await host.getByRole("button", { name: "Import questions" }).click();
       await host
         .getByLabel("Question pack", { exact: true })
         .setInputFiles("data/pub-sampler.json");
       await host.getByRole("button", { name: "Import questions" }).click();
       await host.getByRole("heading", { name: "Question library" }).waitFor();
-      await host.getByRole("button", { name: "Import pack" }).click();
-      await host.getByRole("button", { name: "Add sample questions" }).click();
-      await host.getByText("0 added · 2 already in this room").waitFor();
       await host
         .getByRole("textbox", { name: "Find a question" })
         .fill("Change from your travels");
@@ -731,9 +739,9 @@ try {
           name: "Accepted answers for Change from your travels",
         })
         .click();
-      await host.getByText("1–40 of 162", { exact: true }).waitFor();
+      await host.getByText("1–40 of 269", { exact: true }).waitFor();
       await host.getByRole("button", { name: "Next", exact: true }).click();
-      await host.getByText("41–80 of 162", { exact: true }).waitFor();
+      await host.getByText("41–80 of 269", { exact: true }).waitFor();
       await host.getByLabel("Find an answer").fill("GBP");
       await host.getByText("British Pound", { exact: true }).waitFor();
       assert.equal(await host.locator("#bank-rows li").count(), 1);
@@ -741,15 +749,15 @@ try {
       await host.locator('#question-list [data-action="edit"]').click();
       assert.equal(
         await host.getByLabel("Answer matching").inputValue(),
-        "names",
+        "full",
       );
       assert.equal(await host.locator(".editor-row").count(), 25);
       await host.getByRole("button", { name: "Next answers" }).click();
-      await host.getByText("26–50 of 162", { exact: true }).waitFor();
+      await host.getByText("26–50 of 269", { exact: true }).waitFor();
       await host.getByRole("button", { name: "Save question" }).click();
       await host.getByRole("button", { name: "New question" }).click();
       await host.getByLabel("Picker title").fill("Our society");
-      await host.getByLabel("Topic", { exact: true }).fill("Society");
+      await host.getByLabel("Category", { exact: true }).fill("Society");
       await host.getByLabel("Prompt", { exact: true }).fill("Name a mascot.");
       await host
         .getByRole("textbox", { name: "Accepted answer", exact: true })
@@ -762,15 +770,14 @@ try {
       await host.locator('#question-list [data-action="configure"]').click();
       await host.getByRole("button", { name: "Open question" }).click();
       await team.getByLabel("Your team’s answer").fill("high release flick");
-      await team.getByRole("button", { name: "Submit answer" }).click();
+      await team.getByRole("button", { name: "Dive — submit answer" }).click();
       await team.getByRole("button", { name: "Submit Forehand" }).click();
       await team
         .locator("[data-saved-answer]")
         .getByText("Forehand", { exact: true })
         .waitFor();
       await host.getByText("1 / 1 teams submitted").waitFor();
-      await host.locator('[data-action="lock"]').click();
-      await host.locator('[data-action="reveal"]').click();
+      await host.getByRole("button", { name: "Reveal answers" }).click();
       await team
         .locator(".reveal-line.mine")
         .getByText("Forehand", { exact: true })

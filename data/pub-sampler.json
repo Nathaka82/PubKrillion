@@ -1,199 +1,2415 @@
 {
-  "attribution": "Currency display names from Unicode CLDR via Node.js Intl.DisplayNames (en-GB). © Unicode, Inc. Unicode licence: https://www.unicode.org/license.txt",
+  "attribution": "Currency names and tender records from Unicode CLDR 47. © Unicode, Inc. https://www.unicode.org/license.txt",
   "questions": [
     {
       "id": "sampler-gaming-inputs",
       "title": "At the gaming desk",
       "topic": "Games",
-      "prompt": "Name a type of input device used to play games on a PC. A specific model counts towards its device category.",
+      "prompt": "Name a type of controller or other input device used to play PC games.",
       "matching": "categories",
       "answers": [
-        {"name": "Games controller", "depth": 1, "aliases": []},
-        {"name": "Computer keyboard", "depth": 1, "aliases": ["Keyboard","Gaming keyboard","Mechanical keyboard"]},
-        {"name": "Computer mouse", "depth": 1, "aliases": ["Mouse","Gaming mouse"]},
-        {"name": "Steering wheel", "depth": 2, "aliases": ["Racing wheel","Driving wheel"]},
-        {"name": "Joystick", "depth": 2, "aliases": ["Flight stick"]},
-        {"name": "Microphone", "depth": 2, "aliases": ["Mic"]},
-        {"name": "Touchscreen", "depth": 3, "aliases": ["Touch screen"]},
-        {"name": "Graphics tablet", "depth": 3, "aliases": ["Drawing tablet"]},
-        {"name": "Dance mat", "depth": 4, "aliases": ["Dance pad"]},
-        {"name": "Light gun", "depth": 4, "aliases": []},
-        {"name": "Trackball", "depth": 4, "aliases": []},
-        {"name": "Eye tracker", "depth": 5, "aliases": ["Eye tracking device"]},
-        {"name": "Rudder pedals", "depth": 5, "aliases": ["Flight pedals"]}
+        {
+          "name": "Games controller",
+          "depth": 1,
+          "aliases": []
+        },
+        {
+          "name": "Computer keyboard",
+          "depth": 1,
+          "aliases": [
+            "Keyboard",
+            "Gaming keyboard",
+            "Mechanical keyboard"
+          ]
+        },
+        {
+          "name": "Computer mouse",
+          "depth": 1,
+          "aliases": [
+            "Mouse",
+            "Gaming mouse"
+          ]
+        },
+        {
+          "name": "Steering wheel",
+          "depth": 2,
+          "aliases": [
+            "Racing wheel",
+            "Driving wheel"
+          ]
+        },
+        {
+          "name": "Joystick",
+          "depth": 2,
+          "aliases": [
+            "Flight stick"
+          ]
+        },
+        {
+          "name": "Microphone",
+          "depth": 2,
+          "aliases": [
+            "Mic"
+          ]
+        },
+        {
+          "name": "Touchscreen",
+          "depth": 3,
+          "aliases": [
+            "Touch screen"
+          ]
+        },
+        {
+          "name": "Graphics tablet",
+          "depth": 3,
+          "aliases": [
+            "Drawing tablet"
+          ]
+        },
+        {
+          "name": "Dance mat",
+          "depth": 4,
+          "aliases": [
+            "Dance pad"
+          ]
+        },
+        {
+          "name": "Light gun",
+          "depth": 4,
+          "aliases": []
+        },
+        {
+          "name": "Trackball",
+          "depth": 4,
+          "aliases": []
+        },
+        {
+          "name": "Eye tracker",
+          "depth": 5,
+          "aliases": [
+            "Eye tracking device"
+          ]
+        },
+        {
+          "name": "Rudder pedals",
+          "depth": 4,
+          "aliases": [
+            "Flight pedals"
+          ]
+        }
       ]
     },
     {
       "id": "sampler-world-currencies",
       "title": "Change from your travels",
       "topic": "Geography",
-      "prompt": "Name one of the 162 currencies in this pack, past or present. Its three-letter currency code also counts.",
-      "matching": "names",
-      "source": "https://cldr.unicode.org/translation/currency-names-and-symbols",
+      "prompt": "Name a present or historical currency recorded as legal tender in the Unicode currency list. Give its full name or three-letter code.",
+      "source": "https://raw.githubusercontent.com/unicode-org/cldr-json/47.0.0/cldr-json/cldr-core/supplemental/currencyData.json",
+      "coverage": "All 269 tender codes across territories in Unicode CLDR 47. Fund, metal and test codes are excluded.",
+      "matching": "full",
       "answers": [
-        {"name": "United Arab Emirates Dirham", "depth": 2, "aliases": ["AED"]},
-        {"name": "Afghan Afghani", "depth": 4, "aliases": ["AFN"]},
-        {"name": "Albanian Lek", "depth": 4, "aliases": ["ALL"]},
-        {"name": "Armenian Dram", "depth": 4, "aliases": ["AMD"]},
-        {"name": "Netherlands Antillean Guilder", "depth": 4, "aliases": ["ANG"]},
-        {"name": "Angolan Kwanza", "depth": 4, "aliases": ["AOA"]},
-        {"name": "Argentine Peso", "depth": 3, "aliases": ["ARS"]},
-        {"name": "Australian Dollar", "depth": 2, "aliases": ["AUD"]},
-        {"name": "Aruban Florin", "depth": 4, "aliases": ["AWG"]},
-        {"name": "Azerbaijani Manat", "depth": 4, "aliases": ["AZN"]},
-        {"name": "Bosnia-Herzegovina Convertible Mark", "depth": 4, "aliases": ["BAM"]},
-        {"name": "Barbadian Dollar", "depth": 4, "aliases": ["BBD"]},
-        {"name": "Bangladeshi Taka", "depth": 4, "aliases": ["BDT"]},
-        {"name": "Bulgarian Lev", "depth": 3, "aliases": ["BGN"]},
-        {"name": "Bahraini Dinar", "depth": 4, "aliases": ["BHD"]},
-        {"name": "Burundian Franc", "depth": 4, "aliases": ["BIF"]},
-        {"name": "Bermudian Dollar", "depth": 4, "aliases": ["BMD"]},
-        {"name": "Brunei Dollar", "depth": 4, "aliases": ["BND"]},
-        {"name": "Bolivian Boliviano", "depth": 4, "aliases": ["BOB"]},
-        {"name": "Brazilian Real", "depth": 2, "aliases": ["BRL"]},
-        {"name": "Bahamian Dollar", "depth": 4, "aliases": ["BSD"]},
-        {"name": "Bhutanese Ngultrum", "depth": 5, "aliases": ["BTN"]},
-        {"name": "Botswanan Pula", "depth": 4, "aliases": ["BWP"]},
-        {"name": "Belarusian Rouble", "depth": 4, "aliases": ["BYN"]},
-        {"name": "Belize Dollar", "depth": 4, "aliases": ["BZD"]},
-        {"name": "Canadian Dollar", "depth": 2, "aliases": ["CAD"]},
-        {"name": "Congolese Franc", "depth": 4, "aliases": ["CDF"]},
-        {"name": "Swiss Franc", "depth": 2, "aliases": ["CHF","Swiss francs"]},
-        {"name": "Chilean Peso", "depth": 4, "aliases": ["CLP"]},
-        {"name": "Chinese Yuan", "depth": 2, "aliases": ["CNY","Chinese renminbi","Renminbi","Yuan"]},
-        {"name": "Colombian Peso", "depth": 4, "aliases": ["COP"]},
-        {"name": "Costa Rican Colón", "depth": 4, "aliases": ["CRC"]},
-        {"name": "Cuban Convertible Peso", "depth": 4, "aliases": ["CUC"]},
-        {"name": "Cuban Peso", "depth": 4, "aliases": ["CUP"]},
-        {"name": "Cape Verdean Escudo", "depth": 4, "aliases": ["CVE"]},
-        {"name": "Czech Koruna", "depth": 3, "aliases": ["CZK"]},
-        {"name": "Djiboutian Franc", "depth": 5, "aliases": ["DJF"]},
-        {"name": "Danish Krone", "depth": 2, "aliases": ["DKK"]},
-        {"name": "Dominican Peso", "depth": 4, "aliases": ["DOP"]},
-        {"name": "Algerian Dinar", "depth": 4, "aliases": ["DZD"]},
-        {"name": "Egyptian Pound", "depth": 3, "aliases": ["EGP"]},
-        {"name": "Eritrean Nakfa", "depth": 4, "aliases": ["ERN"]},
-        {"name": "Ethiopian Birr", "depth": 4, "aliases": ["ETB"]},
-        {"name": "Euro", "depth": 1, "aliases": ["EUR","Euros"]},
-        {"name": "Fijian Dollar", "depth": 4, "aliases": ["FJD"]},
-        {"name": "Falkland Islands Pound", "depth": 4, "aliases": ["FKP"]},
-        {"name": "British Pound", "depth": 1, "aliases": ["GBP","Pound sterling","Sterling","British pound sterling"]},
-        {"name": "Georgian Lari", "depth": 4, "aliases": ["GEL"]},
-        {"name": "Ghanaian Cedi", "depth": 4, "aliases": ["GHS"]},
-        {"name": "Gibraltar Pound", "depth": 4, "aliases": ["GIP"]},
-        {"name": "Gambian Dalasi", "depth": 4, "aliases": ["GMD"]},
-        {"name": "Guinean Franc", "depth": 4, "aliases": ["GNF"]},
-        {"name": "Guatemalan Quetzal", "depth": 4, "aliases": ["GTQ"]},
-        {"name": "Guyanaese Dollar", "depth": 4, "aliases": ["GYD"]},
-        {"name": "Hong Kong Dollar", "depth": 3, "aliases": ["HKD"]},
-        {"name": "Honduran Lempira", "depth": 4, "aliases": ["HNL"]},
-        {"name": "Croatian Kuna", "depth": 4, "aliases": ["HRK"]},
-        {"name": "Haitian Gourde", "depth": 4, "aliases": ["HTG"]},
-        {"name": "Hungarian Forint", "depth": 3, "aliases": ["HUF"]},
-        {"name": "Indonesian Rupiah", "depth": 3, "aliases": ["IDR"]},
-        {"name": "Israeli New Shekel", "depth": 3, "aliases": ["ILS"]},
-        {"name": "Indian Rupee", "depth": 2, "aliases": ["INR","Indian rupees"]},
-        {"name": "Iraqi Dinar", "depth": 4, "aliases": ["IQD"]},
-        {"name": "Iranian Rial", "depth": 4, "aliases": ["IRR"]},
-        {"name": "Icelandic Króna", "depth": 3, "aliases": ["ISK"]},
-        {"name": "Jamaican Dollar", "depth": 4, "aliases": ["JMD"]},
-        {"name": "Jordanian Dinar", "depth": 4, "aliases": ["JOD"]},
-        {"name": "Japanese Yen", "depth": 1, "aliases": ["JPY","Yen"]},
-        {"name": "Kenyan Shilling", "depth": 3, "aliases": ["KES"]},
-        {"name": "Kyrgyz Som", "depth": 4, "aliases": ["KGS"]},
-        {"name": "Cambodian Riel", "depth": 4, "aliases": ["KHR"]},
-        {"name": "Comorian Franc", "depth": 5, "aliases": ["KMF"]},
-        {"name": "North Korean Won", "depth": 4, "aliases": ["KPW"]},
-        {"name": "South Korean Won", "depth": 3, "aliases": ["KRW"]},
-        {"name": "Kuwaiti Dinar", "depth": 4, "aliases": ["KWD"]},
-        {"name": "Cayman Islands Dollar", "depth": 4, "aliases": ["KYD"]},
-        {"name": "Kazakhstani Tenge", "depth": 4, "aliases": ["KZT"]},
-        {"name": "Laotian Kip", "depth": 4, "aliases": ["LAK"]},
-        {"name": "Lebanese Pound", "depth": 4, "aliases": ["LBP"]},
-        {"name": "Sri Lankan Rupee", "depth": 4, "aliases": ["LKR"]},
-        {"name": "Liberian Dollar", "depth": 4, "aliases": ["LRD"]},
-        {"name": "Lesotho Loti", "depth": 4, "aliases": ["LSL"]},
-        {"name": "Libyan Dinar", "depth": 4, "aliases": ["LYD"]},
-        {"name": "Moroccan Dirham", "depth": 3, "aliases": ["MAD"]},
-        {"name": "Moldovan Leu", "depth": 4, "aliases": ["MDL"]},
-        {"name": "Malagasy Ariary", "depth": 5, "aliases": ["MGA"]},
-        {"name": "Macedonian Denar", "depth": 4, "aliases": ["MKD"]},
-        {"name": "Myanmar Kyat", "depth": 4, "aliases": ["MMK"]},
-        {"name": "Mongolian Tugrik", "depth": 4, "aliases": ["MNT"]},
-        {"name": "Macanese Pataca", "depth": 4, "aliases": ["MOP"]},
-        {"name": "Mauritanian Ouguiya", "depth": 5, "aliases": ["MRU"]},
-        {"name": "Mauritian Rupee", "depth": 4, "aliases": ["MUR"]},
-        {"name": "Maldivian Rufiyaa", "depth": 4, "aliases": ["MVR"]},
-        {"name": "Malawian Kwacha", "depth": 4, "aliases": ["MWK"]},
-        {"name": "Mexican Peso", "depth": 2, "aliases": ["MXN"]},
-        {"name": "Malaysian Ringgit", "depth": 3, "aliases": ["MYR"]},
-        {"name": "Mozambican Metical", "depth": 4, "aliases": ["MZN"]},
-        {"name": "Namibian Dollar", "depth": 4, "aliases": ["NAD"]},
-        {"name": "Nigerian Naira", "depth": 4, "aliases": ["NGN"]},
-        {"name": "Nicaraguan Córdoba", "depth": 4, "aliases": ["NIO"]},
-        {"name": "Norwegian Krone", "depth": 2, "aliases": ["NOK"]},
-        {"name": "Nepalese Rupee", "depth": 4, "aliases": ["NPR"]},
-        {"name": "New Zealand Dollar", "depth": 2, "aliases": ["NZD"]},
-        {"name": "Omani Rial", "depth": 4, "aliases": ["OMR"]},
-        {"name": "Panamanian Balboa", "depth": 4, "aliases": ["PAB"]},
-        {"name": "Peruvian Sol", "depth": 4, "aliases": ["PEN"]},
-        {"name": "Papua New Guinean Kina", "depth": 4, "aliases": ["PGK"]},
-        {"name": "Philippine Peso", "depth": 3, "aliases": ["PHP"]},
-        {"name": "Pakistani Rupee", "depth": 3, "aliases": ["PKR"]},
-        {"name": "Polish Zloty", "depth": 2, "aliases": ["PLN"]},
-        {"name": "Paraguayan Guarani", "depth": 4, "aliases": ["PYG"]},
-        {"name": "Qatari Riyal", "depth": 4, "aliases": ["QAR"]},
-        {"name": "Romanian Leu", "depth": 3, "aliases": ["RON"]},
-        {"name": "Serbian Dinar", "depth": 4, "aliases": ["RSD"]},
-        {"name": "Russian Rouble", "depth": 3, "aliases": ["RUB"]},
-        {"name": "Rwandan Franc", "depth": 4, "aliases": ["RWF"]},
-        {"name": "Saudi Riyal", "depth": 3, "aliases": ["SAR"]},
-        {"name": "Solomon Islands Dollar", "depth": 5, "aliases": ["SBD"]},
-        {"name": "Seychellois Rupee", "depth": 4, "aliases": ["SCR"]},
-        {"name": "Sudanese Pound", "depth": 4, "aliases": ["SDG"]},
-        {"name": "Swedish Krona", "depth": 2, "aliases": ["SEK"]},
-        {"name": "Singapore Dollar", "depth": 3, "aliases": ["SGD"]},
-        {"name": "St Helena Pound", "depth": 4, "aliases": ["SHP"]},
-        {"name": "Sierra Leonean Leone", "depth": 4, "aliases": ["SLE"]},
-        {"name": "Sierra Leonean Leone (1964—2022)", "depth": 4, "aliases": ["SLL"]},
-        {"name": "Somali Shilling", "depth": 4, "aliases": ["SOS"]},
-        {"name": "Surinamese Dollar", "depth": 5, "aliases": ["SRD"]},
-        {"name": "South Sudanese Pound", "depth": 4, "aliases": ["SSP"]},
-        {"name": "São Tomé & Príncipe Dobra", "depth": 5, "aliases": ["STN"]},
-        {"name": "Salvadoran Colón", "depth": 4, "aliases": ["SVC"]},
-        {"name": "Syrian Pound", "depth": 4, "aliases": ["SYP"]},
-        {"name": "Swazi Lilangeni", "depth": 4, "aliases": ["SZL"]},
-        {"name": "Thai Baht", "depth": 2, "aliases": ["THB"]},
-        {"name": "Tajikistani Somoni", "depth": 5, "aliases": ["TJS"]},
-        {"name": "Turkmenistani Manat", "depth": 4, "aliases": ["TMT"]},
-        {"name": "Tunisian Dinar", "depth": 4, "aliases": ["TND"]},
-        {"name": "Tongan Paʻanga", "depth": 5, "aliases": ["TOP"]},
-        {"name": "Turkish Lira", "depth": 2, "aliases": ["TRY"]},
-        {"name": "Trinidad & Tobago Dollar", "depth": 4, "aliases": ["TTD"]},
-        {"name": "New Taiwan Dollar", "depth": 3, "aliases": ["TWD"]},
-        {"name": "Tanzanian Shilling", "depth": 4, "aliases": ["TZS"]},
-        {"name": "Ukrainian Hryvnia", "depth": 4, "aliases": ["UAH"]},
-        {"name": "Ugandan Shilling", "depth": 4, "aliases": ["UGX"]},
-        {"name": "US Dollar", "depth": 1, "aliases": ["USD","United States dollar","American dollar"]},
-        {"name": "Uruguayan Peso", "depth": 4, "aliases": ["UYU"]},
-        {"name": "Uzbekistani Som", "depth": 4, "aliases": ["UZS"]},
-        {"name": "Venezuelan Bolívar", "depth": 4, "aliases": ["VES"]},
-        {"name": "Vietnamese Dong", "depth": 4, "aliases": ["VND"]},
-        {"name": "Vanuatu Vatu", "depth": 5, "aliases": ["VUV"]},
-        {"name": "Samoan Tala", "depth": 4, "aliases": ["WST"]},
-        {"name": "Central African CFA Franc", "depth": 5, "aliases": ["XAF"]},
-        {"name": "East Caribbean Dollar", "depth": 4, "aliases": ["XCD"]},
-        {"name": "Caribbean guilder", "depth": 4, "aliases": ["XCG"]},
-        {"name": "Special Drawing Rights", "depth": 4, "aliases": ["XDR"]},
-        {"name": "West African CFA Franc", "depth": 5, "aliases": ["XOF"]},
-        {"name": "CFP Franc", "depth": 5, "aliases": ["XPF"]},
-        {"name": "Sucre", "depth": 4, "aliases": ["XSU"]},
-        {"name": "Yemeni Rial", "depth": 4, "aliases": ["YER"]},
-        {"name": "South African Rand", "depth": 2, "aliases": ["ZAR"]},
-        {"name": "Zambian Kwacha", "depth": 4, "aliases": ["ZMW"]},
-        {"name": "Zimbabwean Gold", "depth": 4, "aliases": ["ZWG"]},
-        {"name": "Zimbabwean Dollar (2009–2024)", "depth": 4, "aliases": ["ZWL"]}
-      ]
+        {
+          "name": "Afghan Afghani",
+          "aliases": [
+            "AFN"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Afghan Afghani (1927–2002)",
+          "aliases": [
+            "AFA"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Albanian Lek",
+          "aliases": [
+            "ALL"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Albanian Lek (1946–1965)",
+          "aliases": [
+            "ALK"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Algerian Dinar",
+          "aliases": [
+            "DZD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Andorran Peseta",
+          "aliases": [
+            "ADP"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Angolan Kwanza",
+          "aliases": [
+            "AOA"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Angolan Kwanza (1977–1991)",
+          "aliases": [
+            "AOK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Angolan New Kwanza (1990–2000)",
+          "aliases": [
+            "AON"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Angolan Readjusted Kwanza (1995–1999)",
+          "aliases": [
+            "AOR"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Argentine Austral",
+          "aliases": [
+            "ARA"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Argentine Peso",
+          "aliases": [
+            "ARS"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Argentine Peso (1881–1970)",
+          "aliases": [
+            "ARM"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Argentine Peso (1983–1985)",
+          "aliases": [
+            "ARP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Argentine Peso Ley (1970–1983)",
+          "aliases": [
+            "ARL"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Armenian Dram",
+          "aliases": [
+            "AMD"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Aruban Florin",
+          "aliases": [
+            "AWG"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Australian Dollar",
+          "aliases": [
+            "AUD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Austrian Schilling",
+          "aliases": [
+            "ATS"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Azerbaijani Manat",
+          "aliases": [
+            "AZN"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Azerbaijani Manat (1993–2006)",
+          "aliases": [
+            "AZM"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Bahamian Dollar",
+          "aliases": [
+            "BSD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Bahraini Dinar",
+          "aliases": [
+            "BHD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Bangladeshi Taka",
+          "aliases": [
+            "BDT",
+            "Taka"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Barbadian Dollar",
+          "aliases": [
+            "BBD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Belarusian Rouble",
+          "aliases": [
+            "BYN",
+            "Belarusian Ruble"
+          ],
+          "depth": 2,
+          "examples": [
+            "rouble"
+          ]
+        },
+        {
+          "name": "Belarusian Rouble (1994–1999)",
+          "aliases": [
+            "BYB",
+            "Belarusian Ruble (1994–1999)"
+          ],
+          "depth": 2,
+          "examples": [
+            "rouble"
+          ]
+        },
+        {
+          "name": "Belarusian Rouble (2000–2016)",
+          "aliases": [
+            "BYR",
+            "Belarusian Ruble (2000–2016)"
+          ],
+          "depth": 2,
+          "examples": [
+            "rouble"
+          ]
+        },
+        {
+          "name": "Belgian Franc",
+          "aliases": [
+            "BEF"
+          ],
+          "depth": 1,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Belize Dollar",
+          "aliases": [
+            "BZD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Bermudian Dollar",
+          "aliases": [
+            "BMD",
+            "Bermudan Dollar"
+          ],
+          "depth": 2,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Bhutanese Ngultrum",
+          "aliases": [
+            "BTN"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Bolivian Boliviano",
+          "aliases": [
+            "BOB"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Bolivian Boliviano (1863–1963)",
+          "aliases": [
+            "BOL"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Bolivian Peso",
+          "aliases": [
+            "BOP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Bosnia-Herzegovina Convertible Mark",
+          "aliases": [
+            "BAM"
+          ],
+          "depth": 1,
+          "examples": [
+            "mark"
+          ]
+        },
+        {
+          "name": "Bosnia-Herzegovina Dinar (1992–1994)",
+          "aliases": [
+            "BAD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Bosnia-Herzegovina New Dinar (1994–1997)",
+          "aliases": [
+            "BAN"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Botswanan Pula",
+          "aliases": [
+            "BWP"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Brazilian Cruzado (1986–1989)",
+          "aliases": [
+            "BRC"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Brazilian Cruzeiro (1942–1967)",
+          "aliases": [
+            "BRZ"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Brazilian Cruzeiro (1990–1993)",
+          "aliases": [
+            "BRE"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Brazilian Cruzeiro (1993–1994)",
+          "aliases": [
+            "BRR"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Brazilian New Cruzado (1989–1990)",
+          "aliases": [
+            "BRN"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Brazilian New Cruzeiro (1967–1986)",
+          "aliases": [
+            "BRB"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Brazilian Real",
+          "aliases": [
+            "BRL",
+            "Real"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "British Pound",
+          "aliases": [
+            "British pound sterling",
+            "GBP",
+            "Pound sterling",
+            "Sterling"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Brunei Dollar",
+          "aliases": [
+            "BND"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Bulgarian Hard Lev",
+          "aliases": [
+            "BGL"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Bulgarian Lev",
+          "aliases": [
+            "BGN"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Bulgarian Lev (1879–1952)",
+          "aliases": [
+            "BGO"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Bulgarian Socialist Lev",
+          "aliases": [
+            "BGM"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Burmese Kyat",
+          "aliases": [
+            "BUK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Burundian Franc",
+          "aliases": [
+            "BIF"
+          ],
+          "depth": 2,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Cambodian Riel",
+          "aliases": [
+            "KHR"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Canadian Dollar",
+          "aliases": [
+            "CAD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Cape Verdean Escudo",
+          "aliases": [
+            "CVE"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Caribbean guilder",
+          "aliases": [
+            "XCG"
+          ],
+          "depth": 2,
+          "examples": [
+            "guilder"
+          ]
+        },
+        {
+          "name": "Cayman Islands Dollar",
+          "aliases": [
+            "KYD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Central African CFA Franc",
+          "aliases": [
+            "XAF"
+          ],
+          "depth": 1,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "CFP Franc",
+          "aliases": [
+            "XPF"
+          ],
+          "depth": 2,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Chilean Escudo",
+          "aliases": [
+            "CLE"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Chilean Peso",
+          "aliases": [
+            "CLP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Chinese Yuan",
+          "aliases": [
+            "CNY",
+            "Chinese renminbi",
+            "Renminbi",
+            "Yuan"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Colombian Peso",
+          "aliases": [
+            "COP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Comorian Franc",
+          "aliases": [
+            "KMF"
+          ],
+          "depth": 4,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Congolese Franc",
+          "aliases": [
+            "CDF"
+          ],
+          "depth": 1,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Costa Rican Colón",
+          "aliases": [
+            "CRC"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Croatian Dinar",
+          "aliases": [
+            "HRD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Croatian Kuna",
+          "aliases": [
+            "HRK"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Cuban Convertible Peso",
+          "aliases": [
+            "CUC"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Cuban Peso",
+          "aliases": [
+            "CUP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Cypriot Pound",
+          "aliases": [
+            "CYP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Czech Koruna",
+          "aliases": [
+            "CZK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Czechoslovak Hard Koruna",
+          "aliases": [
+            "CSK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Danish Krone",
+          "aliases": [
+            "DKK"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Djiboutian Franc",
+          "aliases": [
+            "DJF"
+          ],
+          "depth": 3,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Dominican Peso",
+          "aliases": [
+            "DOP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Dutch Guilder",
+          "aliases": [
+            "NLG"
+          ],
+          "depth": 2,
+          "examples": [
+            "guilder"
+          ]
+        },
+        {
+          "name": "East Caribbean Dollar",
+          "aliases": [
+            "XCD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "East German Mark",
+          "aliases": [
+            "DDM"
+          ],
+          "depth": 1,
+          "examples": [
+            "mark"
+          ]
+        },
+        {
+          "name": "Ecuadorian Sucre",
+          "aliases": [
+            "ECS"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Egyptian Pound",
+          "aliases": [
+            "EGP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Equatorial Guinean Ekwele",
+          "aliases": [
+            "GQE"
+          ],
+          "depth": 5
+        },
+        {
+          "name": "Eritrean Nakfa",
+          "aliases": [
+            "ERN"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Estonian Kroon",
+          "aliases": [
+            "EEK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Ethiopian Birr",
+          "aliases": [
+            "Birr",
+            "ETB"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Euro",
+          "aliases": [
+            "EUR",
+            "Euros"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Falkland Islands Pound",
+          "aliases": [
+            "FKP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Fijian Dollar",
+          "aliases": [
+            "FJD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Finnish Markka",
+          "aliases": [
+            "FIM"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "French Franc",
+          "aliases": [
+            "FRF",
+            "Franc français"
+          ],
+          "depth": 1,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Gambian Dalasi",
+          "aliases": [
+            "GMD"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Georgian Kupon Larit",
+          "aliases": [
+            "GEK"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Georgian Lari",
+          "aliases": [
+            "GEL"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "German Mark",
+          "aliases": [
+            "DEM",
+            "Deutsche Mark",
+            "Deutschmark"
+          ],
+          "depth": 1,
+          "examples": [
+            "mark"
+          ]
+        },
+        {
+          "name": "Ghanaian Cedi",
+          "aliases": [
+            "GHS"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Ghanaian Cedi (1979–2007)",
+          "aliases": [
+            "GHC"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Gibraltar Pound",
+          "aliases": [
+            "GIP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Greek Drachma",
+          "aliases": [
+            "GRD"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Guatemalan Quetzal",
+          "aliases": [
+            "GTQ",
+            "Quetzal"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Guinea-Bissau Peso",
+          "aliases": [
+            "GWP"
+          ],
+          "depth": 2,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Guinean Franc",
+          "aliases": [
+            "GNF"
+          ],
+          "depth": 2,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Guinean Syli",
+          "aliases": [
+            "GNS"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Guyanaese Dollar",
+          "aliases": [
+            "GYD"
+          ],
+          "depth": 4,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Haitian Gourde",
+          "aliases": [
+            "HTG"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Honduran Lempira",
+          "aliases": [
+            "HNL"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Hong Kong Dollar",
+          "aliases": [
+            "HKD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Hungarian Forint",
+          "aliases": [
+            "Forint",
+            "HUF"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Icelandic Króna",
+          "aliases": [
+            "ISK"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Icelandic Króna (1918–1981)",
+          "aliases": [
+            "ISJ"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Indian Rupee",
+          "aliases": [
+            "INR",
+            "Indian rupees"
+          ],
+          "depth": 1,
+          "examples": [
+            "rupee"
+          ]
+        },
+        {
+          "name": "Indonesian Rupiah",
+          "aliases": [
+            "IDR",
+            "Rupiah"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Iranian Rial",
+          "aliases": [
+            "IRR"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Iraqi Dinar",
+          "aliases": [
+            "IQD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Irish Pound",
+          "aliases": [
+            "IEP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Israeli New Shekel",
+          "aliases": [
+            "ILS",
+            "New shekel"
+          ],
+          "depth": 2,
+          "examples": [
+            "shekel"
+          ]
+        },
+        {
+          "name": "Israeli Pound",
+          "aliases": [
+            "ILP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Israeli Shekel (1980–1985)",
+          "aliases": [
+            "ILR"
+          ],
+          "depth": 2,
+          "examples": [
+            "shekel"
+          ]
+        },
+        {
+          "name": "Italian Lira",
+          "aliases": [
+            "ITL",
+            "Lira italiana"
+          ],
+          "depth": 1,
+          "examples": [
+            "lira"
+          ]
+        },
+        {
+          "name": "Jamaican Dollar",
+          "aliases": [
+            "JMD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Japanese Yen",
+          "aliases": [
+            "JPY",
+            "Yen"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Jordanian Dinar",
+          "aliases": [
+            "JOD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Kazakhstani Tenge",
+          "aliases": [
+            "KZT",
+            "Tenge"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Kenyan Shilling",
+          "aliases": [
+            "KES"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Kuwaiti Dinar",
+          "aliases": [
+            "KWD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Kyrgyz Som",
+          "aliases": [
+            "KGS",
+            "Kyrgystani Som"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Laotian Kip",
+          "aliases": [
+            "LAK"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Latvian Lats",
+          "aliases": [
+            "LVL"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Latvian Rouble",
+          "aliases": [
+            "LVR",
+            "Latvian Ruble"
+          ],
+          "depth": 2,
+          "examples": [
+            "rouble"
+          ]
+        },
+        {
+          "name": "Lebanese Pound",
+          "aliases": [
+            "LBP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Lesotho Loti",
+          "aliases": [
+            "LSL"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Liberian Dollar",
+          "aliases": [
+            "LRD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Libyan Dinar",
+          "aliases": [
+            "LYD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Lithuanian Litas",
+          "aliases": [
+            "LTL"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Lithuanian Talonas",
+          "aliases": [
+            "LTT"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Luxembourgian Franc",
+          "aliases": [
+            "LUF"
+          ],
+          "depth": 4,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Macanese Pataca",
+          "aliases": [
+            "MOP"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Macedonian Denar",
+          "aliases": [
+            "MKD"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Macedonian Denar (1992–1993)",
+          "aliases": [
+            "MKN"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Malagasy Ariary",
+          "aliases": [
+            "MGA"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Malagasy Franc",
+          "aliases": [
+            "MGF"
+          ],
+          "depth": 2,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Malawian Kwacha",
+          "aliases": [
+            "MWK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Malaysian Ringgit",
+          "aliases": [
+            "MYR",
+            "Ringgit"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Maldivian Rufiyaa",
+          "aliases": [
+            "MVR"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Maldivian Rupee (1947–1981)",
+          "aliases": [
+            "MVP"
+          ],
+          "depth": 2,
+          "examples": [
+            "rupee"
+          ]
+        },
+        {
+          "name": "Malian Franc",
+          "aliases": [
+            "MLF"
+          ],
+          "depth": 2,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Maltese Lira",
+          "aliases": [
+            "MTL"
+          ],
+          "depth": 1,
+          "examples": [
+            "lira"
+          ]
+        },
+        {
+          "name": "Maltese Pound",
+          "aliases": [
+            "MTP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Mauritanian Ouguiya",
+          "aliases": [
+            "MRU"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Mauritanian Ouguiya (1973–2017)",
+          "aliases": [
+            "MRO"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Mauritian Rupee",
+          "aliases": [
+            "MUR"
+          ],
+          "depth": 2,
+          "examples": [
+            "rupee"
+          ]
+        },
+        {
+          "name": "Mexican Peso",
+          "aliases": [
+            "MXN"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Mexican Silver Peso (1861–1992)",
+          "aliases": [
+            "MXP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Moldovan Cupon",
+          "aliases": [
+            "MDC"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Moldovan Leu",
+          "aliases": [
+            "MDL"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Monegasque Franc",
+          "aliases": [
+            "MCF"
+          ],
+          "depth": 3,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Mongolian Tugrik",
+          "aliases": [
+            "MNT",
+            "Tugrik"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Moroccan Dirham",
+          "aliases": [
+            "MAD"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Moroccan Franc",
+          "aliases": [
+            "MAF"
+          ],
+          "depth": 1,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Mozambican Escudo",
+          "aliases": [
+            "MZE"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Mozambican Metical",
+          "aliases": [
+            "MZN"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Mozambican Metical (1980–2006)",
+          "aliases": [
+            "MZM"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Myanmar Kyat",
+          "aliases": [
+            "Kyat",
+            "MMK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Namibian Dollar",
+          "aliases": [
+            "NAD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Nepalese Rupee",
+          "aliases": [
+            "NPR"
+          ],
+          "depth": 1,
+          "examples": [
+            "rupee"
+          ]
+        },
+        {
+          "name": "Netherlands Antillean Guilder",
+          "aliases": [
+            "ANG"
+          ],
+          "depth": 3,
+          "examples": [
+            "guilder"
+          ]
+        },
+        {
+          "name": "New Taiwan Dollar",
+          "aliases": [
+            "TWD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "New Zealand Dollar",
+          "aliases": [
+            "NZD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Nicaraguan Córdoba",
+          "aliases": [
+            "NIO"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Nicaraguan Córdoba (1988–1991)",
+          "aliases": [
+            "NIC"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Nigerian Naira",
+          "aliases": [
+            "NGN",
+            "Naira"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "North Korean Won",
+          "aliases": [
+            "KPW"
+          ],
+          "depth": 1,
+          "examples": [
+            "won"
+          ]
+        },
+        {
+          "name": "Norwegian Krone",
+          "aliases": [
+            "NOK"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Omani Rial",
+          "aliases": [
+            "OMR"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Pakistani Rupee",
+          "aliases": [
+            "PKR"
+          ],
+          "depth": 1,
+          "examples": [
+            "rupee"
+          ]
+        },
+        {
+          "name": "Panamanian Balboa",
+          "aliases": [
+            "PAB"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Papua New Guinean Kina",
+          "aliases": [
+            "PGK"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Paraguayan Guarani",
+          "aliases": [
+            "PYG"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Peruvian Inti",
+          "aliases": [
+            "PEI"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Peruvian Sol",
+          "aliases": [
+            "PEN"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Peruvian Sol (1863–1965)",
+          "aliases": [
+            "PES"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Philippine Peso",
+          "aliases": [
+            "PHP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Polish Zloty",
+          "aliases": [
+            "PLN"
+          ],
+          "depth": 2,
+          "examples": [
+            "zloty"
+          ]
+        },
+        {
+          "name": "Polish Zloty (1950–1995)",
+          "aliases": [
+            "PLZ"
+          ],
+          "depth": 2,
+          "examples": [
+            "zloty"
+          ]
+        },
+        {
+          "name": "Portuguese Escudo",
+          "aliases": [
+            "PTE"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Portuguese Guinea Escudo",
+          "aliases": [
+            "GWE"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Qatari Riyal",
+          "aliases": [
+            "QAR"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Rhodesian Dollar",
+          "aliases": [
+            "RHD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Romanian Leu",
+          "aliases": [
+            "RON"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Romanian Leu (1952–2006)",
+          "aliases": [
+            "ROL"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Russian Rouble",
+          "aliases": [
+            "RUB",
+            "Russian Ruble"
+          ],
+          "depth": 2,
+          "examples": [
+            "rouble"
+          ]
+        },
+        {
+          "name": "Russian Rouble (1991–1998)",
+          "aliases": [
+            "RUR",
+            "Russian Ruble (1991–1998)"
+          ],
+          "depth": 2,
+          "examples": [
+            "rouble"
+          ]
+        },
+        {
+          "name": "Rwandan Franc",
+          "aliases": [
+            "RWF"
+          ],
+          "depth": 1,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Salvadoran Colón",
+          "aliases": [
+            "SVC"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Samoan Tala",
+          "aliases": [
+            "WST"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "São Tomé & Príncipe Dobra",
+          "aliases": [
+            "STN"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "São Tomé & Príncipe Dobra (1977–2017)",
+          "aliases": [
+            "STD"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Saudi Riyal",
+          "aliases": [
+            "SAR"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Serbian Dinar",
+          "aliases": [
+            "RSD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Serbian Dinar (2002–2006)",
+          "aliases": [
+            "CSD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Seychellois Rupee",
+          "aliases": [
+            "SCR"
+          ],
+          "depth": 3,
+          "examples": [
+            "rupee"
+          ]
+        },
+        {
+          "name": "Sierra Leonean Leone",
+          "aliases": [
+            "SLE"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Sierra Leonean Leone (1964—2022)",
+          "aliases": [
+            "SLL"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Singapore Dollar",
+          "aliases": [
+            "SGD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Slovak Koruna",
+          "aliases": [
+            "SKK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Slovenian Tolar",
+          "aliases": [
+            "SIT"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Solomon Islands Dollar",
+          "aliases": [
+            "SBD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Somali Shilling",
+          "aliases": [
+            "SOS"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "South African Rand",
+          "aliases": [
+            "Rand",
+            "ZAR"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "South Korean Hwan (1953–1962)",
+          "aliases": [
+            "KRH"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "South Korean Won",
+          "aliases": [
+            "KRW",
+            "Republic of Korea won"
+          ],
+          "depth": 1,
+          "examples": [
+            "won"
+          ]
+        },
+        {
+          "name": "South Korean Won (1945–1953)",
+          "aliases": [
+            "KRO"
+          ],
+          "depth": 1,
+          "examples": [
+            "won"
+          ]
+        },
+        {
+          "name": "South Sudanese Pound",
+          "aliases": [
+            "SSP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Soviet Rouble",
+          "aliases": [
+            "SUR"
+          ],
+          "depth": 2,
+          "examples": [
+            "rouble"
+          ]
+        },
+        {
+          "name": "Spanish Peseta",
+          "aliases": [
+            "ESP"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Sri Lankan Rupee",
+          "aliases": [
+            "LKR"
+          ],
+          "depth": 1,
+          "examples": [
+            "rupee"
+          ]
+        },
+        {
+          "name": "St Helena Pound",
+          "aliases": [
+            "SHP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Sudanese Dinar (1992–2007)",
+          "aliases": [
+            "SDD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Sudanese Pound",
+          "aliases": [
+            "SDG"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Sudanese Pound (1957–1998)",
+          "aliases": [
+            "SDP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Surinamese Dollar",
+          "aliases": [
+            "SRD"
+          ],
+          "depth": 3,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Surinamese Guilder",
+          "aliases": [
+            "SRG"
+          ],
+          "depth": 3,
+          "examples": [
+            "guilder"
+          ]
+        },
+        {
+          "name": "Swazi Lilangeni",
+          "aliases": [
+            "SZL"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Swedish Krona",
+          "aliases": [
+            "SEK"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Swiss Franc",
+          "aliases": [
+            "CHF",
+            "Swiss francs"
+          ],
+          "depth": 1,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Syrian Pound",
+          "aliases": [
+            "SYP"
+          ],
+          "depth": 1,
+          "examples": [
+            "pound"
+          ]
+        },
+        {
+          "name": "Tajikistani Rouble",
+          "aliases": [
+            "TJR",
+            "Tajikistani Ruble"
+          ],
+          "depth": 3,
+          "examples": [
+            "rouble"
+          ]
+        },
+        {
+          "name": "Tajikistani Somoni",
+          "aliases": [
+            "TJS"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Tanzanian Shilling",
+          "aliases": [
+            "TZS"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Thai Baht",
+          "aliases": [
+            "Baht",
+            "THB"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Timorese Escudo",
+          "aliases": [
+            "TPE"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Tongan Paʻanga",
+          "aliases": [
+            "TOP"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Trinidad & Tobago Dollar",
+          "aliases": [
+            "TTD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Tunisian Dinar",
+          "aliases": [
+            "TND"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Turkish Lira",
+          "aliases": [
+            "TRY"
+          ],
+          "depth": 1,
+          "examples": [
+            "lira"
+          ]
+        },
+        {
+          "name": "Turkish Lira (1922–2005)",
+          "aliases": [
+            "TRL"
+          ],
+          "depth": 1,
+          "examples": [
+            "lira"
+          ]
+        },
+        {
+          "name": "Turkmenistani Manat",
+          "aliases": [
+            "TMT"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Turkmenistani Manat (1993–2009)",
+          "aliases": [
+            "TMM"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "Ugandan Shilling",
+          "aliases": [
+            "UGX"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Ugandan Shilling (1966–1987)",
+          "aliases": [
+            "UGS"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Ukrainian Hryvnia",
+          "aliases": [
+            "Hryvnia",
+            "UAH"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Ukrainian Karbovanets",
+          "aliases": [
+            "UAK"
+          ],
+          "depth": 4
+        },
+        {
+          "name": "United Arab Emirates Dirham",
+          "aliases": [
+            "AED"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Uruguayan Peso",
+          "aliases": [
+            "UYU"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "Uruguayan Peso (1975–1993)",
+          "aliases": [
+            "UYP"
+          ],
+          "depth": 1,
+          "examples": [
+            "peso"
+          ]
+        },
+        {
+          "name": "US Dollar",
+          "aliases": [
+            "American dollar",
+            "USD",
+            "United States dollar"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Uzbekistani Som",
+          "aliases": [
+            "UZS"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Vanuatu Vatu",
+          "aliases": [
+            "VUV",
+            "Vatu"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Venezuelan Bolívar",
+          "aliases": [
+            "VES"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Venezuelan Bolívar (1871–2008)",
+          "aliases": [
+            "VEB"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Venezuelan Bolívar (2008–2018)",
+          "aliases": [
+            "VEF"
+          ],
+          "depth": 1
+        },
+        {
+          "name": "Vietnamese Dong",
+          "aliases": [
+            "VND"
+          ],
+          "depth": 1,
+          "examples": [
+            "dong"
+          ]
+        },
+        {
+          "name": "Vietnamese Dong (1978–1985)",
+          "aliases": [
+            "VNN"
+          ],
+          "depth": 1,
+          "examples": [
+            "dong"
+          ]
+        },
+        {
+          "name": "West African CFA Franc",
+          "aliases": [
+            "XOF"
+          ],
+          "depth": 1,
+          "examples": [
+            "franc"
+          ]
+        },
+        {
+          "name": "Yemeni Dinar",
+          "aliases": [
+            "YDD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Yemeni Rial",
+          "aliases": [
+            "YER"
+          ],
+          "depth": 2
+        },
+        {
+          "name": "Yugoslavian Convertible Dinar (1990–1992)",
+          "aliases": [
+            "YUN"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Yugoslavian Hard Dinar (1966–1990)",
+          "aliases": [
+            "YUD"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Yugoslavian New Dinar (1994–2002)",
+          "aliases": [
+            "YUM"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Yugoslavian Reformed Dinar (1992–1993)",
+          "aliases": [
+            "YUR"
+          ],
+          "depth": 2,
+          "examples": [
+            "dinar"
+          ]
+        },
+        {
+          "name": "Zairean New Zaire (1993–1998)",
+          "aliases": [
+            "ZRN"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Zairean Zaire (1971–1993)",
+          "aliases": [
+            "ZRZ"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Zambian Kwacha",
+          "aliases": [
+            "ZMW"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Zambian Kwacha (1968–2012)",
+          "aliases": [
+            "ZMK"
+          ],
+          "depth": 3
+        },
+        {
+          "name": "Zimbabwean Dollar (1980–2008)",
+          "aliases": [
+            "ZWD"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Zimbabwean Dollar (2008)",
+          "aliases": [
+            "ZWR"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Zimbabwean Dollar (2009–2024)",
+          "aliases": [
+            "ZWL"
+          ],
+          "depth": 1,
+          "examples": [
+            "dollar"
+          ]
+        },
+        {
+          "name": "Zimbabwean Gold",
+          "aliases": [
+            "ZWG"
+          ],
+          "depth": 1
+        }
+      ],
+      "context": "International · Money"
     }
   ]
 }

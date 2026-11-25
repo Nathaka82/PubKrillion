@@ -3,7 +3,7 @@
     "id": "summer-hosts",
     "matching": "names",
     "title": "Summer Olympic cities",
-    "prompt": "Name an official host city of the Summer Olympic Games held between 1896 and 2024 inclusive.",
+    "prompt": "Name a city that hosted the Summer Olympics between 1896 and 2024.",
     "topic": "Sport",
     "source": "https://stillmed.olympics.com/media/Documents/Olympic-Games/Factsheets/The-Games-of-the-Olympiad.pdf",
     "answers": [
@@ -27,8 +27,8 @@
       {"name": "Mexico City", "depth": 4, "aliases": ["Ciudad de México","CDMX"]},
       {"name": "Atlanta", "depth": 4, "aliases": []},
       {"name": "Montreal", "depth": 4, "aliases": []},
-      {"name": "Helsinki", "depth": 5, "aliases": ["Helsingfors"]},
-      {"name": "Antwerp", "depth": 5, "aliases": ["Antwerpen","Anvers"]},
+      {"name": "Helsinki", "depth": 4, "aliases": ["Helsingfors"]},
+      {"name": "Antwerp", "depth": 4, "aliases": ["Antwerpen","Anvers"]},
       {"name": "St. Louis", "depth": 5, "aliases": ["Saint Louis"]}
     ]
   },
@@ -37,7 +37,7 @@
     "matching": "names",
     "title": "Early Pixar",
     "prompt": "Name a Pixar feature film that had its original US theatrical release between 1995 and June 2015 inclusive.",
-    "topic": "Film",
+    "topic": "Film & TV",
     "source": "https://www.pixar.com/feature-films/",
     "answers": [
       {"name": "Toy Story", "depth": 1, "aliases": []},
@@ -53,8 +53,8 @@
       {"name": "Toy Story 3", "depth": 4, "aliases": ["Toy Story Three"]},
       {"name": "A Bug’s Life", "depth": 4, "aliases": ["Bugs Life"]},
       {"name": "Brave", "depth": 4, "aliases": []},
-      {"name": "Monsters University", "depth": 5, "aliases": ["Monsters Uni"]},
-      {"name": "Cars 2", "depth": 5, "aliases": ["Cars Two"]}
+      {"name": "Monsters University", "depth": 4, "aliases": ["Monsters Uni"]},
+      {"name": "Cars 2", "depth": 4, "aliases": ["Cars Two"]}
     ]
   },
   {
@@ -95,12 +95,12 @@
       {"name": "Bromine", "depth": 4, "aliases": ["Br"]},
       {"name": "Krypton", "depth": 4, "aliases": ["Kr"]},
       {"name": "Selenium", "depth": 4, "aliases": ["Se"]},
-      {"name": "Beryllium", "depth": 5, "aliases": ["Be"]},
+      {"name": "Beryllium", "depth": 4, "aliases": ["Be"]},
       {"name": "Scandium", "depth": 5, "aliases": ["Sc"]},
-      {"name": "Vanadium", "depth": 5, "aliases": ["V"]},
-      {"name": "Manganese", "depth": 5, "aliases": ["Mn"]},
-      {"name": "Gallium", "depth": 5, "aliases": ["Ga"]},
-      {"name": "Germanium", "depth": 5, "aliases": ["Ge"]}
+      {"name": "Vanadium", "depth": 4, "aliases": ["V"]},
+      {"name": "Manganese", "depth": 4, "aliases": ["Mn"]},
+      {"name": "Gallium", "depth": 4, "aliases": ["Ga"]},
+      {"name": "Germanium", "depth": 4, "aliases": ["Ge"]}
     ]
   },
   {
@@ -108,7 +108,7 @@
     "matching": "names",
     "title": "Mind the gap",
     "prompt": "Name one of London Underground’s 11 Tube lines. Use the line name as it appears on the TfL map.",
-    "topic": "Travel",
+    "topic": "Geography",
     "source": "https://content.tfl.gov.uk/standard-tube-map.pdf",
     "coverage": "The complete named set under the conditions in the prompt. Equivalent spellings and listed aliases score together.",
     "answers": [
@@ -121,7 +121,7 @@
       {"name": "District", "depth": 3, "aliases": ["District Line"]},
       {"name": "Bakerloo", "depth": 4, "aliases": ["Bakerloo Line"]},
       {"name": "Metropolitan", "depth": 4, "aliases": ["Metropolitan Line","Met Line"]},
-      {"name": "Hammersmith & City", "depth": 5, "aliases": ["Hammersmith and City Line"]},
+      {"name": "Hammersmith & City", "depth": 4, "aliases": ["Hammersmith and City Line"]},
       {"name": "Waterloo & City", "depth": 5, "aliases": ["Waterloo and City Line"]}
     ]
   },
@@ -129,7 +129,7 @@
     "id": "beatles",
     "matching": "names",
     "title": "The Beatles on record",
-    "prompt": "Name one of the 13 original Beatles albums listed in their official core catalogue for 1963–1970.",
+    "prompt": "Name one of the Beatles’ 13 core albums released between 1963 and 1970.",
     "topic": "Music",
     "source": "https://www.thebeatles.com/albums",
     "answers": [
@@ -145,7 +145,7 @@
       {"name": "A Hard Day’s Night", "depth": 4, "aliases": ["Hard Day’s Night"]},
       {"name": "Please Please Me", "depth": 4, "aliases": []},
       {"name": "Beatles for Sale", "depth": 5, "aliases": []},
-      {"name": "With the Beatles", "depth": 5, "aliases": []}
+      {"name": "With the Beatles", "depth": 4, "aliases": []}
     ]
   },
   {
@@ -153,7 +153,7 @@
     "matching": "names",
     "title": "Nine walkers",
     "prompt": "Name one of the nine members of the Fellowship who set out from Rivendell in The Lord of the Rings.",
-    "topic": "Books",
+    "topic": "Books & Literature",
     "source": "https://www.tolkienestate.com/writing/nicole-guedeney-the-lord-of-the-rings-or-how-to-survive-fear-and-despair/",
     "answers": [
       {"name": "Frodo Baggins", "depth": 1, "aliases": ["Frodo","Mr Frodo"]},
@@ -164,7 +164,7 @@
       {"name": "Gimli", "depth": 3, "aliases": ["Gimli son of Glóin"]},
       {"name": "Boromir", "depth": 4, "aliases": ["Boromir of Gondor"]},
       {"name": "Peregrin Took", "depth": 4, "aliases": ["Pippin","Pippin Took","Peregrin"]},
-      {"name": "Meriadoc Brandybuck", "depth": 5, "aliases": ["Merry","Merry Brandybuck","Meriadoc"]}
+      {"name": "Meriadoc Brandybuck", "depth": 4, "aliases": ["Merry","Merry Brandybuck","Meriadoc"]}
     ]
   },
   {
@@ -182,7 +182,7 @@
       {"name": "Germany", "depth": 3, "aliases": ["West Germany","Deutschland","Federal Republic of Germany"]},
       {"name": "Italy", "depth": 3, "aliases": ["Italia"]},
       {"name": "Spain", "depth": 4, "aliases": ["España"]},
-      {"name": "Uruguay", "depth": 5, "aliases": []}
+      {"name": "Uruguay", "depth": 4, "aliases": []}
     ]
   },
   {
@@ -205,7 +205,7 @@
       {"name": "Ceres", "depth": 4, "aliases": []},
       {"name": "Eris", "depth": 4, "aliases": []},
       {"name": "Haumea", "depth": 5, "aliases": []},
-      {"name": "Makemake", "depth": 5, "aliases": []}
+      {"name": "Makemake", "depth": 4, "aliases": []}
     ]
   },
   {
@@ -227,9 +227,9 @@
       {"name": "Newfoundland and Labrador", "depth": 4, "aliases": ["NL"]},
       {"name": "New Brunswick", "depth": 4, "aliases": ["NB"]},
       {"name": "Yukon", "depth": 4, "aliases": ["Yukon Territory","YT"]},
-      {"name": "Prince Edward Island", "depth": 5, "aliases": ["PEI","PE"]},
-      {"name": "Northwest Territories", "depth": 5, "aliases": ["NWT","NT"]},
-      {"name": "Nunavut", "depth": 5, "aliases": ["NU"]}
+      {"name": "Prince Edward Island", "depth": 4, "aliases": ["PEI","PE"]},
+      {"name": "Northwest Territories", "depth": 4, "aliases": ["NWT","NT"]},
+      {"name": "Nunavut", "depth": 4, "aliases": ["NU"]}
     ]
   },
   {
@@ -237,7 +237,7 @@
     "matching": "names",
     "title": "Two eras of Bond",
     "prompt": "Name an official James Bond film starring either Pierce Brosnan or Daniel Craig as 007.",
-    "topic": "Film",
+    "topic": "Film & TV",
     "source": "https://www.007.com/the-films/",
     "answers": [
       {"name": "Skyfall", "depth": 1, "aliases": []},
@@ -248,7 +248,7 @@
       {"name": "Die Another Day", "depth": 3, "aliases": ["DAD"]},
       {"name": "Tomorrow Never Dies", "depth": 4, "aliases": ["TND"]},
       {"name": "Quantum of Solace", "depth": 4, "aliases": ["QoS"]},
-      {"name": "The World Is Not Enough", "depth": 5, "aliases": ["World Is Not Enough","TWINE"]}
+      {"name": "The World Is Not Enough", "depth": 4, "aliases": ["World Is Not Enough","TWINE"]}
     ]
   },
   {
@@ -256,7 +256,7 @@
     "matching": "names",
     "title": "Over and out",
     "prompt": "Give the word used to represent any letter in the NATO phonetic alphabet.",
-    "topic": "Language",
+    "topic": "General Knowledge",
     "source": "https://www.nato.int/en/about-us/nato-history/history-by-theme/symbols-of-nato/nato-phonetic-alphabet",
     "answers": [
       {"name": "Alfa", "depth": 1, "aliases": ["Alpha"]},
@@ -283,8 +283,8 @@
       {"name": "Victor", "depth": 4, "aliases": []},
       {"name": "Yankee", "depth": 4, "aliases": []},
       {"name": "X-ray", "depth": 4, "aliases": []},
-      {"name": "Quebec", "depth": 5, "aliases": []},
-      {"name": "Uniform", "depth": 5, "aliases": []}
+      {"name": "Quebec", "depth": 4, "aliases": []},
+      {"name": "Uniform", "depth": 4, "aliases": []}
     ]
   },
   {
@@ -308,8 +308,8 @@
       {"name": "South Downs", "depth": 4, "aliases": ["The South Downs","South Downs National Park"]},
       {"name": "North York Moors", "depth": 4, "aliases": ["North York Moors National Park","North Yorkshire Moors"]},
       {"name": "Pembrokeshire Coast", "depth": 4, "aliases": ["Pembrokeshire Coast National Park","Arfordir Penfro","Parc Cenedlaethol Arfordir Penfro"]},
-      {"name": "Loch Lomond and the Trossachs", "depth": 5, "aliases": ["Loch Lomond and the Trossachs National Park"]},
-      {"name": "Northumberland", "depth": 5, "aliases": ["Northumberland National Park"]},
+      {"name": "Loch Lomond and the Trossachs", "depth": 4, "aliases": ["Loch Lomond and the Trossachs National Park"]},
+      {"name": "Northumberland", "depth": 4, "aliases": ["Northumberland National Park"]},
       {"name": "The Broads", "depth": 5, "aliases": ["Broads","Broads National Park","Norfolk Broads"]}
     ]
   },
@@ -318,7 +318,7 @@
     "matching": "names",
     "title": "One night at the Oscars",
     "prompt": "Name a film nominated for Best Picture at the March 2024 Academy Awards, including the winner.",
-    "topic": "Film",
+    "topic": "Film & TV",
     "source": "https://www.oscars.org/oscars/ceremonies/2024",
     "answers": [
       {"name": "Barbie", "depth": 1, "aliases": []},
@@ -329,8 +329,8 @@
       {"name": "Maestro", "depth": 3, "aliases": []},
       {"name": "Anatomy of a Fall", "depth": 4, "aliases": ["Anatomie d’une chute"]},
       {"name": "The Zone of Interest", "depth": 4, "aliases": ["Zone of Interest"]},
-      {"name": "Past Lives", "depth": 5, "aliases": []},
-      {"name": "American Fiction", "depth": 5, "aliases": []}
+      {"name": "Past Lives", "depth": 4, "aliases": []},
+      {"name": "American Fiction", "depth": 4, "aliases": []}
     ]
   },
   {
@@ -338,7 +338,7 @@
     "matching": "names",
     "title": "Boots on the Moon",
     "prompt": "Name an Apollo astronaut who walked on the Moon. A surname is enough.",
-    "topic": "History",
+    "topic": "General Knowledge",
     "source": "https://science.nasa.gov/moon/moon-walkers/",
     "coverage": "The complete named set under the conditions in the prompt. Equivalent spellings and listed aliases score together.",
     "answers": [
@@ -352,7 +352,7 @@
       {"name": "David Scott", "depth": 4, "aliases": ["Scott","Dave Scott","David Randolph Scott"]},
       {"name": "Charlie Duke", "depth": 4, "aliases": ["Duke","Charles Duke","Charles Moss Duke Jr"]},
       {"name": "Harrison Schmitt", "depth": 4, "aliases": ["Schmitt","Jack Schmitt","Harrison Hagan Schmitt"]},
-      {"name": "Edgar Mitchell", "depth": 5, "aliases": ["Mitchell","Ed Mitchell","Edgar Dean Mitchell"]},
+      {"name": "Edgar Mitchell", "depth": 4, "aliases": ["Mitchell","Ed Mitchell","Edgar Dean Mitchell"]},
       {"name": "James Irwin", "depth": 5, "aliases": ["Irwin","Jim Irwin","James Benson Irwin"]}
     ]
   },
@@ -380,7 +380,7 @@
     "matching": "categories",
     "title": "On the menu",
     "prompt": "Name one of the 14 food allergen groups that UK food businesses must declare. Give the name of the group.",
-    "topic": "Food",
+    "topic": "Food & Drink",
     "source": "https://www.gov.uk/understanding-food-labelling/allergen-labelling",
     "coverage": "The complete named set under the conditions in the prompt. Equivalent spellings and listed aliases score together.",
     "answers": [
@@ -397,7 +397,7 @@
       {"name": "Molluscs", "depth": 4, "aliases": ["Mollusks","Mollusc","Mollusk"]},
       {"name": "Celery", "depth": 4, "aliases": []},
       {"name": "Lupin", "depth": 5, "aliases": ["Lupine"]},
-      {"name": "Sulphur dioxide and sulphites", "depth": 5, "aliases": ["Sulphites","Sulfites","Sulfur dioxide","Sulphur dioxide","Sulfur dioxide and sulfites"]}
+      {"name": "Sulphur dioxide and sulphites", "depth": 4, "aliases": ["Sulphites","Sulfites","Sulfur dioxide","Sulphur dioxide","Sulfur dioxide and sulfites"]}
     ]
   },
   {
@@ -416,7 +416,7 @@
       {"name": "Williams", "depth": 3, "aliases": ["Williams Racing","Williams Mercedes"]},
       {"name": "Alpine", "depth": 4, "aliases": ["BWT Alpine","Alpine Renault"]},
       {"name": "Haas", "depth": 4, "aliases": ["Haas F1 Team","Haas Ferrari","MoneyGram Haas F1 Team"]},
-      {"name": "RB", "depth": 5, "aliases": ["VCARB","Racing Bulls","Visa Cash App RB","RB Honda RBPT"]},
+      {"name": "RB", "depth": 4, "aliases": ["VCARB","Racing Bulls","Visa Cash App RB","RB Honda RBPT"]},
       {"name": "Kick Sauber", "depth": 5, "aliases": ["Sauber","Stake F1 Team Kick Sauber","Kick Sauber Ferrari"]}
     ]
   },
@@ -425,7 +425,7 @@
     "matching": "names",
     "title": "Through the wardrobe",
     "prompt": "Name one of the seven books in C. S. Lewis’s Chronicles of Narnia.",
-    "topic": "Books",
+    "topic": "Books & Literature",
     "source": "https://www.loc.gov/nls/new-materials/book-lists/the-chronicles-of-narnia/",
     "answers": [
       {"name": "The Lion, the Witch and the Wardrobe", "depth": 1, "aliases": ["Lion the Witch and the Wardrobe","Lion Witch and the Wardrobe"]},
@@ -434,7 +434,7 @@
       {"name": "The Silver Chair", "depth": 3, "aliases": ["Silver Chair"]},
       {"name": "The Magician’s Nephew", "depth": 4, "aliases": ["Magician’s Nephew"]},
       {"name": "The Last Battle", "depth": 4, "aliases": ["Last Battle"]},
-      {"name": "The Horse and His Boy", "depth": 5, "aliases": ["Horse and His Boy"]}
+      {"name": "The Horse and His Boy", "depth": 4, "aliases": ["Horse and His Boy"]}
     ]
   },
   {
@@ -461,7 +461,7 @@
     "matching": "names",
     "title": "It’s all Greek",
     "prompt": "Give the English name of any of the 24 letters in the standard Greek alphabet.",
-    "topic": "Language",
+    "topic": "General Knowledge",
     "source": "https://www.open.edu/openlearn/mod/oucontent/view.php?id=112596&section=__introduction",
     "coverage": "The complete named set under the conditions in the prompt. Equivalent spellings and listed aliases score together.",
     "answers": [
@@ -485,10 +485,10 @@
       {"name": "Psi", "depth": 4, "aliases": []},
       {"name": "Chi", "depth": 4, "aliases": ["Khi"]},
       {"name": "Rho", "depth": 4, "aliases": []},
-      {"name": "Upsilon", "depth": 5, "aliases": ["Ypsilon"]},
-      {"name": "Xi", "depth": 5, "aliases": ["Ksi"]},
-      {"name": "Nu", "depth": 5, "aliases": []},
-      {"name": "Eta", "depth": 5, "aliases": []}
+      {"name": "Upsilon", "depth": 4, "aliases": ["Ypsilon"]},
+      {"name": "Xi", "depth": 4, "aliases": ["Ksi"]},
+      {"name": "Nu", "depth": 4, "aliases": []},
+      {"name": "Eta", "depth": 4, "aliases": []}
     ]
   }
 ]
