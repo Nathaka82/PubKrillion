@@ -31,6 +31,10 @@ class DownloadTooLarge(ValueError):
     pass
 
 
+def retry_wait(origin):
+    return max(0, int(_retry_after.get(origin, 0) - time.monotonic() + 1))
+
+
 def fetch(url, limit=8_000_000, timeout=20):
     origin = urllib.parse.urlsplit(url).netloc.lower()
     if _retry_after.get(origin, 0) > time.monotonic():
@@ -604,6 +608,28 @@ def named_record(item, labels, aliases):
 
 def named_items(page):
     ids = [r["item"]["value"].rsplit("/", 1)[-1] for r in page]
+    for _, record in entity_name_records(ids):
+        if record:
+            yield record
+
+
+def language_map(entity, field, required):
+    value = entity.get(field, None if required else {})
+    if value == []:  # MediaWiki formatversion 1 can encode an empty map as an array.
+        return {}
+    if not isinstance(value,dict):
+        raise ValueError("Wikidata omitted the requested names.")
+    return value
+
+
+def name_text(value, lang):
+    if (not isinstance(value,dict) or value.get("language",lang)!=lang
+            or not isinstance(value.get("value"),str)):
+        raise ValueError("Wikidata returned a malformed name.")
+    return value["value"]
+
+
+def entity_name_records(ids, *, allow_missing=False):
     if not all(re.fullmatch(r"Q[1-9]\d*", item) for item in ids):
         raise ValueError("Unexpected Wikidata entity identifier.")
     def batches(batch):
@@ -617,7 +643,8 @@ def named_items(page):
             }
         )
         try:
-            entities = json.loads(fetch("https://www.wikidata.org/w/api.php?" + args))["entities"]
+            result = json.loads(fetch("https://www.wikidata.org/w/api.php?" + args))
+            entities = result.get("entities") if isinstance(result,dict) else None
         except DownloadTooLarge:
             if len(batch)==1:
                 raise
@@ -625,14 +652,24 @@ def named_items(page):
             yield from batches(batch[:middle])
             yield from batches(batch[middle:])
             return
+        if not isinstance(entities,dict) or set(entities) != set(batch) or "warnings" in result or "error" in result:
+            raise ValueError("Wikidata returned an incomplete name batch.")
         for item in batch:
             entity = entities[item]
+            if not isinstance(entity,dict):
+                raise ValueError("Wikidata returned a malformed entity.")
+            if allow_missing and entity.get("id")==item and "missing" in entity:
+                yield item, None
+                continue
             if entity.get("id") != item or "missing" in entity:
                 raise ValueError("The Wikidata names no longer belong to the requested entity.")
-            labels = {lang:v["value"] for lang,v in entity.get("labels",{}).items()}
-            aliases = {lang:[v["value"] for v in values] for lang,values in entity.get("aliases",{}).items()}
-            if record := named_record(item,labels,aliases):
-                yield record
+            labels = {lang:name_text(v,lang) for lang,v in language_map(entity,"labels",allow_missing).items()}
+            aliases = {}
+            for lang,values in language_map(entity,"aliases",allow_missing).items():
+                if not isinstance(values,list):
+                    raise ValueError("Wikidata returned malformed aliases.")
+                aliases[lang] = [name_text(v,lang) for v in values]
+            yield item, named_record(item,labels,aliases)
     for start in range(0, len(ids), 50):
         yield from batches(ids[start:start+50])
 

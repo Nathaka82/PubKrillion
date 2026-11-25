@@ -56,15 +56,16 @@ def excluded_names(db, cls, wanted, included, *, roles=False):
     file_format = db.execute("SELECT format FROM publication").fetchone()[0]
     if file_format>=20:
         names, index = ("scope_name","scope_names_by_term") if file_format>=23 else ("date_name","date_names_by_term")
+        source_names = "answer_scope_name n" if file_format >= 33 else f"{names} n INDEXED BY {index}"
         for item,display,preferred in db.execute(DESCENDANTS+f""" SELECT DISTINCT n.id,n.display,n.preferred
-            FROM json_each(?) w CROSS JOIN {names} n INDEXED BY {index} ON n.term=w.value
+            FROM json_each(?) w CROSS JOIN {source_names} ON n.term=w.value
             WHERE +n.cls IN (SELECT id FROM scope) AND n.id NOT IN (SELECT value FROM json_each(?))""",lookup):
             yield "wd:Q"+str(item),display,bool(preferred)
+    names, items = ("answer_world_name","answer_item") if file_format >= 33 else ("world_name","item")
     rows = db.execute(
         DESCENDANTS
-        + f""" SELECT DISTINCT i.id,i.name,i.aliases FROM json_each(?) w
-        CROSS JOIN world_name n ON n.term=w.value CROSS JOIN item i ON i.id=n.id WHERE
-        n.id NOT IN (SELECT value FROM json_each(?)) AND EXISTS(
+        + f""" SELECT DISTINCT i.id,i.name,i.aliases FROM {names} n CROSS JOIN {items} i ON i.id=n.id
+        WHERE n.term IN (SELECT value FROM json_each(?)) AND n.id NOT IN (SELECT value FROM json_each(?)) AND EXISTS(
         SELECT 1 FROM world_member m WHERE m.id=n.id AND m.cls IN (SELECT id FROM scope){role_query})""",
         lookup,
     )
@@ -225,7 +226,8 @@ def joined_release(db, keys, query, args):
         if qid in names:
             name, aliases = names[qid]
         else:
-            name, forms = db.execute("SELECT name,aliases FROM item WHERE id=?",(item,)).fetchone()
+            table = "answer_item" if file_format >= 33 else "item"
+            name, forms = db.execute(f"SELECT name,aliases FROM {table} WHERE id=?",(item,)).fetchone()
             aliases = set(forms.split("\t")) - {""}
         result.append((qid, name, sorted(aliases - {name})))
     joined = {"revision": digest(revisions), "captured": min(dates), "rows": result, "n": len(result)}

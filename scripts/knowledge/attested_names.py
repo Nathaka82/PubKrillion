@@ -230,11 +230,10 @@ def conflict_names(graph, publication):
     yield from graph.execute("""SELECT c.id,c.display,0 FROM answer_name_claim c
         WHERE NOT EXISTS(SELECT 1 FROM qualified q WHERE q.id=c.id)""")
     terms = graph.execute("SELECT term,display FROM added_name")
-    scope_table = (
-        "scope_name"
-        if publication.execute("SELECT format FROM publication").fetchone()[0] >= 23
-        else "date_name"
-    )
+    version = publication.execute("SELECT format FROM publication").fetchone()[0]
+    scope_table = "scope_name" if version >= 23 else "date_name"
+    world_names = "answer_world_name" if version >= 33 else "world_name"
+    scope_names = "answer_scope_name" if version >= 33 else scope_table
     while batch := terms.fetchmany(400):
         displays = {}
         for term, name in batch:
@@ -242,8 +241,8 @@ def conflict_names(graph, publication):
         rows = publication.execute(
             f"""WITH words AS (SELECT value term FROM json_each(?))
             SELECT w.term,a.id FROM words w CROSS JOIN attested_name a ON a.term=w.term
-            UNION SELECT w.term,n.id FROM words w CROSS JOIN world_name n ON n.term=w.term
-            UNION SELECT w.term,n.id FROM words w CROSS JOIN {scope_table} n ON n.term=w.term""",
+            UNION SELECT n.term,n.id FROM {world_names} n WHERE n.term IN (SELECT term FROM words)
+            UNION SELECT w.term,n.id FROM words w CROSS JOIN {scope_names} n ON n.term=w.term""",
             (json.dumps(list(displays)),),
         )
         for term, item in rows:

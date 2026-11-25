@@ -196,9 +196,10 @@ def play(db, game, key, prompt):
     ).fetchone()
 
     def records(prop):
+        names = "answer_item" if file_format >= 33 else "item"
         results = db.execute(
-            """SELECT m.id,i.name,i.aliases,i.incoming,group_concat(m.cls) FROM class_match m
-            CROSS JOIN item i ON i.id=m.id WHERE m.property=? AND length(i.name) BETWEEN 1 AND 140 GROUP BY m.id""",
+            f"""SELECT m.id,i.name,i.aliases,i.incoming,group_concat(m.cls) FROM class_match m
+            CROSS JOIN {names} i ON i.id=m.id WHERE m.property=? AND length(i.name) BETWEEN 1 AND 140 GROUP BY m.id""",
             (prop,),
         )
         for item, name, aliases, incoming, types in results:

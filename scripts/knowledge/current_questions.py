@@ -57,8 +57,12 @@ def publish(db):
         INSERT OR IGNORE INTO named_scope SELECT r.role,r.id FROM world_role r
             WHERE EXISTS(SELECT 1 FROM attested_name a WHERE a.id=r.id);
         INSERT OR IGNORE INTO scope_name SELECT s.cls,a.term,a.id,a.display,0 FROM attested_name a
-            CROSS JOIN named_scope s ON s.id=a.id;
-        DROP TABLE named_scope;""")
+            CROSS JOIN named_scope s ON s.id=a.id;""")
+    verified = db.execute("""SELECT s.cls,s.id,l.forms FROM named_scope s JOIN audited_label l ON l.id=s.id""")
+    db.executemany("INSERT OR IGNORE INTO scope_name VALUES(?,?,?,?,0)",
+                   ((cls,folded_spelling(name),item,name) for cls,item,forms in verified
+                    for name in forms.split("\t") if name))
+    db.execute("DROP TABLE named_scope")
 
     # Publish natural questions for qualified forms even before a host asks for one.
     rules = dict(db.execute("SELECT key,n FROM live_rule WHERE n>0 AND key NOT GLOB 'during:*'"))

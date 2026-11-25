@@ -456,12 +456,32 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             PRIMARY KEY(id,exact)) WITHOUT ROWID;""")
     candidates = "(SELECT id FROM measure_decision WHERE outcome='accepted')" if measured_decisions else "candidate"
     has_name_claims = attested_names.stage(db,name_catalogue)
-    joined = db.execute(f"""SELECT e.*, (SELECT json_group_array(m.class) FROM membership m
+    import entity_labels
+    from world_index import SOURCE as world_archive
+    checked_labels = entity_labels.stage(db,name_catalogue)
+    label_fields = ("l.forms,l.checked AS names_checked,l.variants" if checked_labels
+                    else "NULL AS forms,NULL AS names_checked,NULL AS variants")
+    label_join = "LEFT JOIN candidate_labels l ON l.id=e.id" if checked_labels else ""
+    joined = db.execute(f"""SELECT e.*, {label_fields}, (SELECT json_group_array(m.class) FROM membership m
             WHERE m.id=e.id AND m.source=e.source) AS classes FROM {candidates} c CROSS JOIN entity e ON e.id=c.id
+        {label_join}
         WHERE ? IS NULL OR e.source=? ORDER BY c.id,e.source""", (plan.get("register"), plan.get("register")))
     for eid, records in groupby(joined, key=lambda r: r["id"]):
         rows = list(records)
-        names = sorted({name for r in rows for name in (r["name"], *json.loads(r["aliases"]))})
+        names = {r["name"] for r in rows}
+        names_checked = None
+        variants = None
+        for row in rows:
+            source = row["source"]
+            if row["forms"] is not None and (source.startswith("world5m-") or
+                    source.startswith(("wikidata-query-", "wikidata-joined-"))
+                    and row["names_checked"] >= sources[source]["checked"]):
+                names.update(filter(None,row["forms"].split("\t")))
+                names_checked = row["names_checked"]
+                variants = row["variants"]
+            else:
+                names.update(json.loads(row["aliases"]))
+        names = sorted(names)
         preferred = {spelling(r["name"]) for r in rows}
         db.executemany("INSERT OR IGNORE INTO spellings VALUES(?,?,?,?,?,?)",
                        ((eid, key, folded_spelling(name), name, key in preferred, norm(name))
@@ -567,6 +587,12 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                 continue
             evidence.extend(edges)
         selected.update(r["source"] for r in evidence)
+        if names_checked is not None:
+            evidence.append({"source":"Wikidata","namesChecked":names_checked,
+                             "url":"https://www.wikidata.org/wiki/"+eid[3:]})
+            if variants:
+                evidence.append({"source":"Wikidata5M","qualifiedNames":variants.split("\t"),
+                                 "url":world_archive})
         if has_name_claims:
             claims = list(db.execute("SELECT statement,prop,lang,display FROM answer_name_claim WHERE id=?", (eid,)))
             extra = {row[3] for row in claims}.difference(names)

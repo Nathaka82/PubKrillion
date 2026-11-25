@@ -145,9 +145,10 @@ class MeasuredRule:
                         )
 
                     def members():
+                        names = "answer_item" if db.execute("SELECT format FROM publication").fetchone()[0] >= 33 else "item"
                         for item, name, aliases, incoming in db.execute(
                             f"""SELECT i.id,i.name,i.aliases,i.incoming FROM
-                                ({query}) m JOIN item i ON i.id=m.id""",
+                                ({query}) m JOIN {names} i ON i.id=m.id""",
                             args,
                         ):
                             yield (

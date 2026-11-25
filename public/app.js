@@ -817,6 +817,15 @@ function evidenceLinks(evidence) {
       items.add(link(record.url, esc(record.nameProperty) + " · " + '<bdi lang="' + esc(record.language) + '">' + esc(record.name) + '</bdi>'));
       continue;
     }
+    if (record.namesChecked && record.url) {
+      items.add(link(record.url, "Names and translations recorded on Wikidata"));
+      continue;
+    }
+    if (record.qualifiedNames?.length && record.url) {
+      items.add(link(record.url, "Archived titles with verified qualifiers · " +
+        record.qualifiedNames.map(name => "<bdi>" + esc(name) + "</bdi>").join(", ")));
+      continue;
+    }
     if (record.dates?.length) {
       for (const claim of record.dates) {
         const value = claim.value;

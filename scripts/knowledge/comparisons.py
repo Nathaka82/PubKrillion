@@ -98,7 +98,7 @@ def import_world_values(db, fingerprint):
     )
     db.execute(
         """INSERT INTO entity SELECT ?, 'wd:Q'||i.id,i.name,aliases_json(i.aliases),NULL,
-        'https://www.wikidata.org/wiki/Q'||i.id||'#P31' FROM measured_id m CROSS JOIN item i ON i.id=m.id""",
+        'https://www.wikidata.org/wiki/Q'||i.id||'#P31' FROM measured_id m CROSS JOIN answer_item i ON i.id=m.id""",
         (WORLD_SOURCE,),
     )
     db.execute(
@@ -129,10 +129,10 @@ def compile_shared_names(db, has_world):
             # Include names from unmeasured items, including aliases shared only
             # between a specialist source and the general graph.
             extra = """WITH external_terms AS MATERIALIZED (SELECT DISTINCT term FROM entity_name),
-                ids(id) AS (SELECT id FROM world_homonym UNION
+                ids(id) AS (SELECT id FROM world_homonym UNION SELECT id FROM label_record UNION
                 SELECT a.id FROM external_terms e CROSS JOIN world.entity_alias a ON a.term=e.term UNION
                 SELECT t.id FROM external_terms e CROSS JOIN world.title t ON t.term=e.term)
-                SELECT i.id,i.name,i.aliases FROM ids CROSS JOIN item i ON i.id=ids.id
+                SELECT i.id,i.name,i.aliases FROM ids CROSS JOIN answer_item i ON i.id=ids.id
                 WHERE NOT EXISTS(SELECT 1 FROM measured_id m WHERE m.id=i.id)"""
             for item, name, aliases in db.execute(extra):
                 for pos, alias in enumerate((name, *aliases.split("\t"))):

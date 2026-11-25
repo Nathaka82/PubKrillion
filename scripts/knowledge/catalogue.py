@@ -18,7 +18,7 @@ from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
 FORMAT = int(Path(__file__).with_name("catalogue-format").read_text(encoding="ascii"))
-RULE_REVISION = "first-use-work-forms-1"
+RULE_REVISION = "entity-owned-answer-names-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -272,6 +272,7 @@ def import_feed(db, manifest, cache, offline, definition=None):
 
 def build(world, output, feeds, *, offline=False, include_bundled=True, measurements=None, discover_dates=False, discover_names=False):
     import attested_names
+    import entity_labels
     import attention
     import scope_evidence
     import work_forms
@@ -320,6 +321,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             db.executescript(topic_sources.SCHEMA)
             db.executescript(world_links.SCHEMA)
             db.executescript(attested_names.SCHEMA)
+            db.executescript(entity_labels.SCHEMA)
             import current_questions, date_rules, date_updates, date_properties, dated_links
             db.executescript(current_questions.SCHEMA)
             db.executescript(date_rules.SCHEMA)
@@ -393,6 +395,10 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 watched += date_updates.collect(db,output.parent,offline,previous=output)
                 if discover_names and not offline:
                     try:
+                        entity_labels.refresh(db,output.parent)
+                    except (OSError,ValueError,KeyError) as error:
+                        print(f"Entity name update deferred: {error}",flush=True)
+                    try:
                         attested_names.refresh(db, output.parent,previous=output)
                     except (OSError, ValueError, KeyError) as error:
                         print(f"Recorded name update deferred: {error}",flush=True)
@@ -400,6 +406,8 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                     fingerprint = hashlib.file_digest(data, "sha256").hexdigest()
                 hierarchy = taxonomy.attach(db,taxonomy.location(output.parent),fingerprint)
             name_revision = attested_names.install(db,output.parent,output) if world is not None else None
+            if world is not None:
+                watched.append(("entity-labels",entity_labels.publish(db,output.parent,output)))
             rank_path, rank_release = attention.source(output.parent, output)
             edition = digest([FORMAT, RULE_REVISION, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,name_revision,rank_release])
             reuse_world = False
@@ -472,6 +480,7 @@ def summary(db):
             JOIN current_question q USING(rule) WHERE q.n>=2""").fetchone()[0] if file_format>=26 else 0,
         "resolvedTargets": db.execute("SELECT count(*) FROM current_target").fetchone()[0] if file_format>=25 else 0,
         "recordedNames": db.execute("SELECT count(*) FROM attested_name").fetchone()[0] if file_format>=22 else 0,
+        "checkedNameEntities": db.execute("SELECT count(*) FROM label_record").fetchone()[0] if file_format>=33 else 0,
         "dateStatements": db.execute("SELECT count(DISTINCT statement) FROM date_fact").fetchone()[0] if file_format>=20 else 0,
         "dateProperties": db.execute("SELECT count(*) FROM date_property").fetchone()[0] if file_format>=20 else 0,
         "datedRelationshipQuestions": db.execute("SELECT count(*) FROM current_question WHERE rule GLOB 'during:*'").fetchone()[0] if file_format>=24 else 0,
@@ -1336,7 +1345,8 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
                 known = db.execute("SELECT incoming FROM item WHERE id=?", (source_id,)).fetchone()
                 yield source_id, name, aliases, known[0] if known else 0
         else:
-            for row in db.execute(f"SELECT i.* FROM ({query}) m JOIN item i ON i.id=m.id", args):
+            names = "answer_item" if file_format >= 33 else "item"
+            for row in db.execute(f"SELECT i.* FROM ({query}) m JOIN {names} i ON i.id=m.id", args):
                 yield row["id"], row["name"], row["aliases"].split("\t"), row["incoming"]
     def records():
         for item, name, aliases, incoming in items():
@@ -1536,6 +1546,6 @@ if __name__ == "__main__":
                 import taxonomy
                 from watched_rules import due_requests
                 storage = (args.output or catalogue_path(args.db)).parent
-                import attested_names, date_discovery, target_discovery
-                if taxonomy.tick(world,taxonomy.location(storage)) or due_requests(storage,args.output or catalogue_path(args.db)) or date_discovery.is_due(storage) or target_discovery.is_due(storage) or attested_names.is_due(storage):
+                import attested_names, date_discovery, entity_labels, target_discovery
+                if taxonomy.tick(world,taxonomy.location(storage)) or due_requests(storage,args.output or catalogue_path(args.db)) or date_discovery.is_due(storage) or target_discovery.is_due(storage) or attested_names.is_due(storage) or entity_labels.due(storage):
                     break

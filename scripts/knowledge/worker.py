@@ -219,6 +219,12 @@ def main():
                             game.execute("PRAGMA foreign_keys=ON")
                             prune_previews(game)
                             bank, _ = play(publication, game, key, req["prompt"], req.get("edition"))
+                            if publication.execute("SELECT format FROM publication").fetchone()[0] >= 33:
+                                import entity_labels
+                                try:
+                                    entity_labels.request(args.db.parent, publication, game, bank)
+                                except (OSError,sqlite3.Error) as error:
+                                    print(f"Name-check queue unavailable: {error}",file=sys.stderr)
                         if key.startswith("date-"):
                             from date_rules import Rule,segments
                             for source in {row[0] for row in segments(publication,Rule.decode(key))}:
