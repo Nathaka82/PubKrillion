@@ -3,6 +3,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
@@ -239,12 +240,27 @@ class DatedQuestions(unittest.TestCase):
                 self.assertTrue(
                     any(p.get("dates", [{}])[0].get("url", "").endswith("/Q101-a") for p in proof)
                 )
+                # An independently verified date and relationship can also answer
+                # the class question when the original graph has no such entity.
+                broad = catalogue.match_question(db, "Name a work")
+                wide_bank, wide_meta = catalogue.play(db, game, broad["key"], broad["prompt"])
+                answers = dict(game.execute("SELECT entity,evidence FROM kb_member WHERE bank=?", (wide_bank,)))
+                self.assertEqual(len(answers), broad["records"])
+                self.assertEqual(len(answers), wide_meta["answerCount"])
+                self.assertIn("wd:Q102", answers)
+                self.assertNotIn("wd:Q103", answers)
+                checks = [urllib.parse.unquote(p["url"]) for p in json.loads(answers["wd:Q101"]) if "url" in p]
+                self.assertTrue(any("wd:Q101 (wdt:P31|wdt:P106)/wdt:P279* wd:Q10" in url for url in checks))
+                self.assertFalse(db.execute("SELECT 1 FROM relation_witness WHERE origin=?", (key,)).fetchone())
             members.clear()
             changed = False
             watched_rules.refresh_cache(key, file)
             self.publish()
-            with closing(catalogue.reader(self.edition)) as db, self.assertRaises(catalogue.RuleWithdrawn):
-                catalogue.match_question(db, prompt)
+            with closing(catalogue.reader(self.edition)) as db:
+                with self.assertRaises(catalogue.RuleWithdrawn):
+                    catalogue.match_question(db, prompt)
+                refreshed = catalogue.match_question(db, "Name a work")
+                self.assertEqual(refreshed["records"], broad["records"] - 2)
 
     def test_geographic_date_capture_only_keeps_subjects_with_a_verified_path(self):
         rule = dated_links.Rule.decode("during:date-10-577-1998-2000+g-10-131-99")

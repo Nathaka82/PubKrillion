@@ -17,7 +17,7 @@ from graph import ROOT, class_determiner, digest, folded_spelling, indefinite_ar
 from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
-FORMAT = 31
+FORMAT = int(Path(__file__).with_name("catalogue-format").read_text(encoding="ascii"))
 RULE_REVISION = "first-use-work-forms-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 

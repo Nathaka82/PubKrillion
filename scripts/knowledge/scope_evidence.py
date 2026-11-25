@@ -18,10 +18,12 @@ def publish(db):
     for origin, blob in db.execute("SELECT key,release FROM live_rule WHERE n>0"):
         parts = origin[4:].split("+") if origin.startswith("and:") else [origin]
         direct = [part for part in parts if part.startswith("w-")]
-        if not direct:
+        conditions = predicates(origin)
+        if not conditions:
             continue
-        # The verifier uses P31/subclass membership whenever a direct condition is present.
-        cls = predicates(origin)[0][0]
+        # All captures verify the bare class. Only direct relationship captures
+        # also establish the stricter P31 membership of an undated direct rule.
+        cls = conditions[0][0]
         payload = json.loads(gzip.decompress(blob))
         db.executemany("INSERT INTO scope_witness VALUES(?,?,?)",
                        ((cls, origin, int(qid[1:])) for qid, _, _ in payload["rows"]))
@@ -43,6 +45,8 @@ def origins(db, rule):
 
 
 def add_sources(db, graph, cls, *, rule=None, condition=None):
+    from dated_links import Rule
+
     if rule:
         captures = ((*row, cls) for row in origins(db, rule))
     else:
@@ -52,21 +56,35 @@ def add_sources(db, graph, cls, *, rule=None, condition=None):
     for origin, revision, checked, blob, supported_cls in captures:
         payload = json.loads(gzip.decompress(blob))
         parts = origin[4:].split("+") if origin.startswith("and:") else [origin]
-        pattern = membership_pattern(parts, predicates(origin))
+        prefix = ""
+        if dated := Rule.decode(origin):
+            from date_updates import PREFIX, body
+            from dated_link_updates import relationship_pattern
+            prefix = PREFIX
+            pattern = relationship_pattern(dated) + " " + body(dated.date)
+        else:
+            pattern = membership_pattern(parts, predicates(origin))
         source_url = "https://query.wikidata.org/#" + urllib.parse.quote(
-            f"SELECT DISTINCT ?item WHERE {{ {pattern} }}", safe="")
+            prefix + f"SELECT DISTINCT ?item WHERE {{ {pattern} }}", safe="")
         source = {"source": "wikidata-query-witness-" + digest(origin), "revision": revision,
                   "captured": checked, "url": source_url}
-        ingest(graph, source, records(db, payload["rows"], supported_cls, condition))
+        includes_roles = bool(dated) or all(part.startswith("g-") for part in parts)
+        ingest(graph, source, records(db, payload["rows"], supported_cls, condition, includes_roles))
 
 
-def records(db, rows, cls, condition):
+def records(db, rows, cls, condition, includes_roles):
+    from class_updates import evidence
+
     for qid, name, aliases in rows:
         incoming = db.execute("SELECT incoming FROM item WHERE id=?", (int(qid[1:]),)).fetchone()
-        class_check = f"ASK {{ wd:{qid} wdt:P31/wdt:P279* wd:Q{cls} . }}"
+        if includes_roles:
+            url = evidence(f"type:Q{cls}", qid)
+        else:
+            query = f"ASK {{ wd:{qid} wdt:P31/wdt:P279* wd:Q{cls} . }}"
+            url = "https://query.wikidata.org/#" + urllib.parse.quote(query, safe="")
         yield {
             "id": "wd:" + qid, "name": name, "aliases": aliases, "types": [f"wd:Q{cls}"],
-            "url": "https://query.wikidata.org/#" + urllib.parse.quote(class_check, safe=""),
+            "url": url,
             "edges": [(condition["relation"], condition["target"])] if condition else [],
             "graph_recognition": [0, incoming[0] if incoming else 0],
         }

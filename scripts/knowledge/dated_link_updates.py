@@ -12,16 +12,20 @@ from places import collect_paths, expression, matching_paths
 from world_facts import bindings
 
 
-def capture(rule, *, size=1000):
+def relationship_pattern(rule):
     target = f"wd:Q{rule.target}"
-    direct = rule.mode == "w"
-    if direct:
-        related = f"""?item wdt:P{rule.prop} {target}; p:P{rule.prop} ?edge .
+    if rule.mode == "w":
+        return f"""?item wdt:P{rule.prop} {target}; p:P{rule.prop} ?edge .
             ?edge a wikibase:BestRank; <http://www.wikidata.org/prop/statement/P{rule.prop}> {target} ."""
-    else:
-        related = f"?item {expression(rule.prop)} {target} ."
-        if rule.prop == 131:
-            related += f" FILTER(?item!={target})"
+    related = f"?item {expression(rule.prop)} {target} ."
+    if rule.prop == 131:
+        related += f" FILTER(?item!={target})"
+    return related
+
+
+def capture(rule, *, size=1000):
+    direct = rule.mode == "w"
+    related = relationship_pattern(rule)
     scope = related + " " + date_body(rule.date)
     fields = "?s ?item ?date ?precision" + (" ?edge" if direct else "")
 

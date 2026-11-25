@@ -472,6 +472,12 @@ class CatalogueTests(unittest.TestCase):
             self.assertEqual(names,["New building"])
             proof=json.loads(game.execute("SELECT evidence FROM kb_member WHERE bank=?",(bank,)).fetchone()[0])
             self.assertEqual([s["property"] for s in next(p["steps"] for p in proof if "steps" in p)],["P276","P131","P131"])
+            broad = catalogue.match_question(db, "Name a work")
+            wide_bank, _ = catalogue.play(db, game, broad["key"], broad["prompt"])
+            self.assertEqual(game.execute("SELECT entity FROM kb_answer_key WHERE bank=? AND form=0 AND term=?",
+                                          (wide_bank, "regional name")).fetchone(), ("wd:Q999",))
+            self.assertIsNone(game.execute("SELECT 1 FROM kb_member WHERE bank=? AND entity='wd:Q998'",
+                                           (wide_bank,)).fetchone())
 
     def test_same_named_places_can_be_selected_by_containing_region(self):
         with closing(sqlite3.connect(self.world)) as raw:

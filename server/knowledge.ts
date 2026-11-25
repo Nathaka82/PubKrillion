@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { CatalogueRule } from "./question-drafts.ts";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
@@ -13,6 +13,8 @@ import {
   type Answer,
   type Question,
 } from "./rules.ts";
+
+const catalogueFormat = Number(readFileSync(new URL("../scripts/knowledge/catalogue-format", import.meta.url), "utf8").trim());
 
 export type IndexedQuestion = Question & {
   knowledge: string;
@@ -354,7 +356,7 @@ export class Research {
     if (stamp === this.catalogueStamp) return this.catalogueEdition;
     const publication = new DatabaseSync(this.catalogueFile, { readOnly: true });
     let edition;
-    try { edition = publication.prepare("SELECT edition FROM publication WHERE format BETWEEN 4 AND 31").get()?.edition; }
+    try { edition = publication.prepare("SELECT edition FROM publication WHERE format BETWEEN 4 AND ?").get(catalogueFormat)?.edition; }
     finally { publication.close(); }
     if (typeof edition !== "string") return;
     const checkpoint = edition + ":answer-scores-v31";
