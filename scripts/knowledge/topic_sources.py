@@ -8,7 +8,7 @@ import unicodedata
 from dataclasses import dataclass
 
 from graph import digest, folded_spelling, spelling
-from target_lookup import named_candidates, prior_candidates
+from target_lookup import QID, named_candidates, prior_candidates
 from world_facts import bindings
 
 SCHEMA = """
@@ -195,18 +195,46 @@ def collect(db, storage, offline, previous=None):
     return captures
 
 
+def published_credits(db, topic):
+    """Use a checked name and already playable rules when the host abbreviates a credit."""
+    if not topic.cls:
+        return [], []
+    identity = db.execute("SELECT ids,crowded FROM source_topic WHERE key=?", (Topic(topic.term).key,)).fetchone()
+    if identity:
+        if identity[1]:
+            return [], []
+        ids = json.loads(identity[0])
+    elif qid := QID.fullmatch(topic.term):
+        ids = [int(qid[1])]
+    else:
+        # A folded alias alone cannot identify names with significant punctuation.
+        ids = [i for i, label in db.execute("""SELECT t.id,t.name FROM current_target_name n
+               JOIN current_target t ON t.id=n.target WHERE n.term=? AND n.preferred=1""",
+               (folded_spelling(topic.term),)) if spelling(label) == topic.term]
+    if not 1 <= len(ids) <= MAX_NAMES:
+        return [], []
+    keys = [f"w-{topic.cls}-{prop}-{target}" for target in ids for prop in CREDITS]
+    matches = db.execute("""SELECT q.rule,l.n,q.prompt FROM json_each(?) wanted
+        CROSS JOIN current_question q ON q.rule=wanted.value CROSS JOIN live_rule l ON l.key=q.rule
+        WHERE l.n>=2 ORDER BY l.n DESC,q.prompt,q.rule LIMIT ?""", (json.dumps(keys), MAX_NAMES)).fetchall()
+    return ids, matches
+
+
 def choices(db, topic, edition):
     from catalogue import RuleWithdrawn, UnverifiedRule
     from date_rules import DateChoices
     row = db.execute("SELECT ids,crowded FROM source_topic WHERE key=?", (topic.key,)).fetchone()
-    if not row:
-        raise UnverifiedRule(topic.key, "This edition has not searched for question subjects and credits for this topic.")
-    ids = json.loads(row[0])
-    if row[1]:
+    if row and row[1]:
         raise RuleWithdrawn("Several entities could match that name. Enter a specific Wikidata Q number.")
-    rows = db.execute("""SELECT t.rule,l.n,q.prompt FROM source_topic_rule t
-        LEFT JOIN live_rule l ON l.key=t.rule LEFT JOIN current_question q ON q.rule=t.rule
-        WHERE t.topic=? ORDER BY t.position""", (topic.key,)).fetchall()
+    if row:
+        ids = json.loads(row[0])
+        rows = db.execute("""SELECT t.rule,l.n,q.prompt FROM source_topic_rule t
+            LEFT JOIN live_rule l ON l.key=t.rule LEFT JOIN current_question q ON q.rule=t.rule
+            WHERE t.topic=? ORDER BY t.position""", (topic.key,)).fetchall()
+    else:
+        ids, rows = published_credits(db, topic)
+        if not rows:
+            raise UnverifiedRule(topic.key, "This edition has not searched for question subjects and credits for this topic.")
     cards = [dict(key=key, prompt=prompt, edition=edition, records=n, complete=False)
              for key, n, prompt in rows if prompt and n is not None and n >= 2]
     note = "Choose a question to play with its documented answers."

@@ -127,18 +127,23 @@ async function checkQuestionPicker(host) {
     for (const action of ["configure", "bank-answers"]) {
       const last = list.locator('[data-action="' + action + '"]').last();
       const id = await last.getAttribute("data-id");
-      const atBottom = await list.evaluate((el) => {
+      const position = await list.evaluateHandle((el) => {
         el.scrollTop = el.scrollHeight;
-        return el.scrollTop;
+        const saved = { top: null };
+        // A short viewport may scroll again to bring the chosen button into view.
+        el.addEventListener("click", () => { saved.top = el.scrollTop; }, { once: true, capture: true });
+        return saved;
       });
-      assert.ok(atBottom > 0);
       await last.click();
+      const openedAt = await position.evaluate(saved => saved.top);
+      await position.dispose();
+      assert.ok(openedAt > 0);
       await host.getByRole("button", { name: "Back to questions" }).click();
       await last.waitFor();
       assert.equal(await search.inputValue(), "Music");
-      assert.ok(
-        Math.abs((await list.evaluate((el) => el.scrollTop)) - atBottom) <= 2,
-      );
+      const restored = await list.evaluate((el) => el.scrollTop);
+      assert.ok(Math.abs(restored - openedAt) <= 2,
+        `Returning from ${action} should restore the list to ${openedAt}px (found ${restored}px)`);
       assert.deepEqual(
         await host.evaluate(() => [
           document.activeElement.dataset.id,

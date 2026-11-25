@@ -82,6 +82,12 @@ class SourceTopics(unittest.TestCase):
             self.assertIn("Q801 (writer)", request["sourceNote"])
             self.assertIn("Q802 (press)", request["sourceNote"])
             self.assertEqual({c["key"] for c in cards}, {"w-10-50-801", "w-10-123-802"})
+            for text in ("works by Cedar", "Name a work by Cedar", "works by Q801"):
+                abbreviated = {"idea": text, "completeOnly": False}
+                chosen = ideas.published_suggestions(db, abbreviated)
+                self.assertEqual([c["key"] for c in chosen], ["w-10-50-801"])
+                if "Cedar" in text:
+                    self.assertIn("Q802 (press)", abbreviated["sourceNote"])
             game.executescript((ROOT / "server/knowledge.sql").read_text())
             for card in cards:
                 self.assertEqual(card["records"], 3)
