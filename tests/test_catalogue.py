@@ -548,6 +548,80 @@ class CatalogueTests(unittest.TestCase):
                     play(db,game,both(publisher,genre),"Name a work in the genre Genre published by Studio")
                 self.assertEqual(game.execute("SELECT count(*) FROM kb_member WHERE bank=?",(old,)).fetchone()[0],7)
 
+    def test_form_and_primary_class_answers_share_a_bank_with_independent_withdrawals(self):
+        import gzip
+        import work_forms
+        from graph import digest
+        with closing(sqlite3.connect(self.world)) as world:
+            world.executescript("""
+                INSERT INTO property VALUES(50,'author'),(7937,'form of creative work'),(136,'genre');
+                INSERT INTO entity VALUES(13,'Creator'),(14,'sonata'),(15,'landscape');
+                INSERT INTO triple VALUES(14,279,10),(1,31,14),(1,50,13),(4,7937,15),(7,136,14);
+            """)
+            world.commit()
+        def capture(rule, ids):
+            watched_rules.follow(self.root,rule)
+            rows = [[f"Q{i}",f"Work {i}",[f"Alternative {i}"]] for i in ids]
+            payload = dict(key=rule,rows=rows,revision=digest([rule,rows]),captured=1000)
+            path = dict(watched_rules.requests(self.root))[rule]
+            watched_rules.replace(path,gzip.compress(json.dumps(payload).encode()))
+        def both(a,b):
+            return "and:" + "+".join(sorted((a,b)))
+        author, publisher, form = "w-10-50-13","w-10-123-11","w-10-7937-14"
+        credit = both(author,form)
+        capture(credit,[1,55,56])
+        capture(both(publisher,form),[55,65])
+        capture(both(author,"w-10-7937-15"),[77])  # format with no subclass path to work
+        capture(both(author,"w-10-136-14"),[78])   # genre alone does not classify the work
+        self.publish()
+        prompt = "Name a sonata written by Creator"
+        paired = "Name a sonata written by Creator and published by Studio"
+        def check(db,game,wording,expected):
+            card = catalogue.match_question(db,wording)
+            self.assertEqual(card["records"],len(expected))
+            bank, _ = catalogue.play(db,game,card["key"],wording)
+            members = {int(qid[4:]):json.loads(proof) for qid,proof in game.execute(
+                "SELECT entity,evidence FROM kb_member WHERE bank=?",(bank,))}
+            self.assertEqual(set(members),expected)
+            return members
+        with closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            with closing(catalogue.reader(self.published)) as db:
+                check(db,game,"Name a sonata",{1,55,56,65})
+                card = db.execute("SELECT prompt,n FROM current_question WHERE rule='w-14-50-13'").fetchone()
+                self.assertEqual(tuple(card),(prompt,3))
+                members = check(db,game,prompt,{1,55,56})
+                evidence = [urllib.parse.unquote(e["url"]) for e in members[55] if "url" in e]
+                self.assertTrue(any("wd:Q55 wdt:P7937 wd:Q14" in url and "wd:Q55 wdt:P50 wd:Q13" in url for url in evidence))
+                check(db,game,paired,{1,55})
+                self.assertEqual(list(work_forms.subscriptions(db,["type:Q14","w-14-50-13"])),[form,credit])
+            # A P31-only capture can withdraw the nominal branch without invalidating a verified form.
+            capture("w-14-50-13",[])
+            capture(both("w-14-123-11","w-14-50-13"),[])
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                check(db,game,prompt,{1,55,56})
+                check(db,game,paired,{55})
+            # The exact form and author enumerations also constrain older compound evidence.
+            capture(form,[55,56,65])
+            capture(author,[55])
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                check(db,game,prompt,{55})
+                check(db,game,"Name a sonata",{1,55,56,65})
+                check(db,game,paired,{55})
+            with closing(sqlite3.connect(self.published)) as stage:
+                stage.execute("INSERT INTO current_class VALUES('type:Q14','nominal-v2',1001,0,0)")
+                stage.commit()
+            with closing(catalogue.reader(self.published)) as db:
+                check(db,game,"Name a sonata",{55,56,65})
+            capture(form,[])
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                check(db,game,"Name a sonata",{1})
+                with self.assertRaises(catalogue.RuleWithdrawn):
+                    catalogue.play(db,game,"w-14-50-13",prompt)
+
     def test_watched_world_question_republishes_current_members_and_withdrawals(self):
         key = "w-10-123-11"
         watched_rules.follow(self.root, key)

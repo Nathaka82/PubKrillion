@@ -70,8 +70,13 @@ def card(db, phrase, *, strict=False):
     key = ("kind:" if kinds else "type:") + "Q" + str(cls)
     edition, fmt = db.execute("SELECT edition,format FROM publication").fetchone()
     live = db.execute("SELECT n FROM current_class WHERE rule=?", (key,)).fetchone() if fmt >= 15 else None
+    import work_forms
+    forms = fmt >= 30 and not kinds and work_forms.available(db,key)
     if live:
         count = live[0]
+        if forms:
+            query,args = work_forms.union(db,key,"SELECT id FROM current_member WHERE rule=?",(key,))
+            count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
         if not count and strict:
             from catalogue import RuleWithdrawn
 
@@ -81,12 +86,11 @@ def card(db, phrase, *, strict=False):
         members = KINDS if kinds else MEMBERS
         witnessed = (" UNION SELECT w.id FROM scope CROSS JOIN scope_witness w ON w.cls=scope.id"
                      if fmt >= 29 and not kinds else "")
-        count = db.execute(
-            DESCENDANTS
-            + f""" SELECT count(*) FROM (SELECT DISTINCT m.id FROM ({members}) m
-                JOIN item i ON i.id=m.id WHERE length(i.name) BETWEEN 1 AND 140{witnessed})""",
-            args,
-        ).fetchone()[0]
+        query = DESCENDANTS + f""" SELECT DISTINCT m.id FROM ({members}) m
+                JOIN item i ON i.id=m.id WHERE length(i.name) BETWEEN 1 AND 140{witnessed}"""
+        if forms:
+            query,args = work_forms.union(db,key,query,args)
+        count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
     if not count:
         if strict and not live and fmt >= 27 and db.execute(
             "SELECT 1 FROM source_vocabulary WHERE token=? AND name IS NOT NULL", (f"Q{cls}",)
@@ -126,10 +130,12 @@ def play(db, game, key, prompt):
         raise RuleWithdrawn("This source class is no longer in the publication.")
     plan = {"class": "wd:Q" + str(cls), "classLabel": label[0], "catalogueKey": key}
     file_format = db.execute("SELECT format FROM publication").fetchone()[0]
+    import work_forms
+    forms = file_format >= 30 and not kinds and work_forms.available(db,key)
     if file_format >= 15:
         live = db.execute("SELECT * FROM current_class WHERE rule=?", (key,)).fetchone()
         if live:
-            if not live["n"]:
+            if not live["n"] and not forms:
                 raise RuleWithdrawn("The current source has no named members for this class question.")
             from class_updates import evidence
 
@@ -167,6 +173,8 @@ def play(db, game, key, prompt):
                     },
                     current_records(),
                 )
+                if forms:
+                    work_forms.add_sources(db,graph,key,plan["class"])
                 unnamed = live["scanned"]-live["n"] if file_format>=16 else 0
                 return evaluate(graph, game, prompt, plan, unnamed_members=unnamed,name_catalogue=db)
     db.executescript("DROP TABLE IF EXISTS temp.class_match;")
@@ -209,6 +217,8 @@ def play(db, game, key, prompt):
         if file_format >= 29 and not kinds:
             from scope_evidence import add_sources
             add_sources(db,graph,cls)
+        if forms:
+            work_forms.add_sources(db,graph,key,plan["class"])
         if not graph.execute("SELECT 1 FROM entity LIMIT 1").fetchone():
             raise RuleWithdrawn("This edition has no named members of the source class.")
         # Preserve the actual path connecting each source-reported type to the requested class.

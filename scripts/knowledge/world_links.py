@@ -194,13 +194,18 @@ def joined_release(db, keys, query, args):
 
     revisions, names, dates, evidence = [], {}, [], {}
     inherited = False
-    supports_witnesses = db.execute("SELECT format FROM publication").fetchone()[0] >= 29
+    file_format = db.execute("SELECT format FROM publication").fetchone()[0]
     for key in keys:
         capture = current_members(db, key)
         captures = [(key,*capture)] if capture else []
-        if not capture and supports_witnesses and key.startswith("w-"):
+        if not capture and file_format >= 29 and key.startswith("w-"):
             for origin,revision,checked,blob in scope_evidence.origins(db,key):
                 captures.append((origin,revision,checked,json.loads(gzip.decompress(blob))["rows"]))
+                inherited = True
+        if file_format >= 30 and key.startswith("w-"):
+            import work_forms
+            for extra in work_forms.captured(db,key):
+                captures.append(extra)
                 inherited = True
         for origin,revision,checked,rows in captures:
             revisions.append((key,origin,revision))

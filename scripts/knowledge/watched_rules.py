@@ -202,8 +202,11 @@ def discovered_requests(storage, publication, *, include_topics=False):
         sql = "SELECT rule FROM dated_alternative UNION SELECT key FROM live_rule WHERE key GLOB 'during:*'"
         if include_topics and prior.execute("SELECT 1 FROM sqlite_master WHERE name='source_topic_rule'").fetchone():
             sql += " UNION SELECT rule FROM source_topic_rule"
-        keys = prior.execute(sql).fetchall()
-    for (key,) in keys:
+        keys = {row[0] for row in prior.execute(sql)}
+        if prior.execute("SELECT 1 FROM sqlite_master WHERE name='work_form_scope'").fetchone():
+            from work_forms import subscriptions
+            keys.update(subscriptions(prior,(key for key,_ in rule_keys(storage))))
+    for key in sorted(keys):
         if predicates(key):
             yield key, cache / (digest(key) + ".json.gz")
 

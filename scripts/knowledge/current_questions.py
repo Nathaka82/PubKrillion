@@ -18,6 +18,9 @@ CREATE INDEX scope_names_by_term ON scope_name(term);
 
 
 def recorded_spellings(db):
+    for key,item,name,aliases in db.execute("""SELECT m.rule,i.id,i.name,i.aliases FROM work_form_match m
+            JOIN work_form_item i ON (i.origin,i.id)=(m.origin,m.id) WHERE m.rule GLOB 'type:Q*'"""):
+        yield int(key[6:]), item, name, json.loads(aliases)
     for cls, item, name, aliases in db.execute("""SELECT s.cls,m.id,m.name,m.aliases FROM date_scope s
             JOIN date_member m USING(rule) WHERE m.name IS NOT NULL
             UNION ALL SELECT CASE WHEN rule LIKE 'type:%' THEN CAST(substr(rule,7) AS INTEGER) ELSE 0 END,
@@ -31,7 +34,7 @@ def recorded_spellings(db):
 
 
 def publish(db):
-    from catalogue import named_question, world_clause
+    from catalogue import FORMAT, current_count, named_question, world_clause
     from world_links import display_subject
 
     db.executemany(
@@ -55,7 +58,14 @@ def publish(db):
             CROSS JOIN named_scope s ON s.id=a.id;
         DROP TABLE named_scope;""")
 
-    for key, count in db.execute("SELECT key,n FROM live_rule WHERE n>0 AND key NOT GLOB 'during:*'"):
+    # Publish natural questions for qualified forms even before a host asks for one.
+    rules = dict(db.execute("SELECT key,n FROM live_rule WHERE n>0 AND key NOT GLOB 'during:*'"))
+    import work_forms
+    for key, in db.execute("SELECT DISTINCT rule FROM work_form_match WHERE rule GLOB 'w-*'"):
+        rules.setdefault(key, 0)
+    for key,count in rules.items():
+        if work_forms.available(db,key):
+            count = current_count(db,key,count,FORMAT)
         parts = key[4:].split("+") if key.startswith("and:") else [key]
         clauses = []
         property_clauses = []

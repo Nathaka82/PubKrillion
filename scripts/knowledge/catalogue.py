@@ -17,8 +17,8 @@ from graph import ROOT, class_determiner, digest, folded_spelling, indefinite_ar
 from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
-FORMAT = 29
-RULE_REVISION = "natural-source-questions-1"
+FORMAT = 30
+RULE_REVISION = "classified-work-questions-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -250,6 +250,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
     import attested_names
     import attention
     import scope_evidence
+    import work_forms
     import comparisons
     import taxonomy
     import world_classes
@@ -287,6 +288,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             db.executescript(SCHEMA)
             db.executescript(attention.SCHEMA)
             db.executescript(scope_evidence.SCHEMA)
+            db.executescript(work_forms.SCHEMA)
             db.executescript(comparisons.SCHEMA)
             db.executescript(world_classes.SCHEMA)
             import target_lookup, topic_sources, source_vocabulary
@@ -403,6 +405,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 world_links.publish(db,reuse_links)
                 source_vocabulary.publish(db)
                 scope_evidence.publish(db)
+                work_forms.publish(db)
                 current_questions.publish(db)
                 date_rules.index_questions(db)
                 dated_links.discover(db)
@@ -411,6 +414,8 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             compile_question_text(db)
             db.execute("""UPDATE question_text AS q SET n=(SELECT n FROM live_rule l WHERE l.key=q.rule)
                 WHERE q.rule IN (SELECT key FROM live_rule)""")
+            db.execute("""UPDATE question_text AS q SET n=(SELECT n FROM current_question c WHERE c.rule=q.rule)
+                WHERE q.rule IN (SELECT rule FROM current_question WHERE rule GLOB 'and:*')""")
             db.execute("INSERT INTO publication VALUES(?,?)", (edition, FORMAT))
             db.commit()
             stats = summary(db)
@@ -532,9 +537,15 @@ def world_card(db, row, edition):
 
 
 def current_count(db, key, historical, file_format):
+    import work_forms
     if file_format >= 9:
         row = db.execute("SELECT n FROM live_rule WHERE key=?", (key,)).fetchone()
         if row:
+            if file_format >= 30 and work_forms.available(db,key):
+                from world_links import current_members
+                current = [int(qid[1:]) for qid,_,_ in current_members(db,key)[2]]
+                query,args = work_forms.union(db,key,"SELECT value id FROM json_each(?)",(json.dumps(current),))
+                return db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
             return row[0]
     if file_format >= 17 and key.startswith("w-"):
         from world_links import members
@@ -542,6 +553,8 @@ def current_count(db, key, historical, file_format):
         if file_format >= 29:
             import scope_evidence
             query,args = scope_evidence.members(db,key,query,args)
+        if file_format >= 30:
+            query,args = work_forms.union(db,key,query,args)
         return db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
     return historical
 
@@ -907,7 +920,8 @@ def intersection(db, keys):
         return None
     selects, args, conditions = [], [], []
     if graph:
-        linked = db.execute("SELECT format FROM publication").fetchone()[0]>=17
+        file_format = db.execute("SELECT format FROM publication").fetchone()[0]
+        linked = file_format>=17
         for key in keys:
             ids = re.fullmatch(r"[gw]-(\d+)-(\d+)-(\d+)", key)
             if not ids:
@@ -930,6 +944,9 @@ def intersection(db, keys):
                     if not geo and db.execute("SELECT format FROM publication").fetchone()[0] >= 29:
                         import scope_evidence
                         query,values = scope_evidence.members(db,key,query,values)
+                if file_format >= 30 and not geo:
+                    import work_forms
+                    query,values = work_forms.union(db,key,query,values)
             else:
                 row = db.execute("""SELECT c.name,r.name,t.name FROM pattern p JOIN item c ON c.id=p.cls
                 JOIN predicate r ON r.id=p.prop JOIN item t ON t.id=p.target WHERE cls=? AND prop=? AND target=?""",
@@ -1245,7 +1262,11 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
         from world_links import joined_release
         joined=joined_release(db,key[4:].split("+"),query,args)
         live=joined
-    if live and not live["n"]:
+    import work_forms
+    form_support = (file_format >= 30 and key.startswith(("w-","and:")) and
+                    (work_forms.available(db,key) or joined and any(
+                        work_forms.available(db,part) for part in work_forms.operands(key))))
+    if live and not live["n"] and not form_support:
         raise RuleWithdrawn("The latest source check contains no named members for this rule.")
     captured = date_capture or joined or (json.loads(gzip.decompress(live["release"])) if live else {})
     linked = file_format >= 17 and not live
@@ -1298,6 +1319,9 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
         if linked and file_format >= 29 and key.startswith("w-"):
             from scope_evidence import add_sources
             add_sources(db,graph,cls,rule=key,condition=first)
+        if form_support:
+            included = {int(qid[1:]) for qid,_,_ in joined["rows"]} if joined else None
+            work_forms.add_sources(db,graph,key,root,conditions,included)
         if related_source:
             r=related_source
             graph.execute("INSERT INTO source VALUES(?,?,?,?,'{}')",(r["source"],r["revision"],r["url"],r["captured"]))
