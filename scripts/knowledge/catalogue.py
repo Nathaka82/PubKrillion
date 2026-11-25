@@ -17,8 +17,8 @@ from graph import ROOT, class_determiner, digest, folded_spelling, indefinite_ar
 from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
-FORMAT = 30
-RULE_REVISION = "classified-work-questions-1"
+FORMAT = 31
+RULE_REVISION = "first-use-work-forms-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -360,10 +360,12 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 topics = topic_sources.collect(db,output.parent,offline,previous=output)
                 watched = sorted((t["key"],t["revision"],t.get("discoveryVersion",1)) for t in topics)
                 watched += target_lookup.collect(db,output.parent,offline,previous=output,topic_captures=topics)
+                work_forms.prepare_vocabulary(db,output.parent,output,offline)
                 watched.append(("source-vocabulary", digest([tuple(r) for r in db.execute(
                     "SELECT * FROM source_vocabulary ORDER BY token")])))
                 watched += collect(db, output.parent, offline, publication=output)
-                watched += class_updates.refresh(db,output.parent,offline)
+                watched += class_updates.refresh(db,output.parent,offline,publication=output)
+                watched.append(("work-form-precedence", digest(work_forms.precedence(db))))
                 watched += date_updates.collect(db,output.parent,offline,previous=output)
                 if discover_names and not offline:
                     try:
@@ -404,8 +406,8 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 reuse_links = reuse_world and db.execute("SELECT format FROM prior.publication").fetchone()[0] >= 17
                 world_links.publish(db,reuse_links)
                 source_vocabulary.publish(db)
-                scope_evidence.publish(db)
                 work_forms.publish(db)
+                scope_evidence.publish(db)
                 current_questions.publish(db)
                 date_rules.index_questions(db)
                 dated_links.discover(db)
@@ -1025,6 +1027,10 @@ def match_single(db, prompt, *, include_empty=False, request_target=False):
                                               request_target=request_target)
                 n = current_count(db,key,n,edition[1])
             if not n:
+                if edition[1] >= 31 and key.startswith("w-"):
+                    import work_forms
+                    if work_forms.pending(db,key):
+                        raise UnverifiedRule(key,"The builder can check the recorded form and relationship together.")
                 raise RuleWithdrawn("The latest source check contains no named members for this rule.")
             return {"key": key, "edition": edition[0], "prompt": wording, "records": n, "complete": bool(complete)}
     if edition[1] >= 8:

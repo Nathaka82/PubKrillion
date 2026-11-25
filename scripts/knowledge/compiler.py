@@ -831,6 +831,9 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     if unnamed_members:
         noun = "member" if unnamed_members == 1 else "members"
         coverage += f" The source lists {unnamed_members:,} additional {noun} without a usable name."
+    if unnamed_forms := plan.get("unnamedFormRecords"):
+        noun = "record" if unnamed_forms == 1 else "records"
+        coverage += f" The creative-form check found {unnamed_forms:,} {noun} without a usable name."
     if editions:
         coverage += f" Includes {len(editions)} completed finals from {editions[0]} to {editions[-1]}."
     if plan.get("historicalOperands") or any(s.startswith("world5m-") for s in selected):

@@ -190,7 +190,7 @@ def requests(storage):
     return ((key,cache / (stem + ".json.gz")) for key,stem in rule_keys(storage) if predicates(key))
 
 
-def discovered_requests(storage, publication, *, include_topics=False):
+def discovered_requests(storage, publication, *, include_topics=False, retained_forms=False):
     """Use the published question index as the builder's own subscription list."""
     if publication is None or not publication.is_file():
         return
@@ -199,13 +199,16 @@ def discovered_requests(storage, publication, *, include_topics=False):
         if not prior.execute("SELECT 1 FROM sqlite_master WHERE name='dated_alternative'").fetchone():
             return
         # Keep checking withdrawn captures. A subsequent edition may restore them.
-        sql = "SELECT rule FROM dated_alternative UNION SELECT key FROM live_rule WHERE key GLOB 'during:*'"
-        if include_topics and prior.execute("SELECT 1 FROM sqlite_master WHERE name='source_topic_rule'").fetchone():
-            sql += " UNION SELECT rule FROM source_topic_rule"
-        keys = {row[0] for row in prior.execute(sql)}
-        if prior.execute("SELECT 1 FROM sqlite_master WHERE name='work_form_scope'").fetchone():
-            from work_forms import subscriptions
-            keys.update(subscriptions(prior,(key for key,_ in rule_keys(storage))))
+        if retained_forms:
+            keys = {row[0] for row in prior.execute("SELECT key FROM live_rule WHERE key GLOB 'w-*-7937-*'")}
+        else:
+            sql = "SELECT rule FROM dated_alternative UNION SELECT key FROM live_rule WHERE key GLOB 'during:*'"
+            if include_topics and prior.execute("SELECT 1 FROM sqlite_master WHERE name='source_topic_rule'").fetchone():
+                sql += " UNION SELECT rule FROM source_topic_rule"
+            keys = {row[0] for row in prior.execute(sql)}
+            if prior.execute("SELECT 1 FROM sqlite_master WHERE name='work_form_scope'").fetchone():
+                from work_forms import subscriptions
+                keys.update(subscriptions(prior,(key for key,_ in rule_keys(storage))))
     for key in sorted(keys):
         if predicates(key):
             yield key, cache / (digest(key) + ".json.gz")
@@ -220,7 +223,7 @@ def due_requests(storage, publication=None):
             any(time.time() >= due_at(cached) for _, cached in target_lookup.requests(storage)) or
             any(time.time() >= due_at(cached) for _, cached in requests(storage)) or
             any(time.time() >= due_at(cached) for _, cached in discovered_requests(storage, publication, include_topics=True)) or
-            any(time.time() >= due(file) for _,file in registered(storage)) or
+            any(time.time() >= due(file) for _,file in registered(storage,publication)) or
             any(time.time() >= date_updates.due(file) for _,file in date_updates.registered(storage)))
 
 
@@ -229,25 +232,30 @@ def collect(db, storage, offline, publication=None):
     now = int(time.time())
     requested = dict(requests(storage))
     discovered = dict(discovered_requests(storage, publication))
+    # Prior versions fetched whole forms in a single job. Keep their evidence
+    # while the resumable collector builds the new roster.
+    retained = dict(discovered_requests(storage, publication, retained_forms=True))
     topics = {}
     if db.execute("SELECT 1 FROM sqlite_master WHERE name='source_topic_rule'").fetchone():
         topics = {key: storage / "knowledge-sources" / "world-rules" / (digest(key) + ".json.gz")
                   for key, in db.execute("SELECT DISTINCT rule FROM source_topic_rule")}
     pending = []
     have_targets = db.execute("SELECT 1 FROM sqlite_master WHERE name='current_target'").fetchone()
-    for key, cached in (discovered | topics | requested).items():
+    jobs = {}
+    for queue,group in (("retained",retained), ("builder",discovered), ("topic",topics), ("host",requested)):
+        jobs.update((key,(cached,queue)) for key,cached in group.items())
+    for key,(cached,queue) in jobs.items():
         if any(not (known(db, f"Q{cls}") and known(db, f"P{prop}") and
                     (known(db, f"Q{target}") or have_targets and
                      db.execute("SELECT 1 FROM current_target WHERE id=?", (target,)).fetchone()))
                for cls, prop, target in predicates(key)):
-            if not offline and now >= due_at(cached):
+            if queue != "retained" and not offline and now >= due_at(cached):
                 cached.parent.mkdir(parents=True, exist_ok=True)
                 cached.with_suffix(".attempt").touch()
             continue
-        queue = "host" if key in requested else "topic" if key in topics else "builder"
         pending.append((queue, due_at(cached), key, cached))
     versions = []
-    remaining = {"host": 12, "builder": 2, "topic": 6}
+    remaining = {"host": 12, "builder": 2, "topic": 6, "retained": 0}
     for queue, due, key, cached in sorted(pending):
         if not offline and now >= due and remaining[queue]:
             remaining[queue] -= 1

@@ -23,8 +23,10 @@ def recorded_spellings(db):
         yield int(key[6:]), item, name, json.loads(aliases)
     for cls, item, name, aliases in db.execute("""SELECT s.cls,m.id,m.name,m.aliases FROM date_scope s
             JOIN date_member m USING(rule) WHERE m.name IS NOT NULL
-            UNION ALL SELECT CASE WHEN rule LIKE 'type:%' THEN CAST(substr(rule,7) AS INTEGER) ELSE 0 END,
-            id,name,aliases FROM current_member WHERE name IS NOT NULL"""):
+            UNION ALL SELECT CASE WHEN rule LIKE 'type:%' OR rule LIKE 'form:%'
+            THEN CAST(substr(rule,7) AS INTEGER) ELSE 0 END,
+            id,name,aliases FROM current_member m WHERE name IS NOT NULL AND (m.rule NOT GLOB 'form:Q*' OR
+            EXISTS(SELECT 1 FROM work_form_match w WHERE (w.rule,w.id,w.origin)=('type:'||substr(m.rule,6),m.id,m.rule)))"""):
         yield cls, item, name, json.loads(aliases)
     for key, payload in db.execute("SELECT key,release FROM live_rule"):
         conditions = predicates(key)

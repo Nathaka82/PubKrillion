@@ -178,6 +178,7 @@ class CatalogueTests(unittest.TestCase):
         with closing(sqlite3.connect(file)) as db:
             self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0],class_updates.CAPTURE_FORMAT)
             self.assertEqual(db.execute("SELECT id FROM member").fetchall(),[(101,)])
+            self.assertEqual(db.execute("SELECT id FROM unnamed").fetchall(),[(106,)])
             self.assertEqual(db.execute("SELECT scanned,length(checksum),finished FROM scan").fetchall(),[(2,32,1)]*2)
         self.assertNotEqual(self.publish()["edition"],previous)
 
@@ -617,10 +618,10 @@ class CatalogueTests(unittest.TestCase):
                 INSERT INTO triple VALUES(14,279,10),(1,31,14),(1,50,13),(4,7937,15),(7,136,14);
             """)
             world.commit()
-        def capture(rule, ids):
+        def capture(rule, ids, checked=1000):
             watched_rules.follow(self.root,rule)
             rows = [[f"Q{i}",f"Work {i}",[f"Alternative {i}"]] for i in ids]
-            payload = dict(key=rule,rows=rows,revision=digest([rule,rows]),captured=1000)
+            payload = dict(key=rule,rows=rows,revision=digest([rule,rows]),captured=checked)
             path = dict(watched_rules.requests(self.root))[rule]
             watched_rules.replace(path,gzip.compress(json.dumps(payload).encode()))
         def both(a,b):
@@ -674,11 +675,101 @@ class CatalogueTests(unittest.TestCase):
             with closing(catalogue.reader(self.published)) as db:
                 check(db,game,"Name a sonata",{55,56,65})
             capture(form,[])
-            self.publish()
+            withdrawn = self.publish()["edition"]
             with closing(catalogue.reader(self.published)) as db:
                 check(db,game,"Name a sonata",{1})
                 with self.assertRaises(catalogue.RuleWithdrawn):
                     catalogue.play(db,game,"w-14-50-13",prompt)
+            capture(credit,[1,55,56],1001)
+            self.assertNotEqual(self.publish()["edition"],withdrawn)
+            with closing(catalogue.reader(self.published)) as db:
+                check(db,game,prompt,{1,55,56})
+            capture(form,[],1002)
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                with self.assertRaises(catalogue.RuleWithdrawn):
+                    catalogue.play(db,game,"w-14-50-13",prompt)
+
+    def test_first_use_discovers_a_creative_form_without_an_existing_form_question(self):
+        import source_vocabulary
+        import work_forms
+        with closing(sqlite3.connect(self.world)) as db:
+            db.executescript("""
+                INSERT INTO entity VALUES(21,'opera'),(22,'composer Vega'),(23,'song cycle'),(24,'local device');
+                INSERT INTO property VALUES(86,'composer');
+                INSERT INTO triple VALUES(21,279,386724),(23,279,386724),(24,279,10),(1,31,21),(1,86,22);
+            """)
+            db.commit()
+        self.publish()
+        nominal, qualified, category = "w-21-86-22", "and:w-386724-7937-21+w-386724-86-22", "type:Q21"
+        for key in (nominal,category,"type:Q10"):
+            watched_rules.follow(self.root,key)
+        with closing(catalogue.reader(self.published)) as db:
+            self.assertEqual(set(work_forms.subscriptions(db,[nominal,category])),{qualified})
+            self.assertFalse(list(work_forms.subscriptions(db,["w-10-123-11"])))
+            for question,key in [("Name a song cycle","type:Q23"),("Name a local device","type:Q24")]:
+                with self.assertRaises(catalogue.UnverifiedRule) as missing:
+                    catalogue.match_question(db,question)
+                self.assertIn(key,missing.exception.requests)
+        files = dict(class_updates.registered(self.root,self.published))
+        self.assertIn("form:Q21",files)
+        self.assertNotIn("form:Q10",files)
+        def response(ids, query):
+            if "COUNT(" in query:
+                return [{"n":{"value":str(len(ids))}}]
+            return [{"item":{"value":f"http://www.wikidata.org/entity/Q{i}"}} for i in ids]
+        def names(page):
+            for row in page:
+                qid = row["item"]["value"].split("/")[-1]
+                if qid == "Q57":
+                    continue
+                yield qid, "Work " + qid[1:], ["Other name " + qid[1:]], 1
+        def check_form(query):
+            self.assertIn("wdt:P7937 wd:Q21",query)
+            self.assertIn("wd:Q21 wdt:P279+ wd:Q386724",query)
+            return response([1,55,56,57],query)
+        with (patch.object(class_updates,"bindings",side_effect=check_form),
+              patch.object(class_updates,"named_items",side_effect=names),
+              patch.object(class_updates.time,"time",return_value=int(time.time())+300)):
+            class_updates.advance("form:Q21",files["form:Q21"])
+        def credits(query):
+            if "wdt:P7937" in query:
+                self.assertIn("wdt:P86 wd:Q22",query)
+                self.assertIn("wdt:P31/wdt:P279* wd:Q386724",query)
+                return response([55,57,60],query)
+            return response([1],query)
+        with closing(sqlite3.connect(":memory:")) as stage:
+            stage.execute("ATTACH ? AS world",(str(self.world),))
+            stage.executescript(source_vocabulary.SCHEMA+"CREATE TABLE live_rule(key,revision,captured,n,release);")
+            with patch.object(source_vocabulary,"capture",return_value={
+                    "Q386724":["work of creation",[]], "P7937":["form of creative work",[]]}) as metadata:
+                work_forms.prepare_vocabulary(stage,self.root,self.published,False)
+                self.assertEqual(set(metadata.call_args.args[0]),{"Q386724","P7937"})
+            def credit_names(page):
+                for row in page:
+                    i=row["item"]["value"].split("/")[-1]
+                    yield i,"Work "+i[1:],[],1
+            with patch.object(watched_rules,"bindings",side_effect=credits),patch.object(watched_rules,"named_items",side_effect=credit_names):
+                watched_rules.collect(stage,self.root,False,publication=self.published)
+        self.publish()
+        with closing(catalogue.reader(self.published)) as db, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT/"server/knowledge.sql").read_text())
+            for prompt,expected in [("Name an opera",{1,55,56,57}),("Name an opera composed by composer Vega",{1,55,57})]:
+                card = catalogue.match_question(db,prompt)
+                bank,meta = catalogue.play(db,game,card["key"],prompt)
+                members = {int(qid[4:]): json.loads(proof) for qid,proof in game.execute(
+                    "SELECT entity,evidence FROM kb_member WHERE bank=?",(bank,))}
+                self.assertEqual(set(members),expected)
+                self.assertEqual(card["records"],len(expected))
+                if card["key"] == category:
+                    self.assertIn("1 record without a usable name",meta["coverage"])
+                self.assertTrue(any("wdt:P7937 wd:Q21" in urllib.parse.unquote(entry.get("url",""))
+                                    for entry in members[55]))
+            explicit = db.execute("SELECT prompt,n FROM current_question WHERE rule=?",(qualified,)).fetchone()
+            self.assertEqual(explicit[1],2)
+            bank,_ = catalogue.play(db,game,qualified,explicit[0])
+            self.assertEqual({i for i, in game.execute("SELECT entity FROM kb_member WHERE bank=?",(bank,))},
+                             {"wd:Q55","wd:Q57"})
 
     def test_watched_world_question_republishes_current_members_and_withdrawals(self):
         key = "w-10-123-11"

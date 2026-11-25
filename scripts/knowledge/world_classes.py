@@ -21,7 +21,8 @@ def publish(db, *, current_taxonomy=False):
     else:
         db.execute("INSERT OR IGNORE INTO world_parent SELECT o,s FROM world.triple WHERE p=279 AND s<>o")
     db.execute("INSERT OR IGNORE INTO world_role SELECT o,s FROM world.triple WHERE p=106")
-    keys = """SELECT cls FROM world_member UNION SELECT role FROM world_role UNION SELECT parent FROM world_parent"""
+    keys = """SELECT cls FROM world_member UNION SELECT role FROM world_role UNION SELECT parent FROM world_parent
+              UNION SELECT child FROM world_parent"""
 
     def names():
         for cls, label, aliases in db.execute(f"""SELECT i.id,i.name,i.aliases FROM ({keys}) k
@@ -78,6 +79,9 @@ def card(db, phrase, *, strict=False):
             query,args = work_forms.union(db,key,"SELECT id FROM current_member WHERE rule=?",(key,))
             count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
         if not count and strict:
+            if fmt >= 31 and work_forms.pending(db,key):
+                from catalogue import UnverifiedRule
+                raise UnverifiedRule(key,"The builder can check works recorded with this form.")
             from catalogue import RuleWithdrawn
 
             raise RuleWithdrawn("The current source has no named members for this class question.")
@@ -92,9 +96,9 @@ def card(db, phrase, *, strict=False):
             query,args = work_forms.union(db,key,query,args)
         count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
     if not count:
-        if strict and not live and fmt >= 27 and db.execute(
+        if strict and not live and (fmt >= 31 or fmt >= 27 and db.execute(
             "SELECT 1 FROM source_vocabulary WHERE token=? AND name IS NOT NULL", (f"Q{cls}",)
-        ).fetchone():
+        ).fetchone()):
             from catalogue import UnverifiedRule
             raise UnverifiedRule(key, "The builder has learned this class and can verify its full answer list.")
         return None
@@ -132,6 +136,10 @@ def play(db, game, key, prompt):
     file_format = db.execute("SELECT format FROM publication").fetchone()[0]
     import work_forms
     forms = file_format >= 30 and not kinds and work_forms.available(db,key)
+    if file_format >= 31 and not kinds:
+        roster = db.execute("SELECT scanned-n FROM current_class WHERE rule=?", (f"form:Q{cls}",)).fetchone()
+        if roster and roster[0] and cls in work_forms.work_classes(db, [cls]):
+            plan["unnamedFormRecords"] = roster[0]
     if file_format >= 15:
         live = db.execute("SELECT * FROM current_class WHERE rule=?", (key,)).fetchone()
         if live:

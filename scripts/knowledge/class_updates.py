@@ -14,15 +14,21 @@ from sources import fetch, named_items, named_record
 from world_facts import bindings, member_count, member_page, roster_hash
 
 KEY = re.compile(r"(type|kind):(Q[1-9]\d{0,11})")
-CAPTURE_FORMAT = 4
+SOURCE_KEY = re.compile(r"(type|kind|form):(Q[1-9]\d{0,11})")
+CAPTURE_FORMAT = 5
 SCHEMA = """
 CREATE TABLE current_class(rule TEXT PRIMARY KEY,revision TEXT,captured INTEGER,n INTEGER,scanned INTEGER);
 CREATE TABLE current_member(rule TEXT,id INTEGER,name TEXT,aliases TEXT,PRIMARY KEY(rule,id)) WITHOUT ROWID;
+CREATE TABLE current_unnamed(rule TEXT,id INTEGER,PRIMARY KEY(rule,id)) WITHOUT ROWID;
 """
 
 
 def condition(key, item="?item"):
-    kind, cls = KEY.fullmatch(key).groups()
+    kind, cls = SOURCE_KEY.fullmatch(key).groups()
+    if kind == "form":
+        from work_forms import WORK
+        return (f"{item} wdt:P7937 wd:{cls} . {item} wdt:P31/wdt:P279* wd:Q{WORK} . "
+                f"wd:{cls} wdt:P279+ wd:Q{WORK} .")
     if kind == "kind":
         return f"{item} wdt:P279+ wd:{cls} . FILTER({item} != wd:{cls})"
     return f"{item} (wdt:P31|wdt:P106)/wdt:P279* wd:{cls} ."
@@ -34,10 +40,11 @@ def evidence(key, qid):
     )
 
 
-def registered(storage):
+def registered(storage, publication=None):
     from watched_rules import requests_folder
 
     folder = storage / "knowledge-sources" / "world-classes"
+    types = []
     for registration in requests_folder(storage).glob("*.rule"):
         if not re.fullmatch(r"[a-f0-9]{64}", registration.stem) or registration.stat().st_size > 40:
             continue
@@ -47,6 +54,12 @@ def registered(storage):
             continue
         if KEY.fullmatch(key) and registration.stem == digest(key):
             yield key, folder / (registration.stem + ".sqlite")
+            if key.startswith("type:"):
+                types.append(int(key[6:]))
+    from work_forms import prior_work_classes
+    for form in sorted(prior_work_classes(publication, types)):
+        key = f"form:Q{form}"
+        yield key, folder / (digest(key) + ".sqlite")
 
 
 def due(file, capture_format=CAPTURE_FORMAT):
@@ -64,11 +77,15 @@ def due(file, capture_format=CAPTURE_FORMAT):
 
 def fingerprint(db, key):
     checksum = hashlib.sha256(key.encode("ascii"))
-    if db.execute("PRAGMA user_version").fetchone()[0] >= 4:
+    version = db.execute("PRAGMA user_version").fetchone()[0]
+    if version >= 4:
         scans = db.execute("SELECT scanned,checksum FROM scan WHERE finished=1 ORDER BY pass").fetchall()
         if len(scans) != 2 or scans[0] != scans[1] or len(scans[0][1]) != 32:
             raise ValueError("The class capture has no matching membership verification.")
         checksum.update(b"\x00roster-v1\x00" + str(scans[0][0]).encode("ascii") + scans[0][1])
+    if version >= 5:
+        for item, in db.execute("SELECT id FROM unnamed ORDER BY id"):
+            checksum.update(b"\x00unnamed:" + str(item).encode("ascii"))
     for row in db.execute("SELECT id,name,aliases FROM member ORDER BY id"):
         checksum.update(json.dumps(list(row), ensure_ascii=False, separators=(",", ":")).encode() + b"\n")
     return checksum.hexdigest()
@@ -110,6 +127,7 @@ def page_names(page):
 
 def restart_scan(db):
     db.execute("DELETE FROM member")
+    db.execute("DELETE FROM unnamed")
     db.execute("DELETE FROM scan")
     db.executemany("INSERT INTO scan VALUES(?,'',0,?,0)", [(n, bytes(32)) for n in (1, 2)])
 
@@ -122,6 +140,7 @@ def advance(key, file, *, pages=2, page_size=200):
         db.executescript("""CREATE TABLE IF NOT EXISTS scan(pass INTEGER PRIMARY KEY,cursor TEXT,
                 scanned INTEGER,checksum BLOB,finished INTEGER);
             CREATE TABLE IF NOT EXISTS member(id INTEGER PRIMARY KEY,name TEXT,aliases TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS unnamed(id INTEGER PRIMARY KEY);
             CREATE TABLE IF NOT EXISTS release(rule TEXT PRIMARY KEY,revision TEXT,captured INTEGER,n INTEGER);""")
         with db:
             if db.execute("PRAGMA user_version").fetchone()[0] != CAPTURE_FORMAT:
@@ -147,7 +166,7 @@ def advance(key, file, *, pages=2, page_size=200):
                         restart_scan(db)
                     raise ValueError("Membership changed during pagination. The publisher will repeat the class check.")
             if scan == 2 and finished and not scanned:
-                cls = KEY.fullmatch(key)[2]
+                cls = SOURCE_KEY.fullmatch(key)[2]
                 args = urllib.parse.urlencode(
                     {"action": "wbgetentities", "ids": cls, "props": "info", "format": "json"}
                 )
@@ -156,13 +175,19 @@ def advance(key, file, *, pages=2, page_size=200):
                     raise ValueError("The source could not confirm the empty class.")
             names = [(int(qid[1:]), name, json.dumps(sorted(aliases), ensure_ascii=False))
                      for qid, name, aliases, _ in named_items(page)] if scan == 1 else []
-            if scan == 1 and finished and scanned and not names and not db.execute(
+            if scan == 1 and finished and scanned and not key.startswith("form:") and not names and not db.execute(
                     "SELECT 1 FROM member LIMIT 1").fetchone():
                 with db:
                     restart_scan(db)
                 raise ValueError("The source listed class members without usable names.")
             with db:
                 db.executemany("INSERT INTO member VALUES(?,?,?)", names)
+                if scan == 1:
+                    named = {row[0] for row in names}
+                    page_ids = {int(url.rsplit("/Q",1)[1]) for url in urls}
+                    if not named <= page_ids:
+                        raise ValueError("A name belongs to an entity outside the class page.")
+                    db.executemany("INSERT INTO unnamed VALUES(?)", ((item,) for item in page_ids - named))
                 db.execute("UPDATE scan SET cursor=?,scanned=?,checksum=?,finished=? WHERE pass=?",
                            (cursor,scanned,checksum,finished,scan))
                 if scan == 2 and finished:
@@ -177,15 +202,15 @@ def advance(key, file, *, pages=2, page_size=200):
         file.with_suffix(".retry").unlink(missing_ok=True)
 
 
-def refresh(db, storage, offline):
+def refresh(db, storage, offline, publication=None):
     from world_index import install_lock
     from source_vocabulary import known
 
     now = time.time()
     editions = []
     attempted = 0
-    for key, file in sorted(registered(storage), key=lambda pair: (due(pair[1]), pair[0])):
-        cls = int(KEY.fullmatch(key)[2][1:])
+    for key, file in sorted(registered(storage,publication), key=lambda pair: (due(pair[1]), pair[0])):
+        cls = int(SOURCE_KEY.fullmatch(key)[2][1:])
         if not known(db, f"Q{cls}"):
             if not offline and due(file) <= now:
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -220,6 +245,11 @@ def refresh(db, storage, offline):
                     scanned = saved.execute("SELECT scanned FROM progress WHERE rule=?",(key,)).fetchone()[0]
                 if scanned<release[3]:
                     raise ValueError("The current Wikidata class has more names than source members.")
+                if saved.execute("PRAGMA user_version").fetchone()[0] >= 5:
+                    if scanned-release[3] != saved.execute("SELECT count(*) FROM unnamed").fetchone()[0]:
+                        raise ValueError("The class capture is missing membership identities.")
+                    db.executemany("INSERT INTO current_unnamed VALUES(?,?)",
+                                   ((key,i) for i, in saved.execute("SELECT id FROM unnamed")))
                 db.execute("INSERT INTO current_class VALUES(?,?,?,?,?)", (*release,scanned))
                 db.executemany(
                     "INSERT INTO current_member VALUES(?,?,?,?)",
