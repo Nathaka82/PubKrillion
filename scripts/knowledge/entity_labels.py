@@ -58,6 +58,17 @@ def forms(name, aliases):
     )
 
 
+def eligibility_key(graph):
+    """Identify the public subjects of a bank independently of its wording, scores and aliases."""
+    key = hashlib.sha256()
+    found = False
+    for (item,) in graph.execute("""SELECT id FROM qualified WHERE id GLOB 'wd:Q[1-9]*'
+            AND id='wd:Q'||CAST(substr(id,5) AS INTEGER) ORDER BY id"""):
+        key.update(item.encode("ascii") + b"\n")
+        found = True
+    return key.hexdigest() if found else ""
+
+
 def put(db, rows):
     db.executemany(
         """INSERT INTO label_record VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE
@@ -153,17 +164,33 @@ def request(storage, publication, game, bank):
     """Queue distinct public IDs. Rooms, guesses and prompt text stay in the game."""
     from watched_rules import requests_folder
 
+    membership = game.execute(
+        "SELECT json_extract(metadata,'$.nameAuditSet') FROM kb_bank WHERE id=?", (bank,)
+    ).fetchone()
+    if not membership or membership[0] == "":
+        return
+    # Banks from an earlier compiler still have the membership evidence needed below.
+    fingerprint = membership[0]
+    key = "owners-v2:" + (
+        fingerprint if isinstance(fingerprint, str) and re.fullmatch("[0-9a-f]{64}", fingerprint) else bank
+    )
     folder = requests_folder(storage)
     folder.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(folder / "entity-labels.sqlite", timeout=2)) as queue:
         queue.executescript(QUEUE)
-        if queue.execute("SELECT 1 FROM requested WHERE bank=?", (bank,)).fetchone():
+        if queue.execute("SELECT 1 FROM requested WHERE bank=?", (key,)).fetchone():
             return
         with queue:
             rows = game.execute(
-                """SELECT CAST(substr(entity,5) AS INTEGER) FROM kb_member WHERE bank=?
+                """WITH owners(entity) AS (
+                    SELECT entity FROM kb_member WHERE bank=?
+                    UNION ALL
+                    SELECT DISTINCT json_extract(p.value,'$.entity') AS other FROM kb_member m,
+                        json_each(m.evidence) p WHERE m.bank=? AND p.type='object' AND json_type(p.value,'$.classes')='array'
+                        AND json_extract(p.value,'$.entity')<>m.entity)
+                SELECT CAST(substr(entity,5) AS INTEGER) FROM owners WHERE entity GLOB 'wd:Q[1-9]*'
                 AND entity='wd:Q'||CAST(substr(entity,5) AS INTEGER)""",
-                (bank,),
+                (bank, bank),
             )
             ranked = bool(
                 publication.execute("SELECT 1 FROM sqlite_master WHERE name='readership'").fetchone()
@@ -181,10 +208,10 @@ def request(storage, publication, game, bank):
                 )
                 queue.executemany(
                     """INSERT INTO wanted VALUES(?,?) ON CONFLICT(id) DO UPDATE
-                    SET priority=max(priority,excluded.priority)""",
+                    SET priority=excluded.priority WHERE excluded.priority>wanted.priority""",
                     ranks,
                 )
-            queue.execute("INSERT OR IGNORE INTO requested VALUES(?)", (bank,))
+            queue.execute("INSERT OR IGNORE INTO requested VALUES(?)", (key,))
 
 
 def queue_path(storage):
@@ -238,7 +265,7 @@ def refresh(world, storage, *, batches=6, size=40):
                             r[0]
                             for r in cache.execute(
                                 """SELECT c.id FROM label_record c
-                            JOIN requests.wanted w ON w.id=c.id WHERE c.checked<?
+                            JOIN requests.wanted w ON w.id=c.id WHERE w.id>0 AND c.checked<?
                             ORDER BY c.checked,w.priority DESC,w.id LIMIT ?""",
                                 (now - 7 * 86400, size),
                             )
@@ -248,7 +275,7 @@ def refresh(world, storage, *, batches=6, size=40):
                             r[0]
                             for r in cache.execute(
                                 """SELECT w.id FROM requests.wanted w
-                            WHERE NOT EXISTS(SELECT 1 FROM label_record c WHERE c.id=w.id)
+                            WHERE w.id>0 AND NOT EXISTS(SELECT 1 FROM label_record c WHERE c.id=w.id)
                             ORDER BY w.priority DESC,w.id LIMIT ?""",
                                 (size,),
                             )
@@ -287,7 +314,7 @@ def refresh(world, storage, *, batches=6, size=40):
         pending = (
             queued
             and cache.execute("""SELECT 1 FROM requests.wanted w
-            WHERE NOT EXISTS(SELECT 1 FROM label_record c WHERE c.id=w.id) LIMIT 1""").fetchone()
+            WHERE w.id>0 AND NOT EXISTS(SELECT 1 FROM label_record c WHERE c.id=w.id) LIMIT 1""").fetchone()
         )
         finished = int(time.time())
         with cache:

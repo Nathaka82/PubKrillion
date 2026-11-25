@@ -918,6 +918,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         "sourceJudged": True,
         "nameIndex": 2,
         "observedTeams": population,
+        "nameAuditSet": entity_labels.eligibility_key(db),
         **({"choiceSignature": digest(observed)} if observed else {}),
         "examples": [row[0] for row in db.execute(
             """SELECT name FROM (SELECT name,depth,row_number() OVER

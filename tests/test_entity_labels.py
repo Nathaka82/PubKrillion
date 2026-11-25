@@ -29,6 +29,51 @@ class EntityLabels(unittest.TestCase):
             self.world, self.edition, self.root / "feeds", offline=True, include_bundled=False
         )
 
+    def test_queue_includes_every_public_owner_and_reuses_the_same_set_across_prompts(self):
+        from compiler import evaluate
+        from graph import ingest, open_graph
+
+        with closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            source = {"source": "works", "revision": "1", "url": "https://example.org", "terms": {"work": []}}
+            rows = [
+                {"id": item, "name": name, "types": ["work"]}
+                for item, name in (
+                    ("local:1", "Shared"),
+                    ("wd:Q1", "Shared"),
+                    ("wd:Q2", "SHARED"),
+                    ("wd:Q3", "Other work"),
+                    ("wd:Q0", "Invalid zero"),
+                    ("wd:Q-5", "Invalid negative"),
+                    ("wd:Q04", "Invalid leading zero"),
+                )
+            ]
+            ingest(graph, source, rows)
+            first, meta = evaluate(graph, game, "Name a work")
+            second, other = evaluate(graph, game, "Name one work", {"class": "work"})
+            self.assertEqual(meta["nameAuditSet"], other["nameAuditSet"])
+            self.assertNotEqual(first, second)
+            # A relationship target occurring in the proof is not a qualifying subject.
+            game.execute(
+                """UPDATE kb_member SET evidence=json_insert(evidence,'$[#]',
+                json('{"entity":"wd:Q99","relation":"publisher"}')) WHERE bank=?""",
+                (first,),
+            )
+            entity_labels.request(self.root, graph, game, first)
+            entity_labels.request(self.root, graph, game, second)
+            with closing(sqlite3.connect(entity_labels.queue_path(self.root))) as queue:
+                self.assertEqual(list(queue.execute("SELECT id FROM wanted ORDER BY id")), [(1,), (2,), (3,)])
+                self.assertEqual(queue.execute("SELECT count(*) FROM requested").fetchone()[0], 1)
+                # A previous version may have recorded a bank after checking its representatives only.
+                queue.execute("DELETE FROM wanted WHERE id=2")
+                queue.execute("INSERT INTO requested VALUES(?)", (first,))
+                queue.commit()
+                game.execute(
+                    "UPDATE kb_bank SET metadata=json_remove(metadata,'$.nameAuditSet') WHERE id=?", (first,)
+                )
+                entity_labels.request(self.root, graph, game, first)
+                self.assertEqual(queue.execute("SELECT count(*) FROM wanted").fetchone()[0], 3)
+
     def test_names_change_the_checker_search_and_alias_conflicts_without_changing_membership(self):
         with closing(sqlite3.connect(self.world)) as world:
             world.execute("""UPDATE entity SET names=names||char(9)||'Work 1 (1999 film)'||
@@ -126,6 +171,7 @@ class EntityLabels(unittest.TestCase):
             queue.parent.mkdir(parents=True, exist_ok=True)
             with closing(sqlite3.connect(queue)) as want:
                 want.executescript(entity_labels.QUEUE)
+                want.execute("INSERT INTO wanted VALUES(-5,1000)")
                 want.execute("INSERT INTO wanted VALUES(7,100)")
                 want.commit()
             with closing(sqlite3.connect(entity_labels.file(self.root))) as cache:
