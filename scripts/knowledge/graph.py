@@ -10,6 +10,50 @@ from decimal import Decimal, DecimalException
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def indefinite_article(noun):
+    """Choose the English article for a displayed class or reference name."""
+    first = noun.strip().split(maxsplit=1)[0] if noun.strip() else ""
+    word = unicodedata.normalize("NFKD", first).lower()
+    # Initials such as EU, US and MRI have different onsets from ordinary words.
+    letters = first.partition("-")[0].replace(".", "")
+    if letters.isascii() and letters.isupper() and (
+        len(letters) <= 2 or "." in first or re.match(r"^[BCDFGHJKLMNPQRSTVWXZ]{2}", letters)
+    ):
+        return "an" if letters[0] in "AEFHILMNORSX" else "a"
+    if word.startswith(("honest", "honor", "honour", "hour", "heir", "euler")):
+        return "an"
+    if (word.startswith(("eu", "ewe", "uniqu", "univ", "union", "unit", "unif", "unil", "unicor",
+                         "unicy", "use", "user", "usual", "util", "uten", "ubiq", "utop"))
+            or re.match(r"^(?:one|once)\b", word)):
+        return "a"
+    return "an" if word[:1] and word[0] in "aeiou" else "a"
+
+
+def question_noun(label):
+    first = label.split(" ", 1)[0]
+    if (first.partition("-")[0].isupper() or first in ("European", "United", "English")
+            or any(c.isupper() for c in first[1:])):
+        return label
+    return label[:1].lower() + label[1:]
+
+
+def plural_class_head(label):
+    phrase = re.split(r"\s+(?:of|in|from|for|with|on|at|by|and)\s", label, maxsplit=1, flags=re.I)[0]
+    head = re.search(r"\b([a-z]+s)$", phrase, re.I)
+    if head and not head[1].lower().endswith(("ss", "us", "is", "ics", "news", "series", "species")):
+        return head
+
+
+def class_determiner(label):
+    # Plural collection titles can have no singular alias in their source.
+    head = plural_class_head(label)
+    if head and re.match(r"\s+(?:of|in|from)\s", label[head.end():], re.I):
+        return "one of the"
+    return indefinite_article(label)
+
+
 UNITS = {
     "mm": ("length", 0.1),
     "cm": ("length", 1),

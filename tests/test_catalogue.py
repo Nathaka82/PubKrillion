@@ -459,6 +459,41 @@ class CatalogueTests(unittest.TestCase):
                 self.assertEqual(game.execute("SELECT name FROM kb_member WHERE bank=?",(bank,)).fetchone()[0],"Current 44001")
                 self.assertEqual(game.execute("SELECT name FROM kb_member WHERE bank=?",(old,)).fetchone()[0],"Current 2")
 
+    def test_question_wording_uses_attested_singulars_and_understands_earlier_phrases(self):
+        with closing(sqlite3.connect(self.world)) as world:
+            world.executescript("""
+                UPDATE entity SET names='Municipalities of Aster'||char(9)||'municipality of Aster' WHERE id=10;
+                INSERT INTO title VALUES(10,'Municipalities of Aster','municipalities of aster');
+                INSERT INTO property VALUES(47,'shares border with');
+                INSERT INTO triple SELECT s,47,o FROM triple WHERE p=123;
+            """)
+            world.commit()
+        self.publish()
+        with closing(catalogue.reader(self.published)) as db:
+            earlier = 'Name a municipalities of Aster with “shares border with” recorded as Studio'
+            natural = 'Name a municipality of Aster that has shared a border with Studio'
+            for prompt in (earlier, natural, 'Name a municipality of Aster bordering Studio'):
+                card = catalogue.match_question(db,prompt)
+                self.assertEqual((card["key"],card["records"]),("w-10-47-11",5))
+            self.assertEqual(catalogue.match_question(db,natural)["prompt"],natural)
+            self.assertEqual(catalogue.match_question(db,"Name a municipalities of Aster")["prompt"],
+                             "Name a municipality of Aster")
+            with closing(sqlite3.connect(":memory:")) as game:
+                game.executescript((ROOT / "server/knowledge.sql").read_text())
+                _, meta = catalogue.play(db,game,card["key"],natural)
+                self.assertIn("historical borders",meta["playerRule"])
+        from graph import indefinite_article
+        for subject in ("university","European city","United Kingdom constituency","one-act play","NASA mission","UK port"):
+            self.assertEqual(indefinite_article(subject),"a")
+        for subject in ("unidentified object","hour","honorary title","MRI scanner","F.B.I. office","X-ray","EU member"):
+            self.assertEqual(indefinite_article(subject),"an")
+        self.assertEqual(catalogue.world_question("FBI agent",19,"place of birth","Leeds"),
+                         "Name an FBI agent whose place of birth is Leeds")
+        self.assertEqual(catalogue.named_question("X-ray source","in this catalogue"),
+                         "Name an X-ray source in this catalogue")
+        self.assertEqual(catalogue.world_question("Municipalities of Spain",47,"shares border with","Aster"),
+                         "Name one of the municipalities of Spain that has shared a border with Aster")
+
     def test_narrower_evidence_extends_its_class_and_operands_and_can_be_joined_by_id(self):
         import gzip
         from graph import digest

@@ -2,8 +2,9 @@
 
 import gzip
 import json
+import re
 
-from graph import folded_spelling
+from graph import folded_spelling, plural_class_head
 from world_classes import DESCENDANTS
 
 SCHEMA = """
@@ -153,8 +154,23 @@ def target_label(db, target):
 
 
 def display_subject(db, cls, label):
-    """Prefer an attested, unambiguous alias over a parenthesised catalogue title."""
-    import re
+    """Choose a singular, unambiguous class name when the source supplies one."""
+    # Class labels are often Wikipedia list titles such as "Municipalities of Spain".
+    # Only use an inflection if that exact spelling is independently indexed for the class.
+    head = plural_class_head(label)
+    if head:
+        word = head[1]
+        stems = [word[:-1]]
+        if word.lower().endswith("ies"):
+            stems.insert(0, word[:-3] + "y")
+        elif word.lower().endswith(("ches", "shes", "sses", "xes", "zes")):
+            stems.insert(0, word[:-2])
+        for stem in stems:
+            singular = label[:head.start()] + stem + label[head.end():]
+            term = folded_spelling(singular)
+            if (db.execute("SELECT 1 FROM world_class_name WHERE term=? AND cls=?", (term, cls)).fetchone()
+                    and identifiers(db, term, "class") == [cls]):
+                return singular
     if parts := re.fullmatch(r"(.+) \(([^()]+)\)",label):
         candidate=parts[2]+" "+parts[1].lower()
         if identifiers(db,folded_spelling(candidate),"class")==[cls]:

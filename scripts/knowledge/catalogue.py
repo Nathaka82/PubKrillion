@@ -13,12 +13,12 @@ import urllib.request
 from contextlib import closing
 from pathlib import Path
 
-from graph import ROOT, digest, folded_spelling, ingest, norm, open_graph, spelling
+from graph import ROOT, class_determiner, digest, folded_spelling, indefinite_article, ingest, norm, open_graph, question_noun, spelling
 from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
 FORMAT = 29
-RULE_REVISION = "source-vocabulary-1"
+RULE_REVISION = "natural-source-questions-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -182,7 +182,7 @@ def compile_feed_patterns(db):
                                          if ":" in target or qid else target)
         if re.search(r"://|^[\w.-]+:|^Q\d+$", label) or "@" in label or re.match(r"^[a-z]+-[a-z]+-", cls):
             continue
-        article = "an" if cls[:1].lower() in "aeiou" else "a"
+        article = indefinite_article(cls)
         if relation == "standard state":
             phrase, label = "whose standard state is", label.lower()
         elif relation == "group":
@@ -480,14 +480,17 @@ RELATION_PHRASES = {
     495: "whose country of origin is", 725: "with a voice performance by", 750: "distributed by",
     676: "with lyrics by", 793: "whose recorded events include", 840: "set in", 915: "filmed in",
     921: "whose main subject is", 7937: "in the form of",
+    47: "that has shared a border with", 54: "whose sports teams include", 69: "educated at",
+    166: "awarded", 171: "whose parent taxon is", 734: "with the family name",
+    735: "with the given name", 3373: "whose siblings include",
 }
 
 
 def named_question(subject, clause):
-    subject = subject if subject.isupper() else subject[:1].lower() + subject[1:]
+    subject = question_noun(subject)
     if subject == "human":
         subject = "person"
-    article = "an" if subject[:1].lower() in "aeiou" else "a"
+    article = class_determiner(subject)
     return f"Name {article} {subject} {clause}"
 
 
@@ -505,7 +508,7 @@ def world_question(subject, prop, relation, target):
 
 
 def register_card(db, row, edition):
-    article = "an" if row["class"][:1].lower() in "aeiou" else "a"
+    article = indefinite_article(row["class"])
     source = row["source"] if "source" in row.keys() else None
     wording = db.execute("SELECT prompt FROM wording WHERE class=? AND source=coalesce(?,class)",
                          (row["class"], source)).fetchone()
@@ -543,7 +546,7 @@ def current_count(db, key, historical, file_format):
     return historical
 
 
-COMMAND = re.compile(r"^(?:(?:please |can you )?(?:name|identify|list|give me)) (?:an? |the )?")
+COMMAND = re.compile(r"^(?:(?:please |can you )?(?:name|identify|list|give me)) (?:one of the |an? |the )?")
 
 
 def prompt_term(prompt):
@@ -573,10 +576,15 @@ def compile_question_text(db):
     # host types it directly. This includes properties outside the hand-written
     # English phrasing templates and targets with significant symbols.
     db.create_function("prompt_term", 1, prompt_term, deterministic=True)
-    db.create_function("world_prompt", 4, world_question, deterministic=True)
+    from world_links import display_subject
+    subjects = {cls: display_subject(db, cls, name) for cls, name in db.execute(
+        "SELECT DISTINCT p.cls,c.name FROM pattern p JOIN item c ON c.id=p.cls"
+    )}
+    db.create_function("world_prompt", 4, lambda cls, prop, relation, target:
+                       world_question(subjects[cls], prop, relation, target), deterministic=True)
     db.execute("""WITH cards AS MATERIALIZED (
-        SELECT 'w-'||p.cls||'-'||p.prop||'-'||p.target rule,world_prompt(c.name,p.prop,r.name,t.name) prompt,p.n
-        FROM pattern p JOIN item c ON c.id=p.cls JOIN predicate r ON r.id=p.prop JOIN item t ON t.id=p.target)
+        SELECT 'w-'||p.cls||'-'||p.prop||'-'||p.target rule,world_prompt(p.cls,p.prop,r.name,t.name) prompt,p.n
+        FROM pattern p JOIN predicate r ON r.id=p.prop JOIN item t ON t.id=p.target)
         INSERT INTO question_text SELECT prompt_term(prompt),rule,prompt,n,0 FROM cards WHERE length(prompt)<=240""")
     db.execute("""INSERT OR IGNORE INTO question_text SELECT prompt_term(prompt),rule,prompt,n,0
                   FROM current_question WHERE rule GLOB 'and:*'""")
@@ -1044,7 +1052,8 @@ def match_relation(db, body, place_body, edition, *, include_empty=False, resolv
         if area := places.match(db,place_body,edition[0],include_empty=include_empty,resolve_only=resolve_only,
                                 request_target=request_target and edition[1]>=25,date_key=date_key):
             return area
-    phrases = [*RELATION_PHRASES.items(), (161, "starring"), (161, "with a cast including"),
+    phrases = [*RELATION_PHRASES.items(), (47, "bordering"), (47, "that borders"), (47, "that shares a border with"),
+               (161, "starring"), (161, "with a cast including"),
                (17,"in"), (17,"in the country of")]
     # A host can also use the published property label, including properties with no custom wording.
     generic = re.fullmatch(r".+? whose (.+?) is .+", body)
@@ -1347,6 +1356,8 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
             outside_names = (("wd:Q" + str(row[0]), name, pos == 0) for row in others
                              for pos, name in enumerate((row[1], *row[2].split("\t"))) if wanted is None or folded_spelling(name) in wanted)
         plan = {"class": root, "classLabel": subject, "catalogueKey": key}
+        if any(c.get("prop") == 47 for c in conditions):
+            plan["borderScope"] = "Recorded shared borders count, including historical borders and former administrative areas."
         if live:
             plan["liveClass"] = cls
         if len(conditions) == 1 and not linked and not geographic and date_capture is None:

@@ -7,7 +7,7 @@ import re
 from decimal import Decimal
 from pathlib import Path
 
-from graph import ROOT, UNITS, folded_spelling
+from graph import ROOT, UNITS, folded_spelling, indefinite_article
 
 DEFAULT_EXPORT = ROOT / "data/knowledge/wikidata-quantities.sqlite"
 SCHEMA = """
@@ -427,7 +427,7 @@ def alternatives(db, card, complete_only):
         return []
     cls, dimension, op, ref, threshold = spec[:5]
     name = db.execute("SELECT label FROM measure_scope WHERE id=?", (cls,)).fetchone()[0]
-    article = "an " if name[:1].lower() in "aeiou" else "a "
+    article = indefinite_article(name) + " "
     if ref:
         target = db.execute(
             "SELECT name FROM entity WHERE id=? ORDER BY source LIMIT 1", (ref,)
@@ -505,7 +505,7 @@ def suggest(db, idea, complete_only):
         for cls, ref in candidates:
             subject = db.execute("SELECT label FROM measure_scope WHERE id=?", (cls,)).fetchone()[0]
             subject = subject if subject.isupper() else subject[:1].lower() + subject[1:]
-            article = "an" if subject[:1] in "aeiou" else "a"
+            article = indefinite_article(subject)
             label = db.execute(
                 "SELECT name FROM entity WHERE id=? ORDER BY source LIMIT 1", (ref,)
             ).fetchone()[0]

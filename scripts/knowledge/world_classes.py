@@ -6,7 +6,7 @@ import tempfile
 from contextlib import closing
 from pathlib import Path
 
-from graph import digest, folded_spelling, ingest, open_graph
+from graph import class_determiner, digest, folded_spelling, ingest, open_graph, question_noun
 
 SCHEMA = """
 CREATE TABLE world_parent(parent INTEGER,child INTEGER,PRIMARY KEY(parent,child)) WITHOUT ROWID;
@@ -94,12 +94,15 @@ def card(db, phrase, *, strict=False):
             from catalogue import UnverifiedRule
             raise UnverifiedRule(key, "The builder has learned this class and can verify its full answer list.")
         return None
-    name = label if label.isupper() else label[:1].lower() + label[1:]
+    if fmt >= 25:
+        from world_links import display_subject
+        label = display_subject(db, cls, label)
+    name = question_noun(label)
     if tagged or term == f"q{cls}":
         from world_links import identifiers
-        if identifiers(db, folded_spelling(label), "class") != [cls]:
+        if not name.endswith(f" (Q{cls})") and identifiers(db, folded_spelling(label), "class") != [cls]:
             name += f" (Q{cls})"
-    prefix = "a type of " if kinds else ("an " if name[:1].lower() in "aeiou" else "a ")
+    prefix = "a type of " if kinds else class_determiner(name) + " "
     return {
         "key": key,
         "prompt": "Name " + prefix + name,

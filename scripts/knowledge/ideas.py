@@ -9,14 +9,14 @@ from collections import Counter
 from contextlib import closing
 from pathlib import Path
 
-from graph import ROOT, folded_spelling, norm
+from graph import ROOT, folded_spelling, indefinite_article, norm
 from world_index import index_path
 
 STOP = set("a an the of and or for from in on with about something some give me make create question questions round rounds quiz pub theme topic table mixed age ages fun accessible easy hard please".split())
 
 
 def article(noun):
-    return "an " if noun[0].lower() in "aeiou" else "a "
+    return indefinite_article(noun) + " "
 
 
 def nouns(head):

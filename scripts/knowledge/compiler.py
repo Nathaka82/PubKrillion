@@ -882,7 +882,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             "Answers need a source record for the class and the stated relationship." if plan.get("catalogueKey", "").startswith("f-") else
             "Answers must have a directly recorded class and relationship in this Wikidata5M edition."
             if "catalogueKey" in plan else ""
-        ),
+        ) + (" " + plan["borderScope"] if plan.get("borderScope") else ""),
         "scoring": (f"Published Wikimedia readership over 52 weeks covers {readership['coveredAnswers']:,} of {size:,} answer names. "
                     if readership else "") + "Graph links help estimate relative familiarity. First choices from at least 200 teams across three rooms and exact-prompt surveys use an upper confidence bound. At most 5% qualify for the top tier, with at most 1% from two supporting familiarity signals. Missing data earns no rarity bonus.",
         "readership": readership,
