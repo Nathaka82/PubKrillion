@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { CatalogueRule } from "./question-drafts.ts";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { DatabaseSync, type SQLInputValue, type SQLOutputValue } from "node:sqlite";
 import {
   clean,
   demand,
@@ -47,10 +47,64 @@ function spellingDetails(value: string) {
   return (parts ?? []).join("\u001f");
 }
 
+type Suggestion = { answer: Answer; exact: false; entity: string };
+type Ruling = Record<string, SQLOutputValue>;
+
+// Enumerate every single edit on a short spelling. Two outcomes at the same distance require more detail.
+function shortSpellingSuggestion(db: DatabaseSync, bank: string, input: string,
+  decisionFor: (name: string) => Ruling | undefined, suggestion?: Suggestion) {
+  const letters = Array.from(input);
+  const details = spellingDetails(input);
+  const words = input.split(" ").length;
+  const select = "SELECT term,entity,name,depth FROM kb_answer_key WHERE bank=? AND form=1 ";
+  const exact = db.prepare(select + "AND term=?");
+  const byStart = db.prepare(select + "AND term>=? AND term<? AND length(term)=? AND substr(term,?)=? LIMIT 81");
+  const byEnd = db.prepare(select + "AND length(term) BETWEEN 4 AND 7 AND substr(term,-2)=? " +
+    "AND substr(term,1,?)=? AND substr(term,?)=? LIMIT 81");
+  const seen = new Set<string>();
+  const consider = (row: Ruling) => {
+    const term = String(row.term);
+    if (seen.has(term) || spellingDetails(term) !== details || term.split(" ").length !== words) return true;
+    seen.add(term);
+    if (row.entity === null) return false;
+    const entity = String(row.entity), depth = Number(row.depth), name = String(row.name);
+    const same = (r?: Ruling) => r?.entity === entity && r.depth === depth && (entity !== "" || r.name === name);
+    if (suggestion) return same(decisionFor(suggestion.answer.name));
+    let display = name;
+    if (!same(decisionFor(name))) {
+      if (!same(decisionFor(term))) return false;
+      display = term;
+    }
+    suggestion = { answer: { name: display, depth, aliases: [] }, entity, exact: false };
+    return true;
+  };
+  for (let i = 0; i <= letters.length; i++) {
+    const before = letters.slice(0,i).join("");
+    const after = letters.slice(i+1).join("");
+    if (i < letters.length) {
+      const removed = exact.get(bank, before + after);
+      if (removed && !consider(removed)) return;
+      if (i + 1 < letters.length && letters[i] !== letters[i+1]) {
+        const swapped = before + letters[i+1] + letters[i] + letters.slice(i+2).join("");
+        const transposition = exact.get(bank, swapped);
+        if (transposition && !consider(transposition)) return;
+      }
+    }
+    // One unknown character can be inserted or replace a letter. Match its two known sides literally.
+    for (const skip of i < letters.length ? [0, 1] : [0]) {
+      const right = letters.slice(i+skip).join("");
+      const rows = letters.length - i - skip >= 2
+        ? byEnd.all(bank, letters.slice(-2).join(""), i, before, i+2, right)
+        : byStart.all(bank, before, before+"\u{10ffff}", letters.length+1-skip, i+2, right);
+      if (rows.length > 80 || !rows.every(consider)) return;
+    }
+  }
+  return suggestion;
+}
+
 export function lookup(db: DatabaseSync, bank: string, raw: string) {
-  const plain = normal(raw);
-  const key = plain || spelling(raw);
-  const checked = db.prepare("SELECT 1 FROM kb_answer_key WHERE bank=? LIMIT 1").get(bank);
+  const key = normal(raw) || spelling(raw);
+  const checked = db.prepare("SELECT form FROM kb_answer_key WHERE bank=? ORDER BY form DESC LIMIT 1").get(bank);
   const select = checked && db.prepare("SELECT entity,name,depth FROM kb_answer_key WHERE bank=? AND form=? AND term=?");
   const decisionFor = (name: string) => select?.get(bank, 0, spelling(name)) ?? select?.get(bank, 1, foldedSpelling(name));
   const folded = foldedSpelling(raw);
@@ -105,19 +159,25 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
   }
   const member = db.prepare("SELECT name,aliases,depth FROM kb_member WHERE bank=? AND entity=?");
   const owned = (name: string, entity: string) => decisionFor(name)?.entity === entity;
+  let prefixSuggestion: Suggestion | undefined;
   if (list.length === 1) {
     const name = String(list[0].name);
     const entity = String(list[0].entity);
     const depth = Number(list[0].depth);
     if (!checked) return { answer: { name, depth, aliases: [] }, exact: exact.length === 1, entity };
     const canonical = decisionFor(name);
-    if (canonical?.entity === entity && canonical.depth === depth)
-      return { answer: { name, depth, aliases: [] }, exact: false, entity };
-    if (!entity) return undefined;
-    const aliases: string[] = JSON.parse(String(member.get(bank, entity)!.aliases));
-    const matching = aliases.find(form => foldedSpelling(form).startsWith(folded) && owned(form, entity));
-    if (matching) return { answer: { name: matching, depth, aliases: [] }, exact: false, entity };
+    if (canonical?.entity === entity && canonical.depth === depth) {
+      prefixSuggestion = { answer: { name, depth, aliases: [] }, exact: false, entity };
+    } else if (entity) {
+      const aliases: string[] = JSON.parse(String(member.get(bank, entity)!.aliases));
+      const matching = aliases.find(form => foldedSpelling(form).startsWith(folded) && owned(form, entity));
+      if (matching) prefixSuggestion = { answer: { name: matching, depth, aliases: [] }, exact: false, entity };
+    }
   }
+  const size = Array.from(folded).length;
+  if (checked?.form === 1 && size >= 4 && size <= 6)
+    return shortSpellingSuggestion(db, bank, folded, decisionFor, prefixSuggestion);
+  if (prefixSuggestion) return prefixSuggestion;
   // Limit typo correction to a small indexed neighbourhood. Always ask for confirmation.
   if (key.length >= 5) {
     const chars = Array.from(key);
@@ -129,7 +189,7 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
       .all(bank, head, head + "\u{10ffff}", chars.length - 2, chars.length + 2);
     const ending = db.prepare("SELECT term,entity FROM kb_name WHERE bank=? AND substr(term,-3)=? AND length(term) BETWEEN ? AND ? LIMIT 81")
       .all(bank, chars.slice(-3).join(""), chars.length - 2, chars.length + 2);
-    const nearby = [...(leading.length <= 80 ? leading : []), ...(ending.length <= 80 ? ending : [])];
+    const nearby = [leading, ending].filter(rows => rows.length <= 80).flat();
     if (nearby.length) {
       const terms = new Map<string, Set<string>>();
       for (const r of nearby) {

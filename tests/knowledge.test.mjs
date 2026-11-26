@@ -138,10 +138,12 @@ test("source decisions distinguish symbols, scripts, typos and partially qualify
   const f = await fixture(undefined, { QUIZ_SEMANTIC: "off", OPENAI_API_KEY: "" });
   t.after(() => f.close());
   const names = ["C", "C#", "C++", "का", "कि", "!!!", "Églantine"];
-  const titles = ["Open C# Reference", "Open C++ Guide", "Annual 5.25 Record", "मेरी किताब", "Bright Stars", "Bright Starfish"];
+  const titles = ["Open C# Reference", "Open C++ Guide", "Annual 5.25 Record", "मेरी किताब",
+    "Bright Stars", "Bright Starfish", "Matrix", "Piano", "Tango", "Tanog Edition", "Shrek", "Shera", "Scaer", "A*Star", "Oslo", "Kiwi"];
   const records = [...names, ...titles].map((name, i) => ({ id: String(i), name, types: ["notation"],
-    aliases: i === 0 ? ["Regional notation"] : [], edges: [["used in", "Open Studio"]] }));
-  records.push({ id: "excluded", name: "Another notation", types: ["notation"], aliases: ["Regional notation"], edges: [] });
+    aliases: name === "C" ? ["Regional notation", "Frame", "Scale"] : name === "C#" ? ["Frame"] : [],
+    edges: [["used in", "Open Studio"]] }));
+  records.push({ id: "excluded", name: "Another notation", types: ["notation"], aliases: ["Regional notation", "Scale"], edges: [] });
   await writeFile(join(f.dir, "notations.json"), JSON.stringify(records));
   await writeFile(join(f.dir, "notations.manifest.json"), JSON.stringify({ source: "notations",
     url: "https://example.org/register", revision: "1", file: "notations.json", terms: { notation: [] } }));
@@ -151,6 +153,8 @@ test("source decisions distinguish symbols, scripts, typos and partially qualify
   const root = "/rooms/" + (await ok(host("/rooms", "POST", { name: "Names and symbols" }))).code;
   const players = names.map(() => client(f));
   for (const [i, player] of players.entries()) await ok(player(root + "/join", "POST", { name: "Crew " + i }));
+  const sharedPlayer = client(f);
+  await ok(sharedPlayer(root + "/join", "POST", { name: "Shared title" }));
   const { jobs: [job] } = await ok(host(root + "/drafts", "POST", { idea: "Open Studio" }));
   assert.equal(job.records, names.length + titles.length);
   let preview;
@@ -174,6 +178,8 @@ test("source decisions distinguish symbols, scripts, typos and partially qualify
     ["Annual 5.25 Rec", titles[2]], ["मेरी कि", titles[3]],
     ["Open C++ Reference", undefined], ["Open C# Guide", undefined], ["Annual 5 25 Rec", undefined],
     ["मिरी कि", undefined], ["Regional notatio", undefined], ["Reginal notation", undefined], ["Bright Star", undefined],
+    ["Martix", "Matrix"], ["Pieno", "Piano"], ["Tanog", undefined], ["Sherk", undefined],
+    ["Farme", "Frame"], ["Scael", undefined], ["A*Stir", "A*Star"], ["Osol", "Oslo"], ["Kawi", "Kiwi"],
   ]) {
     const reply = await submit(players[0], input);
     assert.equal(reply.status, 422, input);
@@ -189,13 +195,17 @@ test("source decisions distinguish symbols, scripts, typos and partially qualify
   const typo = await submit(players[6], "Xglantine");
   assert.equal(typo.status, 422);
   assert.equal(typo.data.suggestion, "Églantine");
+  const sharedTypo = await submit(sharedPlayer, "Farme");
+  const sharedReceipt = await ok(submit(sharedPlayer, sharedTypo.data.suggestion));
+  assert.equal(sharedReceipt.canonical ?? sharedReceipt.raw, "Frame");
   for (const [i, p] of players.entries()) {
     const receipt = await ok(submit(p, i === 6 ? "Eglantine" : names[i]));
     assert.equal(receipt.canonical ?? receipt.raw, names[i]);
   }
   await ok(host(path + "/reveal", "POST", {}));
   const revealed = await ok(host(path + "?view=host"));
-  assert.deepEqual(new Set(revealed.results.map(row => row.canonical)), new Set(names));
+  assert.deepEqual(new Set(revealed.results.map(row => row.canonical)), new Set([...names, "Frame"]));
+  assert.ok(revealed.results.find(row => row.canonical === "Frame").points <= 15);
   assert.ok(revealed.results.every(row => row.points > 0));
 });
 

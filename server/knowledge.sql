@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS kb_name(
  PRIMARY KEY(bank,term,entity)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS kb_name_ending ON kb_name(bank,substr(term,-3),length(term));
+CREATE INDEX IF NOT EXISTS kb_short_spelling_suffix ON kb_answer_key(bank,substr(term,-2),length(term),term)
+ WHERE form=1 AND length(term) BETWEEN 4 AND 7;
 CREATE TABLE IF NOT EXISTS kb_appeal(
  round INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
  team INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
