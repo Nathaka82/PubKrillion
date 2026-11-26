@@ -1,5 +1,15 @@
 # Running the knowledge worker
 
+## Measuring question coverage
+
+Download the [QALD-10 reference file](https://raw.githubusercontent.com/KGQA/QALD-10/89caa86371c7a65c6c87a64e0eeaa0e247ff5fe5/data/qald_10/qald_10.json) once. Run the following command against a published local catalogue.
+
+```sh
+python scripts/knowledge/benchmark.py qald_10.json --details
+```
+
+The benchmark reads the catalogue and compiles each suggested bank in memory. It uses no network requests or LLM tokens. The pinned dataset contains 40 English questions with at least two distinct Wikidata items as their reference answers. A question counts as an exact match when one bank is offered without qualification and its full set of item IDs equals the reference set. The output includes the catalogue edition, missing and additional IDs, and questions that need clarification. Current source records can differ from the historical reference answers.
+
 ## Publishing the shared catalogue
 
 When a host names an unfamiliar subject, the builder checks its recorded spellings and whether Wikidata uses it as a class or occupation. A verified identity enrolls the requested answer list for collection. If the source lists only subclasses, the host can select an explicit “Name a type of …” question after its answers have been verified. A request about a creator keeps that creator as a condition when the builder learns the subject.
