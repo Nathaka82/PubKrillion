@@ -403,12 +403,21 @@ class ComparisonTests(unittest.TestCase):
         describe(measures)
         self.feed(
             "calibration",
-            [{"id": "bar-1", "name": "Reference bar", "aliases": ["Test bar"], "facts": [length(9, 11)]}],
+            [{"id": "bar-1", "name": "Reference bar", "aliases": ["Test bar", "Test"], "facts": [length(9, 11)]},
+             {"id": "spare", "name": "Spare rod", "aliases": ["Test"], "facts": [length(12)]}],
         )
         self.publish()
         prompt = "Name a gauge longer than the Test bar"
         with closing(catalogue.reader(self.file)) as db:
             rule = catalogue.match_question(db, prompt)
+            for phrase in ["with a length greater than that of the Test bar", "longer than the length of the Test bar",
+                           "whose length exceeds that of the Test bar"]:
+                self.assertEqual(catalogue.match_question(db, "Name a gauge " + phrase)["key"], rule["key"])
+            with self.assertRaisesRegex(ValueError, "different quantities"):
+                catalogue.match_question(db, "Name a gauge longer than the mass of the Test bar")
+            with self.assertRaisesRegex(ValueError, "Several measured records"):
+                catalogue.match_question(db, "Name a gauge longer than the Test")
+            self.assertIsNone(catalogue.match_question(db, "Name a gauge longer than the Test widget"))
             self.assertEqual((rule["records"], rule["complete"]), (4, False))
             bank, report = catalogue.play(db, self.game, rule["key"], prompt)
             self.assertEqual(self.names(bank), {"Gauge A", "Gauge B", "Gauge D", "Gauge G"})

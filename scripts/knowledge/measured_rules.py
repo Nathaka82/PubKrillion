@@ -301,11 +301,16 @@ def match(db, prompt):
         if not right:
             continue
         if comparisons.COMPARE.search(left):
-            spec = comparisons.parse_spec(db, left)
-            if not spec:
+            terms = comparisons.comparison_terms(left)
+            if not terms or not (cls := comparisons.resolve(db, "class", terms.subject, terms.dimension)):
                 continue
-            name = db.execute("SELECT label FROM measure_scope WHERE id=?", (spec[0],)).fetchone()[0]
+            name = db.execute("SELECT label FROM measure_scope WHERE id=?", (cls,)).fetchone()[0]
             card = match_single(db, "Name a " + name + " " + right)
+            if not card or not card["key"].startswith(("w-", "g-", "v-", "f-")):
+                continue
+            # An ambiguous fragment of a longer reference is irrelevant unless the
+            # rest of the prompt independently describes a relationship.
+            spec = comparisons.resolve_spec(db, terms, cls)
         elif comparisons.COMPARE.fullmatch("subject " + right) or comparisons.SCOPE.search(
             " " + right + " "
         ):

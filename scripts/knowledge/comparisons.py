@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import re
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
@@ -23,9 +24,10 @@ CREATE INDEX world_members_by_class ON world_member(cls,id);
 WORLD_SOURCE = "world5m-measure-members"
 COMMAND = re.compile(r"^(?:(?:please |can you )?(?:name|list|identify|give me))\s+", re.IGNORECASE)
 COMPARE = re.compile(
-    r"(.+?)\s+(?:(?:that|which|whose (?:length|mass))\s+)?(?:(?:is|weighs|weighing|measures|grows)\s+)?"
-    r"((?:longer|shorter|bigger|larger|smaller|heavier|lighter|more|less) than|at least|at most|"
-    r"no more than|no less than|over|under)\s+(.+)",
+    r"(.+?)\s+(?:(?:that|which|whose (?:length|mass)|with (?:a )?(?:length|mass)(?: of)?)\s+)?"
+    r"(?:(?:is|weighs|weighing|measures|grows)\s+)?"
+    r"((?:longer|shorter|bigger|larger|smaller|heavier|lighter|greater|more|less) than|at least|at most|"
+    r"no more than|no less than|exceeds|over|under)\s+(.+)",
     re.IGNORECASE,
 )
 SCOPE = re.compile(
@@ -316,7 +318,17 @@ def stats(db, cls, query, args):
     return valid, census[0] if census else None
 
 
-def parse_spec(db, prompt):
+@dataclass(frozen=True)
+class ComparisonTerms:
+    subject: str
+    dimension: str
+    op: str
+    reference: str | None
+    threshold: str | None
+    mode: str
+
+
+def comparison_terms(prompt):
     if not COMMAND.match(prompt):
         return None
     body = COMMAND.sub("", prompt, count=1).strip().rstrip(".?").strip()
@@ -346,22 +358,30 @@ def parse_spec(db, prompt):
         raise ValueError("Use a recorded maximum length or a typical length for a shorter-than comparison.")
     prefix = match[0][: match.start(3)]
     mass = word in ("heavier than", "lighter than") or re.search(
-        r"\b(weighs|weighing|whose mass)\b", prefix, re.IGNORECASE
+        r"\b(?:weighs|weighing|(?:whose|with(?: a)?) mass)\b", prefix, re.IGNORECASE
     )
-    length = word in ("longer than", "shorter than") or re.search(r"\bwhose length\b", prefix, re.IGNORECASE)
+    length = word in ("longer than", "shorter than") or re.search(r"\b(?:whose|with(?: a)?) length\b", prefix, re.IGNORECASE)
     dimension = "mass" if mass else "length"
-    if forced and ((mass and forced != "mass") or (length and forced != "length")):
+    if mass and length or forced and ((mass and forced != "mass") or (length and forced != "length")):
         raise ValueError("The question describes two different measurement dimensions.")
     dimension = forced or dimension
+    reference_measure = re.fullmatch(r"(?:the )?(length|mass) of (.+)", target, re.I)
+    if reference_measure:
+        measured = reference_measure[1].lower()
+        if (mass or length or forced) and measured != dimension:
+            raise ValueError("The reference and the requested measurement describe different quantities.")
+        dimension, target = measured, reference_measure[2]
+    elif target.lower().startswith("that of ") and (mass or length or forced):
+        target = target[8:]
     number = NUMERIC.fullmatch(target)
-    threshold, ref = None, None
+    threshold = None
     if number:
         spelling = number[2].lower()
         unit = UNIT_NAMES.get(spelling) or UNIT_NAMES.get(spelling.removesuffix("s"))
         if not unit:
             return None
         dtype, multiplier = UNITS[unit]
-        if not mass and not length and not forced:
+        if not (mass or length or forced or reference_measure):
             dimension = dtype
         if dimension != dtype or (number[3] and (number[3].lower() == "in mass") != (dtype == "mass")):
             raise ValueError("The unit and the requested measurement describe different quantities.")
@@ -378,16 +398,23 @@ def parse_spec(db, prompt):
             "over",
             "under",
             "more than",
+            "greater than",
+            "exceeds",
             "less than",
-        ) and not (mass or length or forced):
+        ) and not (mass or length or forced or reference_measure):
             return None
-        ref = resolve(db, "reference", target, dimension)
-        if not ref:
-            return None
-    cls = resolve(db, "class", subject, dimension)
+    return ComparisonTerms(subject, dimension, op, None if number else target, threshold, mode)
+
+
+def resolve_spec(db, terms, cls=None):
+    dimension, mode = terms.dimension, terms.mode
+    ref = resolve(db, "reference", terms.reference, dimension) if terms.reference else None
+    if terms.reference and not ref:
+        return None
+    cls = cls or resolve(db, "class", terms.subject, dimension)
     if not cls:
         return None
-    spec = [cls, dimension, op, ref, threshold]
+    spec = [cls, dimension, terms.op, ref, terms.threshold]
     fmt = db.execute("SELECT format FROM publication").fetchone()[0]
     if fmt >= 13:
         if mode == "default":
@@ -402,6 +429,11 @@ def parse_spec(db, prompt):
     elif mode == "record":
         return None
     return spec
+
+
+def parse_spec(db, prompt):
+    terms = comparison_terms(prompt)
+    return resolve_spec(db, terms) if terms else None
 
 
 def parse(db, prompt):
@@ -430,9 +462,9 @@ def alternatives(db, card, complete_only):
     name = db.execute("SELECT label FROM measure_scope WHERE id=?", (cls,)).fetchone()[0]
     article = indefinite_article(name) + " "
     if ref:
-        target = db.execute(
-            "SELECT name FROM entity WHERE id=? ORDER BY source LIMIT 1", (ref,)
-        ).fetchone()[0]
+        terms = comparison_terms(card["prompt"])
+        target = terms.reference if terms and terms.reference else db.execute(
+            "SELECT name FROM entity WHERE id=? ORDER BY source LIMIT 1", (ref,)).fetchone()[0]
     else:
         target = threshold + (" cm" if dimension == "length" else " g")
     direction = (
@@ -441,13 +473,16 @@ def alternatives(db, card, complete_only):
         else {"gt": "heavier than", "lt": "lighter than"}
     )
     operator = {"gt": "over", "lt": "under", "ge": "at least", "le": "at most"}[op]
-    clauses = [
-        "that is usually " + direction.get(op, operator),
-        f"with a recorded maximum {dimension} {operator}",
-    ]
+    measured_target = f"the {dimension} of {target}" if ref else target
+    maximum = f"with a recorded maximum {dimension} {operator} {target}"
+    if ref:
+        compare = {"gt": "exceeds", "lt": "is less than", "ge": "is at least", "le": "is at most"}[op]
+        maximum = f"whose recorded maximum {dimension} {compare} that of {target}"
+    clauses = [f"that is usually {direction[op]} {target}" if op in direction else
+               f"whose {dimension} is usually {operator} {measured_target}", maximum]
     options = []
     for clause in clauses:
-        prompt = f"Name {article}{name} {clause} {target}"
+        prompt = f"Name {article}{name} {clause}"
         if len(prompt) > 240:
             continue
         try:

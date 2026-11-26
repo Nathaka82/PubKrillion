@@ -197,7 +197,12 @@ def published_suggestions(db, request, *, follow_topic=None):
     rules = [direct] if direct["complete"] or not complete_only else []
     if direct["key"].startswith("compare:"):
         from comparisons import alternatives
-        rules.extend(alternatives(db, direct, complete_only))
+        choices = alternatives(db, direct, complete_only)
+        if choices:
+            dimension = json.loads(direct["key"][8:])[1]
+            request["sourceNote"] = (f"The original question uses the reported common {dimension} when available, "
+                                     f"then the {dimension} at maturity. Choose the measurement you want players to use.")
+            rules.extend(choices)
     elif direct["key"].startswith("date-") and not complete_only:
         from dated_links import alternatives
         rules.extend(alternatives(db,direct))
