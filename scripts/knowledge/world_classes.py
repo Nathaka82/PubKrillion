@@ -84,11 +84,18 @@ def card(db, phrase, *, strict=False, literal=None):
             query,args = work_forms.union(db,key,"SELECT id FROM current_member WHERE rule=?",(key,))
             count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
         if not count and strict:
+            from catalogue import RuleWithdrawn, UnverifiedRule
             if fmt >= 31 and work_forms.pending(db,key):
-                from catalogue import UnverifiedRule
                 raise UnverifiedRule(key,"The builder can check works recorded with this form.")
-            from catalogue import RuleWithdrawn
-
+            if (not kinds and db.execute("SELECT 1 FROM sqlite_master WHERE name='discovered_subclass_subject'").fetchone()
+                    and db.execute("SELECT 1 FROM discovered_subclass_subject WHERE cls=?", (cls,)).fetchone()):
+                from date_rules import DateChoices
+                alternate = db.execute("SELECT n FROM current_class WHERE rule=?", (f"kind:Q{cls}",)).fetchone()
+                if alternate is None:
+                    raise UnverifiedRule(f"kind:Q{cls}", "The source records types of this subject. The builder can check them.")
+                if alternate[0]:
+                    option = card(db, f"type of q{cls}", strict=True)
+                    raise DateChoices([option], "The source lists types of this subject. Select the revised question to play.")
             raise RuleWithdrawn("The current source has no named members for this class question.")
     else:
         args = (cls, cls) if kinds else (cls,)

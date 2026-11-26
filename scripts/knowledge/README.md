@@ -2,6 +2,8 @@
 
 ## Publishing the shared catalogue
 
+When a host names an unfamiliar subject, the builder checks its recorded spellings and whether Wikidata uses it as a class or occupation. A verified identity enrolls the requested answer list for collection. If the source lists only subclasses, the host can select an explicit “Name a type of …” question after its answers have been verified. A request about a creator keeps that creator as a condition when the builder learns the subject.
+
 Run the publisher independently of the game. The default Compose configurations include it as the `knowledge-builder` service. These commands also work in a local checkout with Python 3.11 or later.
 
 ```sh

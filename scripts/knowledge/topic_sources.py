@@ -15,6 +15,7 @@ from world_facts import bindings
 SCHEMA = source_vocabulary.SCHEMA + """
 CREATE TABLE source_topic(key TEXT PRIMARY KEY,ids TEXT NOT NULL,crowded INTEGER NOT NULL,upgrade INTEGER NOT NULL) WITHOUT ROWID;
 CREATE INDEX topic_upgrade ON source_topic(key) WHERE upgrade=1;
+CREATE TABLE discovered_subclass_subject(cls INTEGER PRIMARY KEY);
 CREATE TABLE source_topic_rule(topic TEXT,rule TEXT,position INTEGER,PRIMARY KEY(topic,rule)) WITHOUT ROWID;
 """
 
@@ -41,24 +42,43 @@ def name_phrase(term):
 class Topic:
     term: str
     cls: int = 0
+    subject_lookup: str = ""
 
     @property
     def key(self):
-        return "topic:" + json.dumps([self.term, self.cls], ensure_ascii=True, separators=(",", ":"))
+        parts = [self.term, self.cls] + ([self.subject_lookup] if self.subject_lookup else [])
+        return "topic:" + json.dumps(parts, ensure_ascii=True, separators=(",", ":"))
 
     @classmethod
     def decode(cls, key):
         if not isinstance(key, str) or not key.startswith("topic:") or len(key) > 1600:
             return None
         try:
-            name, subject = json.loads(key[6:])
+            name, subject, *mode = json.loads(key[6:])
         except (ValueError, TypeError):
             return None
         if (not isinstance(name, str) or not name_phrase(name) or spelling(name) != name
-                or type(subject) is not int or not 0 <= subject < 10**12):
+                or type(subject) is not int or not 0 <= subject < 10**12
+                or mode and (len(mode) != 1 or mode[0] not in ("subject", "type", "kind") or subject or not subject_phrase(name))):
             return None
-        topic = cls(name, subject)
+        topic = cls(name, subject, mode[0] if mode else "")
         return topic if topic.key == key else None
+
+
+def subject_phrase(name):
+    return bool(QID.fullmatch(name)) or (name_phrase(name) and not re.search(
+        r"\b(?:who|which|that|whose|by|with|in|from|than|not|published|directed|performed|written|composed|created|produced|q\d+)\b", name))
+
+
+def noun_forms(literal):
+    forms = {literal}
+    if literal.endswith("s") and not literal.endswith(("ss", "us", "is", "series", "species")):
+        forms.add(literal[:-1])
+        if literal.endswith("ies"):
+            forms.add(literal[:-3] + "y")
+        if literal.endswith(("ches", "shes", "xes", "zes", "sses", "oes")):
+            forms.add(literal[:-2])
+    return forms
 
 
 def credit_subjects(db, subject):
@@ -69,15 +89,8 @@ def credit_subjects(db, subject):
     classes = set(resolve(db, term, literal=literal))
     if not re.fullmatch(r"[\w]+(?:[ -][\w]+)*", literal) or QID.fullmatch(literal):
         return sorted(classes)
-    forms = {literal}
-    if literal.endswith("s") and not literal.endswith(("ss", "us", "is", "series", "species")):
-        forms.add(literal[:-1])
-        if literal.endswith("ies"):
-            forms.add(literal[:-3] + "y")
-        if literal.endswith(("ches", "shes", "xes", "zes", "sses", "oes")):
-            forms.add(literal[:-2])
     current_names = db.execute("SELECT 1 FROM sqlite_master WHERE name='source_vocabulary'").fetchone()
-    for form in sorted(forms):
+    for form in sorted(noun_forms(literal)):
         base = folded_spelling(form)
         if form != literal:
             classes.update(resolve(db, base, literal=form))
@@ -132,6 +145,97 @@ def choose_credit_subject(db, name, classes, edition):
     raise RuleWithdrawn("The published sources have no playable credit for these subjects and this name.")
 
 
+def discovered_subjects(db, subject, mode="subject"):
+    from catalogue import RuleWithdrawn, UnverifiedRule
+    if (not subject_phrase(subject) or not db.execute("SELECT 1 FROM world_class_name LIMIT 1").fetchone()
+            or db.execute("SELECT format FROM publication").fetchone()[0] < 27):
+        return []
+    topic = Topic(subject, subject_lookup=mode)
+    row = db.execute("SELECT ids,crowded FROM source_topic WHERE key=?", (topic.key,)).fetchone()
+    if row is None:
+        raise UnverifiedRule(topic.key, "The builder can look up this subject and check how its members are recorded.")
+    if row[1]:
+        raise RuleWithdrawn("Several subjects share this spelling. Enter a more specific name or its Wikidata Q number.")
+    ids = json.loads(row[0])
+    if not ids:
+        raise RuleWithdrawn("The source search found no class or occupation with recorded members for this spelling.")
+    if source_vocabulary.pending_names(db, topic.key):
+        raise UnverifiedRule(topic.key, "The builder is checking names for the subjects it found.")
+    return ids
+
+
+def discover_class_question(db, body):
+    from catalogue import RuleWithdrawn, UnverifiedRule
+    from date_rules import DateChoices
+    from world_classes import card
+    kinds = body.startswith("type of ")
+    subject = body[8:] if kinds else body
+    ids = discovered_subjects(db, subject, "kind" if kinds else "type")
+    cards, revised, pending = [], [], []
+    for cls in ids:
+        key = ("kind:" if kinds else "type:") + f"Q{cls}"
+        try:
+            candidate = card(db, ("type of " if kinds else "") + f"q{cls}", strict=True)
+        except UnverifiedRule as error:
+            pending.extend(error.requests)
+        except DateChoices as options:
+            revised.extend(options.cards)
+            pending.extend(options.refresh)
+        except RuleWithdrawn:
+            continue
+        else:
+            if candidate:
+                cards.append(candidate)
+            elif not db.execute("SELECT 1 FROM current_class WHERE rule=?", (key,)).fetchone():
+                pending.append(key)
+    if len(cards) == 1 and len(ids) == 1:
+        return cards[0]
+    if cards:
+        raise DateChoices(cards, "Choose the source subject meant by this name.", refresh=pending)
+    if revised:
+        raise DateChoices(revised, "The source lists types of this subject. Select the revised question to play.", refresh=pending)
+    if pending:
+        raise UnverifiedRule(pending[0], "The builder can verify the members of this subject.", requests=pending)
+    if ids:
+        raise RuleWithdrawn("The source has no playable answer list for this subject in this edition.")
+
+
+def bare_choices(db, topic, edition):
+    from catalogue import RuleWithdrawn, UnverifiedRule
+    from date_rules import DateChoices
+    try:
+        choices(db, topic, edition)
+    except (RuleWithdrawn, UnverifiedRule, DateChoices) as error:
+        original = error
+    if not subject_phrase(topic.term):
+        raise original
+    if isinstance(original, DateChoices) and not db.execute(
+            "SELECT 1 FROM source_topic WHERE key=?", (Topic(topic.term, subject_lookup="type").key,)).fetchone():
+        raise original
+    try:
+        card = discover_class_question(db, topic.term)
+    except DateChoices as alternatives:
+        if isinstance(original, DateChoices):
+            combined = {c["key"]: c for c in [*alternatives.cards, *original.cards]}
+            raise DateChoices(list(combined.values()), "Choose the subject for this question.",
+                              refresh=(*alternatives.refresh, *original.refresh))
+        raise
+    except RuleWithdrawn:
+        raise original
+    except UnverifiedRule as waiting:
+        if isinstance(original, DateChoices):
+            original.refresh = (*original.refresh, *waiting.requests)
+            raise original
+        pending = list(dict.fromkeys([*getattr(original, "requests", []), *waiting.requests]))
+        raise UnverifiedRule(pending[0], "The builder can check this topic for classes and related questions.", requests=pending)
+    if not card:
+        raise original
+    if isinstance(original, DateChoices):
+        raise DateChoices([card, *(c for c in original.cards if c["key"] != card["key"])],
+                          str(original), refresh=original.refresh)
+    return [card]
+
+
 def parse(db, text, *, bare, edition=None):
     from catalogue import COMMAND
 
@@ -140,6 +244,8 @@ def parse(db, text, *, bare, edition=None):
     if match := re.fullmatch(r"(.+?) by (.+)", body):
         if name_phrase(match[2]):
             classes = credit_subjects(db, match[1])
+            if not classes and edition is not None:
+                classes = discovered_subjects(db, match[1])
             if len(classes) == 1:
                 return Topic(match[2], classes[0])
             if classes and edition is not None:
@@ -184,8 +290,44 @@ def credited_names(topic, forms):
     return {}
 
 
+def subject_names(topic, seeds):
+    """Keep exact named identities that the source actually uses to classify members or subclasses."""
+    found, subclass_only = {}, set()
+    for term in sorted(noun_forms(topic.term)):
+        forms, crowded = named_candidates(term, seeds if term == topic.term else ())
+        if crowded:
+            return {}, True, []
+        if not forms:
+            continue
+        values = " ".join(f"wd:Q{i}" for i in sorted(forms))
+        rows = bindings(f"""SELECT ?subject ((EXISTS {{ ?item wdt:P31 ?subject }} ||
+            EXISTS {{ ?item wdt:P106 ?subject }}) AS ?members)
+            (EXISTS {{ ?child wdt:P279 ?subject FILTER(?child != ?subject) }} AS ?children)
+            WHERE {{ VALUES ?subject {{ {values} }} }}""")
+        checked = set()
+        for row in rows:
+            cls = source_id(row, "subject", "Q")
+            if cls not in forms or cls in checked:
+                raise ValueError("The source returned an unexpected class identity.")
+            checked.add(cls)
+            flags = [row[k]["value"] for k in ("members", "children")]
+            if any(v not in ("true", "false", "1", "0") for v in flags):
+                raise ValueError("The class check returned an unknown membership result.")
+            members, children = [v in ("true", "1") for v in flags]
+            if members or children:
+                found[cls] = forms[cls]
+            if children and not members:
+                subclass_only.add(cls)
+        if checked != forms.keys():
+            raise ValueError("The source did not finish checking the named class candidates.")
+    return found, len(found) > MAX_NAMES, sorted(subclass_only)
+
+
 def capture(topic, seeds=(), *, identity=None):
-    if identity is None:
+    if topic.subject_lookup:
+        forms, crowded, subclass_only = subject_names(topic, seeds)
+        named_at = int(time.time())
+    elif identity is None:
         forms, crowded = named_candidates(topic.term, seeds)
         named_at = int(time.time())
     else:
@@ -197,7 +339,7 @@ def capture(topic, seeds=(), *, identity=None):
     crowded = crowded or len(forms) > MAX_NAMES
     proposals, descriptions = [], {}
     # If search was truncated, require a specific identity before proposing any rule.
-    if forms and not crowded:
+    if forms and not crowded and not topic.subject_lookup:
         if len(forms) > 1:
             values = " ".join(f"wd:Q{i}" for i in forms)
             hints = bindings(f"""SELECT ?target ?description WHERE {{ VALUES ?target {{ {values} }}
@@ -246,11 +388,16 @@ def capture(topic, seeds=(), *, identity=None):
                 if n < 2 or prop in (31, 106, 279) or topic.cls and (prop not in CREDITS or not alternative and cls != topic.cls):
                     raise ValueError("The source returned a relationship outside the topic query.")
                 proposals.append([cls, prop, target, n])
+    scoped_identity = scoped_identity or topic.subject_lookup
     rows = [] if crowded else [forms[i] for i in sorted(forms)]
     content = [topic.key, rows, crowded, proposals, descriptions, scoped_identity]
+    extra = {}
+    if topic.subject_lookup:
+        extra["subclassOnly"] = [] if crowded else subclass_only
+        content.append(extra["subclassOnly"])
     return dict(key=topic.key, rows=rows, crowded=crowded, proposals=proposals, descriptions=descriptions,
                 revision=digest(content), checked=int(time.time()), namedAt=named_at, discoveryVersion=DISCOVERY_VERSION,
-                scopedIdentity=scoped_identity)
+                scopedIdentity=scoped_identity, **extra)
 
 
 def cache_path(storage, key):
@@ -287,6 +434,8 @@ def read_capture(file, key):
     identity = [saved[k] for k in ("key", "rows", "crowded", "proposals", "descriptions")]
     if "scopedIdentity" in saved:
         identity.append(saved["scopedIdentity"])
+    if "subclassOnly" in saved:
+        identity.append(saved["subclassOnly"])
     if saved["key"] != key or digest(identity) != saved["revision"]:
         raise ValueError("The source topic failed its fingerprint check.")
     return saved
@@ -324,7 +473,7 @@ def pick(db, proposals):
 
 
 def collect(db, storage, offline, previous=None):
-    from watched_rules import due_at, replace
+    from watched_rules import due_at, follow, replace
     captures = []
     budget = 3
     pending = []
@@ -346,7 +495,7 @@ def collect(db, storage, offline, previous=None):
         if not offline and due <= time.time() and budget:
             budget -= 1
             try:
-                identity = identities.get(topic.term)
+                identity = None if topic.subject_lookup else identities.get(topic.term)
                 seeds = [] if identity else prior_candidates(previous, topic.term)
                 updated = capture(topic, seeds, identity=identity[1] if identity else None)
                 replace(file, gzip.compress(json.dumps(updated, ensure_ascii=False).encode(), mtime=0))
@@ -363,7 +512,24 @@ def collect(db, storage, offline, previous=None):
                    (key, json.dumps([i for i, _, _ in data["rows"]]), data["crowded"],
                     bool(topic.cls and data.get("discoveryVersion", 1) < DISCOVERY_VERSION)))
         captures.append(data)
-    source_vocabulary.collect(db, storage, ((d["key"], vocabulary_terms(d["proposals"])) for d in captures), offline)
+        if topic.subject_lookup == "type":
+            db.executemany("INSERT OR IGNORE INTO discovered_subclass_subject VALUES(?)",
+                           ((cls,) for cls in data.get("subclassOnly", [])))
+        if not offline and topic.subject_lookup:
+            for cls, name, aliases in data["rows"]:
+                token = f"Q{cls}"
+                # The name service already supplied these labels while verifying the class identity.
+                cache = source_vocabulary.cache_file(storage, token)
+                if not cache.exists() or cache.stat().st_mtime < data["namedAt"]:
+                    row = [token, name, aliases]
+                    replace(cache, json.dumps({"row": row, "revision": digest(row)}, ensure_ascii=False).encode())
+                if topic.subject_lookup in ("type", "kind"):
+                    follow(storage, f"{topic.subject_lookup}:Q{cls}")
+                    if topic.subject_lookup == "type" and cls in data.get("subclassOnly", []):
+                        follow(storage, f"kind:Q{cls}")
+    source_vocabulary.collect(db, storage, (
+        (d["key"], {f"Q{i}" for i, _, _ in d["rows"]} if Topic.decode(d["key"]).subject_lookup
+         else vocabulary_terms(d["proposals"])) for d in captures), offline)
     for data in captures:
         for pos, rule in enumerate(pick(db, data["proposals"])):
             db.execute("INSERT INTO source_topic_rule VALUES(?,?,?)", (data["key"], rule, pos))

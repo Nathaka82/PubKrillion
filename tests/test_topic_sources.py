@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/knowledge"))
 import catalogue
+import class_updates
 import date_rules
 import ideas
 import topic_sources as topics
@@ -40,6 +41,92 @@ class SourceTopics(unittest.TestCase):
 
     def publish(self):
         return catalogue.build(self.world, self.pub, self.root, include_bundled=False, offline=True)
+
+    def test_unfamiliar_subject_verifies_its_class_then_automatically_builds_its_bank(self):
+        prompt = "Name a prism device"
+        topic = topics.Topic("prism device", subject_lookup="type")
+        with closing(catalogue.reader(self.pub)) as db:
+            with self.assertRaises(catalogue.UnverifiedRule) as waiting:
+                catalogue.match_question(db, prompt)
+            self.assertEqual(waiting.exception.requests, [topic.key])
+            self.assertTrue(watched_rules.follow(self.root, topic.key))
+            self.assertIsNone(catalogue.match_question(db, prompt + " that weighs less than a pear"))
+            self.assertEqual(ideas.published_suggestions(db, {"idea": prompt, "completeOnly": True}), [])
+            with self.assertRaises(catalogue.UnverifiedRule) as waiting:
+                catalogue.match_question(db, "Name a type of prism device")
+            self.assertEqual(waiting.exception.key, topics.Topic("prism device", subject_lookup="kind").key)
+        forms = {i: [i, "Prism device", []] for i in (901, 902)}
+        with (closing(sqlite3.connect(":memory:")) as stage,
+              patch.object(topics, "named_candidates", return_value=(forms, False)),
+              patch.object(topics, "bindings", return_value=[{"subject": binding("Q", i),
+                  "members": {"value": str(i == 902).lower()}, "children": {"value": "false"}} for i in forms]),
+              patch.object(vocabulary, "capture", side_effect=AssertionError("already verified subject names"))):
+            stage.execute("ATTACH DATABASE ? AS world", (str(self.world),))
+            stage.executescript(topics.SCHEMA)
+            result, = topics.collect(stage, self.root, False)
+            self.assertTrue(result["scopedIdentity"])
+            self.assertEqual(result["rows"], [forms[902]])
+        self.publish()
+        with closing(catalogue.reader(self.pub)) as db, self.assertRaises(catalogue.UnverifiedRule):
+            catalogue.match_question(db, prompt)
+        (key, file), = class_updates.registered(self.root)
+        self.assertEqual(key, "type:Q902")
+        rows = [{"item": binding("Q", i)} for i in (911, 912)]
+        with (patch.object(class_updates, "bindings", side_effect=[rows, [{"n": {"value": "2"}}]] * 2),
+              patch.object(class_updates, "named_items", return_value=[("Q911", "Another Prism", [], 0),
+                         ("Q912", "Small Prism", [], 0)])):
+            class_updates.advance(key, file)
+        self.publish()
+        with closing(catalogue.reader(self.pub)) as db, closing(sqlite3.connect(":memory:")) as game:
+            card = catalogue.match_question(db, prompt)
+            self.assertEqual((card["key"], card["records"], card["complete"]), (key, 2, False))
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            bank, _ = catalogue.play(db, game, key, card["prompt"])
+            self.assertEqual({r[0] for r in game.execute("SELECT entity FROM kb_member WHERE bank=?", (bank,))},
+                             {"wd:Q911", "wd:Q912"})
+
+    def test_unfamiliar_credit_subject_preserves_creator_and_truncated_search_cannot_select_a_class(self):
+        topic = topics.Topic("prism devices", subject_lookup="subject")
+        with closing(catalogue.reader(self.pub)) as db, self.assertRaises(catalogue.UnverifiedRule) as waiting:
+            ideas.published_suggestions(db, {"idea": "prism devices by Cedar", "completeOnly": False})
+        self.assertEqual(waiting.exception.requests, [topic.key])
+        with patch.object(topics, "named_candidates", return_value=({}, True)), patch.object(topics, "bindings") as source:
+            saved = topics.capture(topic)
+            self.assertTrue(saved["crowded"])
+            source.assert_not_called()
+        with closing(sqlite3.connect(self.pub)) as db:
+            db.execute("INSERT INTO source_topic VALUES(?,?,0,0)", (topic.key, "[901]"))
+            db.commit()
+        with closing(catalogue.reader(self.pub)) as db, self.assertRaises(catalogue.UnverifiedRule) as waiting:
+            ideas.published_suggestions(db, {"idea": "prism devices by Cedar", "completeOnly": False})
+        self.assertEqual(waiting.exception.requests, [topics.Topic("cedar", 901).key])
+
+    def test_subclass_only_source_offers_an_explicit_question_after_verification(self):
+        topic = topics.Topic("work", subject_lookup="type")
+        names = {10: [10, "Work", []]}
+        child = {"subject": binding("Q", 10), "members": {"value": "false"}, "children": {"value": "true"}}
+        with (patch.object(topics, "named_candidates", return_value=(names, False)),
+              patch.object(topics, "bindings", return_value=[child])):
+            self.assertEqual(topics.capture(topic)["subclassOnly"], [10])
+        with (patch.object(topics, "named_candidates", return_value=(names, False)),
+              patch.object(topics, "bindings", return_value=[]), self.assertRaisesRegex(ValueError, "did not finish")):
+            topics.capture(topic)
+        with closing(sqlite3.connect(self.pub)) as db:
+            db.execute("INSERT INTO discovered_subclass_subject VALUES(10)")
+            db.execute("INSERT INTO current_class VALUES('type:Q10','checked',100,0,0)")
+            db.commit()
+        with closing(catalogue.reader(self.pub)) as db, self.assertRaises(catalogue.UnverifiedRule) as pending:
+            catalogue.match_question(db, "Name a work")
+        self.assertEqual(pending.exception.key, "kind:Q10")
+        with closing(sqlite3.connect(self.pub)) as db:
+            db.execute("INSERT INTO current_class VALUES('kind:Q10','checked',101,2,2)")
+            db.executemany("INSERT INTO current_member VALUES('kind:Q10',?,?,'[]')", [(81, "Folio"), (82, "Volume")])
+            db.commit()
+        with closing(catalogue.reader(self.pub)) as db:
+            revised, = ideas.published_suggestions(db, {"idea": "Name a work", "completeOnly": False})
+            self.assertEqual((revised["key"], revised["records"]), ("kind:Q10", 2))
+            self.assertIn("type of", revised["prompt"])
+            self.assertEqual(catalogue.match_question(db, revised["prompt"])["key"], "kind:Q10")
 
     def test_plural_subjects_use_credited_works_even_with_many_source_meanings(self):
         with closing(sqlite3.connect(self.world)) as db:
@@ -154,7 +241,7 @@ class SourceTopics(unittest.TestCase):
         with closing(catalogue.reader(self.pub)) as db:
             with self.assertRaises(catalogue.UnverifiedRule) as request:
                 ideas.published_suggestions(db, {"idea": "Cedar", "completeOnly": False})
-            self.assertEqual(request.exception.requests, [topic.key])
+            self.assertEqual(request.exception.requests, [topic.key, topics.Topic("cedar", subject_lookup="type").key])
             self.assertEqual(ideas.published_suggestions(db, {"idea": "Cedar", "completeOnly": True}), [])
         self.assertTrue(watched_rules.follow(self.root, topic.key))
         self.assertTrue(watched_rules.due_requests(self.root, self.pub))

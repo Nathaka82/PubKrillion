@@ -171,11 +171,13 @@ def published_suggestions(db, request, *, follow_topic=None):
             if version >= 26 and db.execute("SELECT 1 FROM world_class_name LIMIT 1").fetchone():
                 import topic_sources
                 topic = topic_sources.parse(db, request["idea"], bare=True, edition=edition)
-                if topic and (topic.cls or db.execute("SELECT 1 FROM source_topic WHERE key=?",(topic.key,)).fetchone()):
+                if topic and topic.cls:
                     topic_sources.choices(db,topic,edition)
+                if topic and db.execute("SELECT 1 FROM source_topic WHERE key=?",(topic.key,)).fetchone():
+                    return topic_sources.bare_choices(db, topic, edition)
                 local = search(db,request["idea"],False)
                 if not local and topic:
-                    topic_sources.choices(db,topic,edition)
+                    return topic_sources.bare_choices(db, topic, edition)
                 return local
     except DateChoices as choices:
         if choices.cards or complete_only:

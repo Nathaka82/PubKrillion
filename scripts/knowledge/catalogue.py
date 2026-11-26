@@ -18,7 +18,7 @@ from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
 FORMAT = int(Path(__file__).with_name("catalogue-format").read_text(encoding="ascii"))
-RULE_REVISION = "wikimedia-production-company-1"
+RULE_REVISION = "named-subject-discovery-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -951,6 +951,8 @@ def match_question(db, prompt):
             import topic_sources
             if topic := topic_sources.parse(db,prompt,bare=False,edition=edition):
                 topic_sources.choices(db,topic,edition)
+            if file_format >= 27:
+                return topic_sources.discover_class_question(db,body)
         return relation
     return next(iter(options.values()), None)
 
