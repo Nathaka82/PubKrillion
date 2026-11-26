@@ -18,11 +18,16 @@ def participant_aliases(db, subject):
 
 def require_explicit_subject(db, body):
     subject = folded_spelling(body).rstrip("?").strip()
+    if db.execute("SELECT 1 FROM sqlite_master WHERE name='suggested_scope'").fetchone():
+        row = db.execute("SELECT class FROM suggested_scope WHERE term=? ORDER BY class LIMIT 1", (subject,)).fetchone()
+        if row:
+            from graph import indefinite_article
+            raise ValueError(f"Choose a published scope, such as “Name {indefinite_article(row[0])} {row[0]}”.")
     if participant_aliases(db, subject):
         raise ValueError("The event source uses that word for its participants. Specify the group or name the event.")
 
 
-def participant_choices(db, body, edition):
+def scoped_choices(db, body, edition):
     from catalogue import prompt_term, register_card
     from date_rules import DateChoices
 
@@ -31,7 +36,12 @@ def participant_choices(db, body, edition):
     subject = parts[0]
     qualifier = " " + parts[1] if len(parts) == 2 else ""
     terms = participant_aliases(db, subject)
-    if not terms or db.execute("SELECT 1 FROM question_text WHERE term=? LIMIT 1", (body,)).fetchone():
+    declared = {}
+    if db.execute("SELECT 1 FROM sqlite_master WHERE name='suggested_scope'").fetchone():
+        for row in db.execute("""SELECT r.* FROM suggested_scope s JOIN register_rule r
+            ON (r.source,r.class)=(s.source,s.class) WHERE s.term=? ORDER BY r.n DESC,r.key LIMIT 3""", (body,)):
+            declared[row["key"]] = register_card(db, row, edition)
+    if not (terms or declared) or db.execute("SELECT 1 FROM question_text WHERE term=? LIMIT 1", (body,)).fetchone():
         return
     if qualifier:
         for source, _ in terms:
@@ -56,7 +66,8 @@ def participant_choices(db, body, edition):
             SELECT r.* FROM overlap o JOIN rules r USING(class)
             ORDER BY r.n>(SELECT count(*) FROM sample) DESC,o.shared DESC,r.n DESC,r.complete DESC,r.key
             LIMIT 8""", (source, cls, cls))
-        cards = [{**register_card(db, row, edition), "complete": bool(row["complete"])} for row in related]
+        cards = [{**register_card(db, row, edition), "complete": bool(row["complete"])}
+                 for row in related if row["key"] not in declared]
         if qualifier:
             subjects = {cls}
             for card in cards:
@@ -83,8 +94,10 @@ def participant_choices(db, body, edition):
                                                 complete=False, edition=edition))
             for card in cards:
                 choices.setdefault(card["key"], card)
-    if choices:
-        raise DateChoices(list(choices.values())[:3],
+    if choices or declared:
+        offered = list(choices.values())
+        offered[1:1] = [card for key, card in declared.items() if key not in choices]
+        raise DateChoices(offered[:3],
                           "This wording can describe different groups. Choose the question you want to play.")
     if qualifier and db.execute("SELECT 1 FROM sqlite_master WHERE name='world_class_name'").fetchone():
         if db.execute("SELECT 1 FROM world_class_name WHERE term=? AND preferred=1", (subject,)).fetchone():

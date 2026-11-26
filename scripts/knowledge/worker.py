@@ -239,6 +239,8 @@ def main():
         game.executescript((ROOT / "server/knowledge.sql").read_text())
         try:
             bootstrap(db)
+            import m49
+            m49.refresh(db, args.db.parent / "knowledge-sources" / "un-m49.json.gz", offline=True)
             if index_path(args.db).is_file():
                 release = source_revision()
                 with db:

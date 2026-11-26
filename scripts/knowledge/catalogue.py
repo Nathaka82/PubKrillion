@@ -336,8 +336,10 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 from sources import refresh_fish
                 refresh_fish(db, output.parent / "knowledge-sources" / "fishbase.sqlite", offline)
             if isinstance(element_names, list):
+                import m49
                 from pubchem_register import refresh
                 refresh(db, output.parent / "knowledge-sources" / "pubchem-periodic-table.json", element_names, offline)
+                m49.refresh(db, output.parent / "knowledge-sources" / "un-m49.json.gz", offline)
             from nobel_register import import_snapshot
             if include_bundled:
                 import_snapshot(db, output.parent / "knowledge-sources" / "nobel-prizes.json", offline)
@@ -730,9 +732,9 @@ def search(db, idea, complete_only=False, *, comparisons=True):
     import date_rules
     edition_id,file_format = db.execute("SELECT edition,format FROM publication").fetchone()
     if file_format >= 8:
-        from scoped_topics import participant_choices
+        from scoped_topics import scoped_choices
         try:
-            participant_choices(db, topic_subject(folded_spelling(idea)).removesuffix("?").strip(), edition_id)
+            scoped_choices(db, topic_subject(folded_spelling(idea)).removesuffix("?").strip(), edition_id)
         except date_rules.DateChoices as choices:
             if choices.cards or complete_only:
                 return [card for card in choices.cards if not complete_only or card["complete"]]
@@ -1079,8 +1081,8 @@ def match_single(db, prompt, *, include_empty=False, request_target=False):
                 raise RuleWithdrawn("The latest source check contains no named members for this rule.")
             return {"key": key, "edition": edition[0], "prompt": wording, "records": n, "complete": bool(complete)}
     if edition[1] >= 8:
-        from scoped_topics import participant_choices
-        participant_choices(db, body, edition[0])
+        from scoped_topics import scoped_choices
+        scoped_choices(db, body, edition[0])
         entries = db.execute("SELECT key FROM class_topic WHERE term=? LIMIT 2", (body,)).fetchall()
         if len(entries) == 1:
             key = entries[0][0]

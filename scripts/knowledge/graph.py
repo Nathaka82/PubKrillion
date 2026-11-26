@@ -88,6 +88,8 @@ CREATE TABLE IF NOT EXISTS entity(source TEXT, id TEXT, name TEXT, aliases TEXT,
 CREATE INDEX IF NOT EXISTS entity_id ON entity(id);
 CREATE TABLE IF NOT EXISTS entity_name(source TEXT,term TEXT,id TEXT,PRIMARY KEY(source,term,id)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS entity_name_lookup ON entity_name(term,id);
+CREATE TABLE IF NOT EXISTS entity_name_proof(source TEXT,id TEXT,proof TEXT NOT NULL,PRIMARY KEY(source,id)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS suggested_scope(term TEXT,source TEXT,class TEXT,PRIMARY KEY(term,source,class)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS member(source TEXT, class TEXT, id TEXT, PRIMARY KEY(source,class,id)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS member_class ON member(class,id);
 CREATE INDEX IF NOT EXISTS member_id ON member(id,class);
@@ -208,6 +210,8 @@ def ingest(db, src, rows, *, index_names=True):
             "calendar",
             "entity",
             "entity_name",
+            "entity_name_proof",
+            "suggested_scope",
             "term",
             "term_display",
             "member",
@@ -263,6 +267,17 @@ def ingest(db, src, rows, *, index_names=True):
                     "INSERT OR IGNORE INTO entity_name VALUES(?,?,?)",
                     ((sid, norm(a), eid) for a in [name, *aliases]),
                 )
+            if r.get("nameSources"):
+                proofs = []
+                for claim in r["nameSources"]:
+                    if not isinstance(claim["names"], (list, tuple, set)):
+                        raise ValueError("Cited names must be a collection of spellings.")
+                    forms = sorted({label(value) for value in claim["names"]})
+                    if not forms or not set(forms).issubset({name, *aliases}):
+                        raise ValueError("Cited alternate names must belong to this entity.")
+                    proofs.append({"source": label(claim["source"]), "url": web_url(claim["url"]),
+                                   "identity": label(claim["identity"]), "names": forms})
+                db.execute("INSERT INTO entity_name_proof VALUES(?,?,?)", (sid, eid, json.dumps(proofs)))
             for c in set(r.get("types", [])):
                 db.execute("INSERT INTO member VALUES(?,?,?)", (sid, label(c), eid))
             for f in r.get("facts", []):
@@ -350,6 +365,11 @@ def ingest(db, src, rows, *, index_names=True):
             ).fetchone()[0]
             if type(expected) is not int or expected <= 0 or expected != actual:
                 raise ValueError("Incomplete enumerated source release for " + c)
+        for cls, phrases in src.get("suggestFor", {}).items():
+            if cls not in census or not isinstance(phrases, (list, tuple, set)):
+                raise ValueError("A suggested register needs a declared census and a collection of phrases.")
+            db.executemany("INSERT OR IGNORE INTO suggested_scope VALUES(?,?,?)",
+                           ((folded_spelling(label(phrase, 450)), sid, cls) for phrase in phrases))
         for cls, facets in src.get("completeFacets", {}).items():
             if cls not in census:
                 raise ValueError("Complete properties require an enumerated source class.")

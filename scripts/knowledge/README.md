@@ -128,6 +128,8 @@ Native CSV, JSON, JSONL and Parquet exports can use `rowMapping` to name their I
 
 The publisher checks every entry and requires exactly one value for each declared complete property. A qualifying property value shared by at least two entries generates a complete question and answer list. Missing values or a discrepancy in the reported total prevent the faulty edition from replacing the working one.
 
+A register can use `suggestFor` to associate broad host wording with a more precise question. Its keys identify classes in the declared census and its values list phrases. For example, “country in South America” offers the UN M49 country-or-area scope. The host sees the definition before play. For names joined from a second provider, an entity’s `nameSources` entries record the publisher, URL, matching identifier and spellings. The answer browser includes the citation with that entity.
+
 ```json
 {
   "source": "dairy-register",

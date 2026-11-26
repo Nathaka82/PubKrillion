@@ -495,11 +495,15 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     label_fields = ("l.forms,l.checked AS names_checked,l.variants,l.origin" if checked_labels
                     else "NULL AS forms,NULL AS names_checked,NULL AS variants,NULL AS origin")
     label_join = "LEFT JOIN candidate_labels l ON l.id=e.id" if checked_labels else ""
+    has_alias_proof = (db.execute("SELECT 1 FROM sqlite_master WHERE name='entity_name_proof'").fetchone()
+                       and db.execute("SELECT 1 FROM entity_name_proof LIMIT 1").fetchone())
+    proof_field = "p.proof" if has_alias_proof else "NULL"
+    proof_join = "LEFT JOIN entity_name_proof p ON (p.source,p.id)=(e.source,e.id)" if has_alias_proof else ""
     surveyed = db.execute("SELECT 1 FROM recall WHERE prompt=? LIMIT 1", (prompt,)).fetchone()
     has_familiarity = db.execute("SELECT 1 FROM familiarity LIMIT 1").fetchone()
-    joined = db.execute(f"""SELECT e.*, {label_fields}, (SELECT json_group_array(m.class) FROM membership m
+    joined = db.execute(f"""SELECT e.*, {label_fields}, {proof_field} AS name_proof, (SELECT json_group_array(m.class) FROM membership m
             WHERE m.id=e.id AND m.source=e.source) AS classes FROM {candidates} c CROSS JOIN entity e ON e.id=c.id
-        {label_join}
+        {label_join} {proof_join}
         WHERE ? IS NULL OR e.source=? ORDER BY c.id,e.source""", (plan.get("register"), plan.get("register")))
     for eid, records in groupby(joined, key=lambda r: r["id"]):
         rows = list(records)
@@ -624,6 +628,9 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                 continue
             evidence.extend(edges)
         selected.update(r["source"] for r in evidence)
+        for row in rows:
+            if row["name_proof"]:
+                evidence.extend(json.loads(row["name_proof"]))
         if names_checked is not None:
             url = "https://www.wikidata.org/wiki/"+eid[3:]
             if name_origin.startswith("dump:") and (revision := name_origin.rsplit(":",1)[1]).isdecimal():
