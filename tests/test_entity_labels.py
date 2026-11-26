@@ -60,9 +60,11 @@ class EntityLabels(unittest.TestCase):
                 (first,),
             )
             entity_labels.request(self.root, graph, game, first)
+            game.execute("UPDATE kb_member SET depth=5 WHERE bank=? AND lower(name)='shared'", (second,))
             entity_labels.request(self.root, graph, game, second)
             with closing(sqlite3.connect(entity_labels.queue_path(self.root))) as queue:
                 self.assertEqual(list(queue.execute("SELECT id FROM wanted ORDER BY id")), [(1,), (2,), (3,)])
+                self.assertEqual(list(queue.execute("SELECT id FROM top_answers ORDER BY id")), [(1,), (2,)])
                 self.assertEqual(queue.execute("SELECT count(*) FROM requested").fetchone()[0], 1)
                 # A previous version may have recorded a bank after checking its representatives only.
                 queue.execute("DELETE FROM wanted WHERE id=2")
@@ -196,6 +198,29 @@ class EntityLabels(unittest.TestCase):
                 self.assertGreater(earliest, time.time() + 7100)
                 queue.touch()
                 self.assertFalse(entity_labels.due(self.root))
+
+    def test_top_answers_get_a_lookup_alongside_popular_and_unrequested_subjects(self):
+        path = entity_labels.queue_path(self.root)
+        path.parent.mkdir(parents=True)
+        with closing(sqlite3.connect(path)) as db:
+            db.executescript(entity_labels.QUEUE)
+            db.executemany(
+                "INSERT INTO wanted VALUES(?,?)",
+                [(8, 1), (10, 500), (11, 400), (12, 300)],
+            )
+            db.execute("INSERT INTO top_answers VALUES(8)")
+            db.commit()
+
+        def names(ids, **kwargs):
+            return [(i, (i, "Name " + i, [], 1)) for i in ids]
+
+        with (
+            closing(sqlite3.connect(":memory:")) as world,
+            patch.object(sources, "entity_name_records", side_effect=names) as fetch,
+        ):
+            world.execute("ATTACH DATABASE ? AS world", (str(self.world),))
+            entity_labels.refresh(world, self.root, batches=3, size=2)
+            self.assertEqual([c.args[0] for c in fetch.call_args_list],[["Q1","Q2"],["Q8","Q10"],["Q11","Q12"]])
 
     def test_incomplete_fields_cannot_retire_observed_names(self):
         for fields in (

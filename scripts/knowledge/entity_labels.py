@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS pacing(id INTEGER PRIMARY KEY,queue_stamp INTEGER,ear
 INSERT OR IGNORE INTO pacing VALUES(1,0,0);"""
 QUEUE = """CREATE TABLE IF NOT EXISTS wanted(id INTEGER PRIMARY KEY,priority INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS wanted_by_priority ON wanted(priority DESC,id);
+CREATE TABLE IF NOT EXISTS top_answers(id INTEGER PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS requested(bank TEXT PRIMARY KEY) WITHOUT ROWID;"""
 
 
@@ -174,6 +175,21 @@ def index_names(db, reuse):
         )
 
 
+def public_owners(game, bank, *, highest=False):
+    tier = " AND depth=5" if highest else ""
+    return game.execute(
+        f"""WITH owners(entity) AS (
+        SELECT entity FROM kb_member WHERE bank=?{tier}
+        UNION ALL
+        SELECT DISTINCT json_extract(p.value,'$.entity') FROM kb_member m,
+            json_each(m.evidence) p WHERE m.bank=?{tier} AND p.type='object' AND json_type(p.value,'$.classes')='array'
+            AND json_extract(p.value,'$.entity')<>m.entity)
+        SELECT CAST(substr(entity,5) AS INTEGER) FROM owners WHERE entity GLOB 'wd:Q[1-9]*'
+        AND entity='wd:Q'||CAST(substr(entity,5) AS INTEGER)""",
+        (bank, bank),
+    )
+
+
 def request(storage, publication, game, bank):
     """Queue distinct public IDs. Rooms, guesses and prompt text stay in the game."""
     from watched_rules import requests_folder
@@ -192,20 +208,12 @@ def request(storage, publication, game, bank):
     folder.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(folder / "entity-labels.sqlite", timeout=2)) as queue:
         queue.executescript(QUEUE)
-        if queue.execute("SELECT 1 FROM requested WHERE bank=?", (key,)).fetchone():
-            return
         with queue:
-            rows = game.execute(
-                """WITH owners(entity) AS (
-                    SELECT entity FROM kb_member WHERE bank=?
-                    UNION ALL
-                    SELECT DISTINCT json_extract(p.value,'$.entity') AS other FROM kb_member m,
-                        json_each(m.evidence) p WHERE m.bank=? AND p.type='object' AND json_type(p.value,'$.classes')='array'
-                        AND json_extract(p.value,'$.entity')<>m.entity)
-                SELECT CAST(substr(entity,5) AS INTEGER) FROM owners WHERE entity GLOB 'wd:Q[1-9]*'
-                AND entity='wd:Q'||CAST(substr(entity,5) AS INTEGER)""",
-                (bank, bank),
-            )
+            # Scores can change while two editions still share the same eligible owners.
+            queue.executemany("INSERT OR IGNORE INTO top_answers VALUES(?)",public_owners(game,bank,highest=True))
+            if queue.execute("SELECT 1 FROM requested WHERE bank=?", (key,)).fetchone():
+                return
+            rows = public_owners(game,bank)
             ranked = bool(
                 publication.execute("SELECT 1 FROM sqlite_master WHERE name='readership'").fetchone()
             )
@@ -268,13 +276,19 @@ def refresh(world, storage, *, batches=6, size=40):
         queued = queue.is_file()
         if queued:
             cache.execute("ATTACH DATABASE ? AS requests", (queue.resolve().as_uri() + "?mode=ro",))
+        has_top = queued and cache.execute(
+            "SELECT 1 FROM requests.sqlite_master WHERE name='top_answers'").fetchone()
         try:
             for batch in range(batches):
                 ids = []
                 if queued and batch:
+                    if batch == 1 and has_top:
+                        ids = [r[0] for r in cache.execute("""SELECT t.id FROM requests.top_answers t
+                            WHERE NOT EXISTS(SELECT 1 FROM label_record c WHERE c.id=t.id)
+                            ORDER BY t.id LIMIT ?""",(size,))]
                     # Reserve a batch for renewing old records. Popular answers must not
                     # consume the new-name allowance every time they become due again.
-                    if batch == batches - 1:
+                    if not ids and batch == batches - 1:
                         ids = [
                             r[0]
                             for r in cache.execute(
@@ -284,16 +298,17 @@ def refresh(world, storage, *, batches=6, size=40):
                                 (now - 7 * 86400, size),
                             )
                         ]
-                    if not ids:
-                        ids = [
+                    if len(ids) < size:
+                        ids.extend(
                             r[0]
                             for r in cache.execute(
                                 """SELECT w.id FROM requests.wanted w
                             WHERE w.id>0 AND NOT EXISTS(SELECT 1 FROM label_record c WHERE c.id=w.id)
+                            AND w.id NOT IN (SELECT value FROM json_each(?))
                             ORDER BY w.priority DESC,w.id LIMIT ?""",
-                                (size,),
+                                (json.dumps(ids),size-len(ids)),
                             )
-                        ]
+                        )
                 scanning = not ids
                 if scanning:
                     ids = [

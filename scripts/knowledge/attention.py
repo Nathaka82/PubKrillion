@@ -136,7 +136,7 @@ def score(graph, publication, size):
             CROSS JOIN readership r ON r.id=j.value""", (json.dumps([r[0] for r in batch]),))
         graph.executemany("INSERT INTO answer_views VALUES(?,?)", matches)
     graph.execute("""CREATE TEMP TABLE name_views AS
-        SELECT q.owner,max(v.views) views,count(v.views)=count(*) complete,
+        SELECT q.owner,max(v.views) views,sum(v.views) total_views,count(v.views)=count(*) complete,
             min(coalesce((SELECT max(g.incoming) FROM graph_familiarity g WHERE g.id=q.id),0) BETWEEN 1 AND 6) sparse
         FROM qualified q LEFT JOIN answer_views v USING(id) GROUP BY q.owner HAVING count(v.views)>0""")
     covered, full = graph.execute("SELECT count(*),coalesce(sum(complete),0) FROM name_views").fetchone()
@@ -145,18 +145,27 @@ def score(graph, publication, size):
     if covered >= 12:
         # Unmeasured names could be anywhere in the ranking. Use the least favourable
         # position for each bonus and include every tie at its boundary.
-        graph.execute("""WITH ranked AS MATERIALIZED (
-            SELECT owner,views,complete,sparse,
-                count(*) OVER (ORDER BY views) low,
-                count(*) OVER (ORDER BY views DESC) high
-            FROM name_views
+        # The most-read owner supplies a lower bound for a shared title. Its
+        # combined readership must still be rare against those lower bounds.
+        graph.execute("""WITH boundaries(views,n) AS (
+            SELECT views,count(*) FROM name_views GROUP BY views UNION ALL
+            SELECT total_views,0 FROM name_views WHERE complete AND total_views<>views GROUP BY total_views
+        ), positions AS MATERIALIZED (
+            SELECT views,sum(sum(n)) OVER (ORDER BY views) low,sum(sum(n)) OVER (ORDER BY views DESC) high
+            FROM boundaries GROUP BY views
+        ), ranked AS MATERIALIZED (
+            SELECT n.owner,n.total_views,n.complete,n.sparse,p.high,t.low
+            FROM name_views n JOIN positions p ON p.views=n.views LEFT JOIN positions t ON t.views=n.total_views
         ) UPDATE result SET depth=CASE
                 WHEN (high+:unknown)*100<=15*:size THEN 1
                 WHEN depth=1 THEN 1
                 WHEN complete AND sparse AND (low+:unknown)*100<=10*:size THEN max(depth,4)
                 WHEN complete AND (low+:unknown)*100<=25*:size THEN max(depth,3)
                 ELSE depth END,
-            proxy=CASE WHEN (high+:unknown)*100<=75*:size THEN NULL ELSE proxy END
+            proxy=CASE WHEN (high+:unknown)*100<=75*:size THEN NULL ELSE proxy END,
+            rare_views=CASE WHEN complete AND sparse AND depth>1 AND survey_total=0
+                AND (low+:unknown)*100<=2*:size THEN total_views END,
+            view_rank_bound=low+:unknown
             FROM ranked WHERE result.id=ranked.owner AND result.upper IS NULL""",
             {"unknown": size-full, "size": size})
     return {"source": "Wikidata QRank", "url": info[1], "revision": info[0],

@@ -6,7 +6,7 @@ import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
-BANK_FORMAT = 35
+BANK_FORMAT = 36
 
 
 def noun(text):
@@ -463,7 +463,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             gaps[state] += n
     db.executescript("""DROP TABLE IF EXISTS temp.result; CREATE TEMP TABLE result(
         id TEXT PRIMARY KEY, name TEXT, depth INTEGER, aliases TEXT, evidence TEXT, upper REAL, proxy REAL,
-        term TEXT UNIQUE, links INTEGER, survey_total REAL NOT NULL);""")
+        term TEXT UNIQUE, links INTEGER, survey_total REAL NOT NULL, rare_views INTEGER, view_rank_bound INTEGER);""")
     db.executescript("""DROP TABLE IF EXISTS temp.qualified;
         CREATE TEMP TABLE qualified(id TEXT PRIMARY KEY, owner TEXT NOT NULL) WITHOUT ROWID;
         DROP TABLE IF EXISTS temp.spellings;
@@ -709,7 +709,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             )
         else:
             db.execute(
-                "INSERT INTO result VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO result(id,name,depth,aliases,evidence,upper,proxy,term,links,survey_total) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     eid,
                     primary,
@@ -749,12 +749,28 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         budget -= num
     # Spend at most one percent on proxy-only estimates, preserving ties at the boundary.
     budget = min(budget, size // 100)
+    if readership:
+        promoted = 0
+        for views, num in db.execute("""SELECT rare_views,count(*) FROM result
+                WHERE rare_views IS NOT NULL GROUP BY rare_views ORDER BY rare_views""").fetchall():
+            if num > budget:
+                budget = 0
+                break
+            db.execute("""UPDATE result SET depth=5,evidence=json_insert(evidence,'$[#]',json_object(
+                'source','Wikidata QRank','readershipViews',rare_views,'rankAtMost',view_rank_bound,
+                'answerNames',?,'incomingLinksPerOwnerBetween',json_array(1,6),'url',?,'revision',?)) WHERE rare_views=?""",
+                (size,readership["url"],readership["revision"],views))
+            promoted += num
+            budget -= num
+        readership["topTierEstimates"] = promoted
     for value, num in db.execute(
-        "SELECT proxy,COUNT(*) FROM result WHERE proxy IS NOT NULL GROUP BY proxy ORDER BY proxy"
+        """SELECT proxy,COUNT(*) FROM result WHERE proxy IS NOT NULL AND depth BETWEEN 2 AND 4
+            AND upper IS NULL AND survey_total=0 GROUP BY proxy ORDER BY proxy"""
     ).fetchall():
         if num > budget:
             break
-        db.execute("UPDATE result SET depth=5 WHERE proxy=?", (value,))
+        db.execute("""UPDATE result SET depth=5 WHERE proxy=? AND depth BETWEEN 2 AND 4
+            AND upper IS NULL AND survey_total=0""", (value,))
         budget -= num
     if not size:
         raise ValueError(
@@ -948,6 +964,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             if "catalogueKey" in plan else ""
         ) + (" " + plan["borderScope"] if plan.get("borderScope") else ""),
         "scoring": (f"Published Wikimedia readership over 52 weeks covers {readership['coveredAnswers']:,} of {size:,} answer names. "
+                    f"{readership['topTierEstimates']:,} earned the top tier through bottom-2% readership and sparse graph links. "
                     if readership else "") + "Graph links help estimate relative familiarity. First choices from at least 200 teams across three rooms and exact-prompt surveys use an upper confidence bound. At most 5% qualify for the top tier, with at most 1% from two supporting familiarity signals. Missing data earns no rarity bonus.",
         "readership": readership,
         "plan": plan,

@@ -57,9 +57,136 @@ class ReadershipTests(unittest.TestCase):
                               ((i,1 if i in shared else i) for i in range(1,104)))
             bank, _ = evaluate(graph,game,prompt,name_catalogue=graph)
             tiers = dict(game.execute("SELECT name,depth FROM kb_member WHERE bank=?", (bank,)))
-            self.assertEqual(tiers["Shared A"],2)
-            self.assertEqual(tiers["Shared B"],2)
-            self.assertEqual(tiers["Film 3"],4)
+            self.assertEqual(tiers["Shared A"], 2)
+            self.assertEqual(tiers["Shared B"], 2)
+            self.assertEqual(tiers["Film 3"], 4)
+
+    def test_top_readership_estimates_respect_missing_owners_ties_surveys_and_the_combined_cap(
+        self,
+    ):
+        import json
+
+        prompt = "Name a film"
+        films = [
+            {
+                "id": f"wd:Q{i}",
+                "name": f"Film {i}",
+                "types": ["film"],
+                "graph_recognition": [0, 3],
+            }
+            for i in range(1, 201)
+        ]
+        films[0]["recall"] = [{"prompt": prompt, "count": 150, "participants": 300}]
+        # Another name qualifies through the existing word-frequency estimator.
+        films[4].update(recognition=[1.3, 2], depth=4)
+        with (
+            closing(open_graph(":memory:")) as graph,
+            closing(sqlite3.connect(":memory:")) as game,
+        ):
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            ingest(
+                graph,
+                {
+                    "source": "films",
+                    "revision": "1",
+                    "url": "https://example.org",
+                    "terms": {"film": []},
+                },
+                films,
+            )
+            graph.executescript(attention.SCHEMA)
+            graph.execute(
+                "INSERT INTO readership_release VALUES('week','https://example.org/qrank',200)"
+            )
+            graph.executemany(
+                "INSERT INTO readership VALUES(?,?)",
+                ((i, 2 if i in (2, 3) else i) for i in range(1, 201)),
+            )
+
+            def compile(edition):
+                bank, meta = evaluate(
+                    graph, game, prompt, name_catalogue=graph, name_edition=edition
+                )
+                rare = {
+                    name: json.loads(proof)
+                    for name, proof in game.execute(
+                        "SELECT name,evidence FROM kb_member WHERE bank=? AND depth=5",
+                        (bank,),
+                    )
+                }
+                self.assertLessEqual(len(rare), 2)
+                return rare, meta["readership"]["topTierEstimates"]
+
+            rare, count = compile("complete")
+            self.assertEqual(count, 2)
+            self.assertEqual(set(rare), {"Film 2", "Film 3"})
+            for entries in rare.values():
+                row = next(p for p in entries if "readershipViews" in p)
+                self.assertEqual(
+                    (
+                        row["readershipViews"],
+                        row["rankAtMost"],
+                        row["answerNames"],
+                        row["revision"],
+                    ),
+                    (2, 3, 200, "week"),
+                )
+            graph.execute("UPDATE readership SET views=2 WHERE id=4")
+            self.assertEqual(compile("tie-exceeds-budget"), ({}, 0))
+            graph.execute("DELETE FROM readership WHERE id>=198")
+            rare, count = compile("incomplete")
+            self.assertEqual(count, 0)
+            self.assertNotIn("Film 2", rare)
+            self.assertNotIn("Film 1", rare)
+
+    def test_shared_readership_is_combined_before_awarding_a_rarity_bonus(self):
+        films = [
+            {
+                "id": f"wd:Q{i}",
+                "name": "Shared" if i <= 3 else f"Film {i}",
+                "types": ["film"],
+                "graph_recognition": [0, 3],
+            }
+            for i in range(1, 203)
+        ]
+        with (
+            closing(open_graph(":memory:")) as graph,
+            closing(sqlite3.connect(":memory:")) as game,
+        ):
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            ingest(
+                graph,
+                {
+                    "source": "films",
+                    "revision": "1",
+                    "url": "https://example.org",
+                    "terms": {"film": []},
+                },
+                films,
+            )
+            graph.executescript(attention.SCHEMA)
+            graph.execute(
+                "INSERT INTO readership_release VALUES('week','https://example.org/qrank',202)"
+            )
+            # Each shared owner looks rarer than any individual rival. Together
+            # they have 30 views and fall outside the top two percent.
+            graph.executemany(
+                "INSERT INTO readership VALUES(?,?)",
+                ((i, 10 if i <= 3 else 10 + i) for i in range(1, 203)),
+            )
+            bank, meta = evaluate(graph, game, "Name a film", name_catalogue=graph)
+            tiers = dict(
+                game.execute("SELECT name,depth FROM kb_member WHERE bank=?", (bank,))
+            )
+            self.assertLess(tiers["Shared"], 5)
+            self.assertEqual(
+                (
+                    tiers["Film 4"],
+                    tiers["Film 5"],
+                    meta["readership"]["topTierEstimates"],
+                ),
+                (5, 5, 2),
+            )
 
     def test_counts_entity_surveys_separately_and_team_choices_once_for_shared_titles(self):
         prompt = "Name a film"
