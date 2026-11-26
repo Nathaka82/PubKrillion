@@ -296,6 +296,8 @@ def main():
             subject = noun(
                 re.sub(r"^(?:name|give me|identify) ", "", prompt, flags=re.IGNORECASE)
             )
+            from scoped_topics import require_explicit_subject
+            require_explicit_subject(db, subject)
             simple = bool(
                 re.fullmatch(r"[\w '’\-]{1,80}", subject)
                 and not re.search(

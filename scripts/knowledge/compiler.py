@@ -60,6 +60,8 @@ def interpret(db, prompt):
         flags=re.IGNORECASE,
     )
     body = noun(body)
+    from scoped_topics import require_explicit_subject
+    require_explicit_subject(db, body)
     try:
         return {"class": class_term(db, body)}
     except ValueError:

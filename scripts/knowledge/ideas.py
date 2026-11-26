@@ -180,7 +180,7 @@ def published_suggestions(db, request):
     except DateChoices as choices:
         if choices.cards or complete_only:
             request["sourceNote"] = str(choices)
-            return [] if complete_only else choices.cards
+            return [card for card in choices.cards if card["complete"] or not complete_only]
         raise
     except UnverifiedRule:
         if complete_only:

@@ -68,6 +68,45 @@ class CatalogueTests(unittest.TestCase):
         with patch.object(catalogue, "bootstrap"):
             return catalogue.build(self.world, self.published, self.root, offline=True)
 
+    def test_event_participant_alias_offers_scoped_questions_and_preserves_the_qualifier(self):
+        from compiler import interpret
+        from date_rules import DateChoices
+        from ideas import published_suggestions
+        competition = {"key": "showcase", "competition": "Design Showcase", "event_aliases": [],
+            "participant": "festival entrant", "participant_aliases": ["studio"], "expected": [2022],
+            "editions": [[2022, "Amber", "Violet"]], "url": "https://example.org/showcase"}
+        (self.root / "show.manifest.json").write_text(json.dumps({"competition": competition}))
+        subject = "Design Council studio"
+        manifest = {"source": "council", "revision": "1", "url": "https://example.org/council",
+                    "census": {subject: 4}, "file": "studios.json",
+                    "completeFacets": {subject: {"in": "Name a DC studio in {value}"}}}
+        (self.root / "council.manifest.json").write_text(json.dumps(manifest))
+        (self.root / "studios.json").write_text(json.dumps([
+            {"id": name, "name": name, "types": [subject], "edges": [["in", region]]}
+            for name, region in [("Amber", "West"), ("Violet", "West"), ("Indigo", "East"), ("Teal", "East")]
+        ]))
+        self.publish()
+        with closing(catalogue.reader(self.published)) as db, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            with self.assertRaisesRegex(ValueError, "name the event"):
+                interpret(db, "Name a studio")
+            self.assertEqual(interpret(db, "Name a studio that reached Design Showcase")["relation"], "reached")
+            with self.assertRaises(DateChoices) as choose:
+                catalogue.match_question(db, "Name a studio")
+            self.assertEqual(choose.exception.cards[0]["records"], 4)
+            self.assertTrue(any("Showcase" in card["prompt"] for card in choose.exception.cards))
+            request = {"idea": "Name a studio in East", "completeOnly": True}
+            cards = published_suggestions(db, request)
+            self.assertEqual([(c["prompt"], c["records"]) for c in cards], [("Name a DC studio in East", 2)])
+            self.assertEqual(catalogue.search(db, "studio in East", complete_only=True), cards)
+            exact = catalogue.match_question(db, cards[0]["prompt"])
+            bank, _ = catalogue.play(db, game, exact["key"], exact["prompt"])
+            self.assertEqual(game.execute("SELECT name FROM kb_member WHERE bank=? ORDER BY name", (bank,)).fetchall(),
+                             [("Indigo",), ("Teal",)])
+            with self.assertRaises(DateChoices) as unavailable:
+                catalogue.match_question(db, "Name a studio in Outer Space")
+            self.assertEqual(unavailable.exception.cards, [])
+
     def test_taxonomy_refresh_resumes_follows_new_parents_and_withdraws_old_paths(self):
         import re
         snapshot=taxonomy.location(self.root)
