@@ -7,7 +7,7 @@ import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
-BANK_FORMAT = 36
+BANK_FORMAT = 37
 
 
 def publication_batches(game, cursor, size):
@@ -480,8 +480,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         for state, n in db.execute("SELECT outcome,count(*) FROM measure_decision WHERE outcome<>'accepted' GROUP BY outcome"):
             gaps[state] += n
     db.executescript("""DROP TABLE IF EXISTS temp.result; CREATE TEMP TABLE result(
-        id TEXT PRIMARY KEY, name TEXT, depth INTEGER, aliases TEXT, evidence TEXT, upper REAL, proxy REAL,
-        term TEXT UNIQUE, links INTEGER, survey_total REAL NOT NULL, rare_views INTEGER, view_rank_bound INTEGER);""")
+        id TEXT PRIMARY KEY, name TEXT, depth INTEGER, aliases TEXT, evidence TEXT, upper REAL, proxy TEXT, proxy_rank INTEGER,
+        term TEXT UNIQUE, links INTEGER, link_ceiling INTEGER, survey_total REAL NOT NULL, rare_views INTEGER, view_rank_bound INTEGER);""")
     db.executescript("""DROP TABLE IF EXISTS temp.qualified;
         CREATE TEMP TABLE qualified(id TEXT PRIMARY KEY, owner TEXT NOT NULL) WITHOUT ROWID;
         DROP TABLE IF EXISTS temp.spellings;
@@ -667,7 +667,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         if upper is not None:
             depth = recall_depth(upper)
         signal = db.execute(
-            "SELECT frequency,languages FROM familiarity WHERE id=? ORDER BY frequency DESC LIMIT 1",
+            "SELECT max(frequency),max(languages),max(frequency>0 AND languages>=2) FROM familiarity WHERE id=?",
             (eid,),
         ).fetchone() if has_familiarity else None
         if signal and not any(signal):
@@ -676,22 +676,23 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         if (
             upper is None
             and signal
+            and signal[2]
             and 0 < signal[0] < 2.5
             and 2 <= signal[1] <= 6
             and depth >= 3
         ):
-            proxy = round(signal[0] + math.log10(signal[1]), 3)
+            proxy = "language coverage"
         links = None
         world_only = all(r["source"].startswith(("world5m-", "wikidata-query-", "wikidata-joined-")) for r in rows)
         if world_only or (upper is None and not signal and depth >= 3):
-            frequency, incoming = db.execute(
-                "SELECT MAX(frequency),MAX(incoming) FROM graph_familiarity WHERE id=?",
+            frequency, incoming, paired = db.execute(
+                "SELECT MAX(frequency),MAX(incoming),MAX(frequency>0 AND incoming>0) FROM graph_familiarity WHERE id=?",
                 (eid,),
             ).fetchone()
             if world_only:
                 links = incoming
-            if upper is None and not signal and depth >= 3 and frequency and 0 < frequency < 2.5 and 1 <= incoming <= 6:
-                proxy = round(frequency + math.log10(1 + incoming), 3)
+            if upper is None and not signal and depth >= 3 and paired and 0 < frequency < 2.5 and 1 <= incoming <= 6:
+                proxy = "graph links"
             if upper is None and not signal and not (frequency or incoming):
                 depth = min(depth, 2)
         existing = db.execute("SELECT * FROM result WHERE term=?", (term,)).fetchone()
@@ -713,14 +714,12 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             )
             if upper is not None:
                 depth = min(depth, recall_depth(upper))
-            proxy = (
-                max(proxy, existing["proxy"])
-                if proxy is not None and existing["proxy"] is not None
-                else None
-            )
+            if proxy != existing["proxy"]:
+                proxy = None
             db.execute(
                 """UPDATE result SET depth=?,aliases=?,evidence=?,upper=?,proxy=?,
-                    links=max(coalesce(links,0),coalesce(?,0)),survey_total=? WHERE term=?""",
+                    links=max(coalesce(links,0),coalesce(?,0)),link_ceiling=link_ceiling+nullif(?,0),
+                    survey_total=? WHERE term=?""",
                 (
                     min(depth, existing["depth"]),
                     json.dumps(aliases),
@@ -728,13 +727,15 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                     upper,
                     proxy,
                     links,
+                    links,
                     survey_total,
                     term,
                 ),
             )
         else:
             db.execute(
-                "INSERT INTO result(id,name,depth,aliases,evidence,upper,proxy,term,links,survey_total) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                """INSERT INTO result(id,name,depth,aliases,evidence,upper,proxy,term,links,link_ceiling,survey_total)
+                   VALUES(?,?,?,?,?,?,?,?,?,nullif(?,0),?)""",
                 (
                     eid,
                     primary,
@@ -745,19 +746,21 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                     proxy,
                     term,
                     links,
+                    links,
                     survey_total,
                 ),
             )
-    size = db.execute("SELECT COUNT(*) FROM result").fetchone()[0]
+    size, unknown_recall = db.execute("SELECT count(*),count(*)-count(upper) FROM result").fetchone()
     # A single graph signal can separate the middle tiers. Ties stay together and zero links
     # convey missing evidence. A top score still requires recall or corroborating signals.
-    db.execute("""WITH ranks AS MATERIALIZED (
-        SELECT id, count(*) OVER () n, cume_dist() OVER (ORDER BY links) low,
-            cume_dist() OVER (ORDER BY links DESC) high FROM result WHERE links>0
-    ) UPDATE result SET depth=CASE WHEN ranks.high<=0.15 AND links>=10 THEN 1
-        WHEN ranks.low<=0.25 THEN 3 ELSE 2 END FROM ranks
-        WHERE result.id=ranks.id AND ranks.n>=12 AND result.depth=2 AND result.upper IS NULL""")
     import attention
+    db.execute("""WITH bounds(owner,low_value,high_value) AS MATERIALIZED (
+        SELECT id,links,link_ceiling FROM result WHERE links>0
+    )""" + attention.RANK_BOUNDS + """ UPDATE result SET depth=CASE
+        WHEN common_rank*100<=15*:size AND links>=10 THEN 1
+        WHEN rare_rank*100<=25*:size THEN 3 ELSE 2 END FROM ranked
+        WHERE result.id=ranked.owner AND measured>=12 AND result.depth=2 AND result.upper IS NULL""",
+        {"size": size})
     readership = attention.score(db, name_catalogue, size, register=plan.get("register"))
     # A partial survey can cap the bonus that indirect signals give a shared name.
     partial = db.execute("SELECT id,survey_total FROM result WHERE upper IS NULL AND survey_total>0")
@@ -769,6 +772,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     ).fetchall():
         if num > budget:
             budget = 0
+            break
+        if num + unknown_recall > budget:
             break
         db.execute("UPDATE result SET depth=5 WHERE upper=?", (bound,))
         budget -= num
@@ -788,15 +793,16 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             promoted += num
             budget -= num
         readership["topTierEstimates"] = promoted
-    for value, num in db.execute(
-        """SELECT proxy,COUNT(*) FROM result WHERE proxy IS NOT NULL AND depth BETWEEN 2 AND 4
-            AND upper IS NULL AND survey_total=0 GROUP BY proxy ORDER BY proxy"""
-    ).fetchall():
-        if num > budget:
-            break
-        db.execute("""UPDATE result SET depth=5 WHERE proxy=? AND depth BETWEEN 2 AND 4
-            AND upper IS NULL AND survey_total=0""", (value,))
-        budget -= num
+    if budget:
+        attention.rank_familiarity(db, size)
+        for rank, num in db.execute("""SELECT proxy_rank,count(*) FROM result WHERE proxy_rank IS NOT NULL
+                GROUP BY proxy_rank ORDER BY proxy_rank""").fetchall():
+            if num > budget:
+                break
+            db.execute("""UPDATE result SET depth=5,evidence=json_insert(evidence,'$[#]',json_object(
+                'familiaritySignals',json_array('word frequency',proxy),'rankAtMost',proxy_rank,'answerNames',?))
+                WHERE proxy_rank=?""", (size, rank))
+            budget -= num
     if not size:
         raise ValueError(
             "No answers met every condition. "
@@ -990,7 +996,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         ) + (" " + plan["borderScope"] if plan.get("borderScope") else ""),
         "scoring": (f"Published Wikimedia readership over 52 weeks covers {readership['coveredAnswers']:,} of {size:,} answer names. "
                     f"{readership['topTierEstimates']:,} earned the top tier through bottom-2% readership and sparse graph links. "
-                    if readership else "") + "Graph links help estimate relative familiarity. First choices from at least 200 teams across three rooms and exact-prompt surveys use an upper confidence bound. At most 5% qualify for the top tier, with at most 1% from two supporting familiarity signals. Missing data earns no rarity bonus.",
+                    if readership else "") + "Graph links help estimate relative familiarity. First choices from at least 200 teams across three rooms and exact-prompt surveys use an upper confidence bound. At most 5% qualify for the top tier. Estimates can award it to at most 1% and require two familiarity signals placing an answer in the bottom 2% even after allowing for missing data.",
         "readership": readership,
         "plan": plan,
         "sources": refs,

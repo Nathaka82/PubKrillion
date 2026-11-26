@@ -811,6 +811,13 @@ function evidenceLinks(evidence) {
   const items = new Set();
   const link = (url, label) => '<li><a target="_blank" rel="noopener noreferrer" href="' + esc(url) + '">' + label + '</a></li>';
   for (const record of evidence) {
+    if (Number.isSafeInteger(record.rankAtMost) && Number.isSafeInteger(record.answerNames)) {
+      const signals = record.readershipViews != null ? "Wikimedia readership and graph links" :
+        Array.isArray(record.familiaritySignals) ? record.familiaritySignals.join(" and ") : "";
+      const rank = record.rankAtMost === 1 ? 'the rarest' : 'among the ' + record.rankAtMost.toLocaleString() + ' rarest';
+      if (signals) items.add('<li>Estimated to be ' + rank + ' of ' + record.answerNames.toLocaleString() +
+        ' answers, using ' + esc(signals) + '.</li>');
+    }
     if (record.readershipItems?.length && record.url) {
       items.add(link(record.url, "Wikimedia readership over 52 weeks"));
       for (const entry of record.readershipItems) {

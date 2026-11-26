@@ -23,6 +23,68 @@ class ReadershipTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
 
+    def test_graph_and_readership_rank_shared_names_against_the_whole_bank(self):
+        def work(item, title, links):
+            return {"id": f"wd:Q{item}", "name": f"Title {title}", "types": ["work"],
+                    "graph_recognition": [0, links]}
+
+        with closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            source = {"source": "world5m-test", "url": "https://example.org", "terms": {"work": []}}
+
+            def tiers(**kwargs):
+                bank, _ = evaluate(graph, game, "Name a work", **kwargs)
+                return dict(game.execute("SELECT name,depth FROM kb_member WHERE bank=?", (bank,)))
+
+            # Twelve measured names are too few to put any of these twenty in either tail.
+            ingest(graph, dict(source, revision="partial"), [work(i, i, i if i <= 12 else 0) for i in range(1, 21)])
+            self.assertEqual(set(tiers().values()), {2})
+
+            rows = [work(i, i, i) for i in range(1, 21)] + [work(21, 4, 4), work(22, 10, 10), work(23, 20, 0)]
+            ingest(graph, dict(source, revision="shared"), rows)
+            graph_tiers = tiers()
+            graph.executescript(attention.SCHEMA)
+            graph.execute("INSERT INTO readership_release VALUES('fixture','https://example.org',22)")
+            graph.executemany("INSERT INTO readership VALUES(?,?)", [
+                (int(row["id"][4:]), row["graph_recognition"][1]) for row in rows if row["graph_recognition"][1]])
+            # Reading and link counts have the same ordering. Isolate the readership ranking.
+            graph.execute("UPDATE graph_familiarity SET incoming=0")
+            readership_tiers = tiers(name_catalogue=graph, name_edition="readership")
+            for scores in (graph_tiers, readership_tiers):
+                self.assertEqual(scores["Title 4"], 2)   # The two owners may have eight counts together.
+                self.assertEqual(scores["Title 5"], 3)   # The missing owner of Title 20 cannot make it rarer.
+                self.assertEqual(scores["Title 18"], 2)  # Title 10's combined twenty can outrank it.
+                self.assertEqual(scores["Title 19"], 1)
+                self.assertEqual(scores["Title 20"], 1)
+
+    def test_estimated_top_score_requires_comparable_evidence_across_the_bank(self):
+        prompt = "Name a work"
+        for field, signal in (("recognition", "language coverage"), ("graph_recognition", "graph links")):
+            with self.subTest(field=field), closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:
+                game.executescript((ROOT / "server/knowledge.sql").read_text())
+                source = {"source": "works", "url": "https://example.org", "terms": {"work": []}}
+                rows = [{"id": str(i), "name": f"Work {i}", "types": ["work"], "depth": 4} for i in range(100)]
+                rows[0][field] = [1, 2]
+                rows[1]["recall"] = [{"prompt": prompt, "count": 0, "participants": 2000}]
+                ingest(graph, dict(source, revision="sparse"), rows)
+                old, meta = evaluate(graph, game, prompt)
+                self.assertEqual(meta["counts"][5], 0)
+
+                for row in rows[1:]:
+                    row[field] = [4, 10]
+                ingest(graph, dict(source, revision="measured"), rows)
+                bank, meta = evaluate(graph, game, prompt)
+                self.assertEqual(meta["counts"][5], 1)
+                name, proof = game.execute("SELECT name,evidence FROM kb_member WHERE bank=? AND depth=5", (bank,)).fetchone()
+                self.assertEqual(name, "Work 0")
+                claim = next(item for item in json.loads(proof) if "familiaritySignals" in item)
+                self.assertEqual((claim["rankAtMost"], claim["answerNames"], claim["familiaritySignals"]),
+                                 (1, 100, ["word frequency", signal]))
+                self.assertFalse(game.execute("SELECT 1 FROM kb_member WHERE bank=? AND depth=5", (old,)).fetchone())
+                rows[2][field] = rows[0][field]
+                ingest(graph, dict(source, revision="tie"), rows)
+                self.assertEqual(evaluate(graph, game, prompt)[1]["counts"][5], 0)
+
     def test_cross_register_conflicts_and_native_ids_do_not_double_count_readership(self):
         with closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:
             game.executescript((ROOT / "server/knowledge.sql").read_text())

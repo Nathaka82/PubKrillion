@@ -154,6 +154,52 @@ def add_registry_readership(graph, publication, register, revision, url):
             WHERE result.id=proofs.owner AND result.upper IS NULL""", (url, revision))
 
 
+# bounds has one row per measured answer name. A shared name has at least the
+# count of its most familiar owner and at most the sum across all its owners.
+# An unmeasured owner leaves the upper bound open. Count each possible rival
+# once, including every tie, to find the worst position in either direction.
+RANK_BOUNDS = """
+    , coverage AS (SELECT count(*) measured,count(high_value) complete FROM bounds)
+    , endpoints(value,starts,ends) AS (
+        SELECT low_value,count(*),0 FROM bounds GROUP BY low_value UNION ALL
+        SELECT high_value,0,count(*) FROM bounds WHERE high_value IS NOT NULL GROUP BY high_value
+    ), positions AS MATERIALIZED (
+        SELECT value,sum(sum(starts)) OVER (ORDER BY value) below,
+               sum(sum(ends)) OVER (ORDER BY value DESC) above FROM endpoints GROUP BY value
+    ), ranked AS MATERIALIZED (
+        SELECT b.owner,b.high_value,c.measured,
+               hi.below+(:size-c.measured) rare_rank,lo.above+(:size-c.complete) common_rank
+        FROM bounds b CROSS JOIN coverage c JOIN positions lo ON lo.value=b.low_value
+        LEFT JOIN positions hi ON hi.value=b.high_value
+    )
+"""
+
+
+def rank_familiarity(graph, size):
+    """Compare like measurements across the bank before awarding an estimated top score."""
+    # Zipf frequency is logarithmic. Convert to linear weights before combining owners.
+    graph.create_function("familiarity_weight", 2, lambda frequency, reach: (10 ** frequency) * reach,
+                          deterministic=True)
+    for method, table, spread, offset in (
+        ("language coverage", "familiarity", "languages", 0),
+        ("graph links", "graph_familiarity", "incoming", 1),
+    ):
+        if not graph.execute("SELECT 1 FROM result WHERE proxy=? AND depth BETWEEN 2 AND 4 LIMIT 1",
+                             (method,)).fetchone():
+            continue
+        graph.execute(f"""WITH per_item AS MATERIALIZED (
+            SELECT q.owner,q.id,max(CASE WHEN f.frequency>0 AND f.{spread}>0
+                THEN familiarity_weight(f.frequency,f.{spread}+{offset}) END) weight
+            FROM qualified q LEFT JOIN {table} f ON f.id=q.id GROUP BY q.id
+        ), bounds(owner,low_value,high_value) AS MATERIALIZED (
+            SELECT owner,max(weight),CASE WHEN count(weight)=count(*) THEN sum(weight) END
+            FROM per_item GROUP BY owner HAVING count(weight)>0
+        )""" + RANK_BOUNDS + """ UPDATE result SET proxy_rank=rare_rank FROM ranked
+            WHERE result.id=ranked.owner AND result.proxy=:method AND result.depth BETWEEN 2 AND 4
+                AND result.upper IS NULL AND result.survey_total=0 AND rare_rank*100<=2*:size""",
+            {"method": method, "size": size})
+
+
 def score(graph, publication, size, *, register=None):
     """Measure only already-qualified answer names. An unlisted QID has unknown readership."""
     if publication is None or not publication.execute(
@@ -183,30 +229,19 @@ def score(graph, publication, size, *, register=None):
     if not covered:
         return None
     if covered >= 12:
-        # Unmeasured names could be anywhere in the ranking. Use the least favourable
-        # position for each bonus and include every tie at its boundary.
-        # The most-read owner supplies a lower bound for a shared title. Its
-        # combined readership must still be rare against those lower bounds.
-        graph.execute("""WITH boundaries(views,n) AS (
-            SELECT views,count(*) FROM name_views GROUP BY views UNION ALL
-            SELECT total_views,0 FROM name_views WHERE complete AND total_views<>views GROUP BY total_views
-        ), positions AS MATERIALIZED (
-            SELECT views,sum(sum(n)) OVER (ORDER BY views) low,sum(sum(n)) OVER (ORDER BY views DESC) high
-            FROM boundaries GROUP BY views
-        ), ranked AS MATERIALIZED (
-            SELECT n.owner,n.total_views,n.complete,n.sparse,p.high,t.low
-            FROM name_views n JOIN positions p ON p.views=n.views LEFT JOIN positions t ON t.views=n.total_views
-        ) UPDATE result SET depth=CASE
-                WHEN (high+:unknown)*100<=15*:size THEN 1
+        graph.execute("""WITH bounds(owner,low_value,high_value) AS MATERIALIZED (
+            SELECT owner,views,CASE WHEN complete THEN total_views END FROM name_views
+        )""" + RANK_BOUNDS + """ UPDATE result SET depth=CASE
+                WHEN common_rank*100<=15*:size THEN 1
                 WHEN depth=1 THEN 1
-                WHEN complete AND sparse AND (low+:unknown)*100<=10*:size THEN max(depth,4)
-                WHEN complete AND (low+:unknown)*100<=25*:size THEN max(depth,3)
+                WHEN sparse AND rare_rank*100<=10*:size THEN max(depth,4)
+                WHEN rare_rank*100<=25*:size THEN max(depth,3)
                 ELSE depth END,
-            proxy=CASE WHEN (high+:unknown)*100<=75*:size THEN NULL ELSE proxy END,
-            rare_views=CASE WHEN complete AND sparse AND depth>1 AND survey_total=0
-                AND (low+:unknown)*100<=2*:size THEN total_views END,
-            view_rank_bound=low+:unknown
-            FROM ranked WHERE result.id=ranked.owner AND result.upper IS NULL""",
-            {"unknown": size-full, "size": size})
+            proxy=CASE WHEN common_rank*100<=75*:size THEN NULL ELSE proxy END,
+            rare_views=CASE WHEN sparse AND depth>1 AND survey_total=0
+                AND rare_rank*100<=2*:size THEN high_value END,
+            view_rank_bound=rare_rank
+            FROM ranked JOIN name_views USING(owner) WHERE result.id=ranked.owner AND result.upper IS NULL""",
+            {"size": size})
     return {"source": "Wikidata QRank", "url": info[1], "revision": info[0],
             "coveredAnswers": covered, "fullyCoveredAnswers": full}
