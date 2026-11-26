@@ -860,6 +860,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             entry["label"] = "Wikidata subclass statements"
         elif sid.startswith("wikidata-joined-"):
             entry["label"] = "Published Wikidata relationship records"
+        elif sid.startswith("wikidata-query-values-"):
+            entry["label"] = "Wikidata statements for the named subject"
         elif sid.startswith("wikidata-query-"):
             entry["label"] = "Current Wikidata class and relationship statements"
         elif sid.startswith(("quantity-class-", "quantity-ref-", "wd-quantity-", "wikidata-measure-")):
@@ -879,7 +881,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         if label:
             reference_label = label[0]
     scope = plan.get("catalogueKey", "").partition(":")[0]
-    interpretation = {"kind": "Types of ", "examples": "Types and named examples of "}.get(scope, "Members of ") + plan.get("classLabel",cls)
+    interpretation = {"kind": "Types of ", "examples": "Types and named examples of ", "values": ""}.get(scope, "Members of ") + plan.get("classLabel",cls)
     player_comparison = ""
     if comparing:
         bound = ref_high if plan["op"] in ("gt","ge") else ref_low
@@ -988,6 +990,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         "playerRule": (
             player_comparison if comparing else plan["dateScope"] if "dateScope" in plan else
             plan["geographicScope"] if "geographicScope" in plan else
+            "Give a name the source lists under this property for the subject in the question." if scope == "values" else
             "Give the name of a type or the name of an individual example. The source must document how it belongs to this group." if scope == "examples" else
             "The source must list the answer as a subclass of the named subject, directly or through another class." if scope == "kind" else
             "The source must list the answer’s type or occupation in this class or one of its subclasses." if plan.get("catalogueKey","").startswith("type:") else

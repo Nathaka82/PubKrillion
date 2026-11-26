@@ -21,6 +21,8 @@ def publish(db, *, current_taxonomy=False):
     else:
         db.execute("INSERT OR IGNORE INTO world_parent SELECT o,s FROM world.triple WHERE p=279 AND s<>o")
     db.execute("INSERT OR IGNORE INTO world_role SELECT o,s FROM world.triple WHERE p=106")
+    db.execute("CREATE INDEX world_role_by_item ON world_role(id,role)")
+    db.execute("CREATE INDEX world_parent_by_child ON world_parent(child,parent)")
     keys = """SELECT cls FROM world_member UNION SELECT role FROM world_role UNION SELECT parent FROM world_parent
               UNION SELECT child FROM world_parent"""
 

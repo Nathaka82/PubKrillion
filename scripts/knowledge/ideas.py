@@ -195,6 +195,9 @@ def published_suggestions(db, request, *, follow_topic=None):
     if not direct:
         return [] if request.get("direct") else search(db, request["idea"], complete_only)
     rules = [direct] if direct["complete"] or not complete_only else []
+    if direct["key"].startswith("values:") and not direct["complete"] and not complete_only and follow_topic:
+        if follow_topic(direct["key"]):
+            request["sourceNote"] = "The builder will check the current Wikidata statements for this subject."
     if direct["key"].startswith("compare:"):
         from comparisons import alternatives
         choices = alternatives(db, direct, complete_only)

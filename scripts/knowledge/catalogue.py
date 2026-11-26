@@ -18,7 +18,7 @@ from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
 FORMAT = int(Path(__file__).with_name("catalogue-format").read_text(encoding="ascii"))
-RULE_REVISION = "discover-relationship-overlap-1"
+RULE_REVISION = "named-subject-values-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -323,7 +323,8 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             db.executescript(world_links.SCHEMA)
             db.executescript(attested_names.SCHEMA)
             db.executescript(entity_labels.SCHEMA)
-            import country_words, current_questions, date_rules, date_updates, date_properties, dated_links
+            import country_words, current_questions, date_rules, date_updates, date_properties, dated_links, item_values
+            db.executescript(item_values.SCHEMA)
             db.executescript(current_questions.SCHEMA)
             db.executescript(date_rules.SCHEMA)
             db.executescript(dated_links.SCHEMA)
@@ -412,6 +413,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             name_revision = attested_names.install(db,output.parent,output) if world is not None else None
             if world is not None:
                 watched.append(("entity-labels",entity_labels.collect(db,output.parent,output)))
+                watched.append(("entity-values",item_values.install(db,output.parent,offline)))
             rank_path, rank_release = attention.source(output.parent, output)
             edition = digest([FORMAT, RULE_REVISION, BANK_FORMAT, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,country_dictionary,name_revision,rank_release])
             reuse_world = False
@@ -733,6 +735,13 @@ def relationship_choices(db,card,complete_only,*,measurements=True):
 def search(db, idea, complete_only=False, *, comparisons=True):
     import date_rules
     edition_id,file_format = db.execute("SELECT edition,format FROM publication").fetchone()
+    if file_format >= 27:
+        import outgoing
+        try:
+            if card := outgoing.match(db,idea,edition_id):
+                return [card] if card["complete"] or not complete_only else []
+        except date_rules.DateChoices as choices:
+            return [card for card in choices.cards if card["complete"] or not complete_only]
     if file_format >= 8:
         from scoped_topics import scoped_choices
         try:
@@ -778,6 +787,8 @@ def search(db, idea, complete_only=False, *, comparisons=True):
                 raise UnverifiedRule(direct["key"])
             return relationship_choices(db,direct,complete_only,measurements=comparisons)
     cards = search_topics(db, idea, complete_only)
+    if file_format >= 27 and not cards:
+        cards = outgoing.suggestions(db, idea, edition_id, complete_only)
     if file_format>=17 and not cards and not complete_only:
         from world_links import suggestions
         edition = db.execute("SELECT edition,format FROM publication").fetchone()
@@ -905,6 +916,10 @@ def match_question(db, prompt):
         if measured:
             return measured
     direct = match_single(db, prompt, include_empty=True)
+    if file_format >= 27 and not direct:
+        import outgoing
+        if values := outgoing.match(db,prompt,edition):
+            return values
     if file_format >= 27 and not direct and not COMMAND.match(folded_spelling(prompt)):
         from country_words import choices
         choices(db, topic_subject(spelling(prompt)), (edition, file_format))
@@ -1266,6 +1281,12 @@ def play(db, game, key, prompt, edition=None):
 
 def prepare_bank(db, game, key, prompt, release):
     from compiler import evaluate
+
+    if key.startswith("values:") and release[1]>=27:
+        from outgoing import Rule
+        if rule := Rule.decode(key):
+            return rule.play(db,game,release[0])
+        raise ValueError("Invalid subject or property identifier.")
 
     if key.startswith("during:") and release[1]>=20:
         import dated_links

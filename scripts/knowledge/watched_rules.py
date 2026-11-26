@@ -81,7 +81,8 @@ def follow(storage, key):
         parts = json.loads(key[6:])
         if isinstance(parts,list) and len(parts)==2 and isinstance(parts[0],str) and predicates(parts[0]):
             key = parts[0]
-    if not predicates(key) and not KEY.fullmatch(key) and not Rule.decode(key):
+    from item_values import KEY as VALUES
+    if not predicates(key) and not KEY.fullmatch(key) and not Rule.decode(key) and not VALUES.fullmatch(key):
         return False
     path = requests_folder(storage) / (digest(key) + ".rule")
     try:
@@ -228,9 +229,9 @@ def discovered_requests(storage, publication, *, include_topics=False, retained_
 
 def due_requests(storage, publication=None):
     from class_updates import registered,due
-    import date_updates
+    import date_updates, item_values
     import target_lookup, topic_sources, source_vocabulary
-    return (any(time.time() >= due_at(cached) for _, cached in topic_sources.requests(storage)) or
+    return (item_values.pending(storage) or any(time.time() >= due_at(cached) for _, cached in topic_sources.requests(storage)) or
             source_vocabulary.due(storage, publication) or
             any(time.time() >= due_at(cached) for _, cached in target_lookup.requests(storage)) or
             any(time.time() >= due_at(cached) for _, cached in requests(storage)) or

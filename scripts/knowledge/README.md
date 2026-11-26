@@ -6,6 +6,8 @@ When a host names an unfamiliar subject, the builder checks its recorded spellin
 
 Run the publisher independently of the game. The default Compose configurations include it as the `knowledge-builder` service. These commands also work in a local checkout with Python 3.11 or later.
 
+Hosts can also ask about a named subject, for example “What instruments did Louis Armstrong play?” The builder identifies the subject and property using source names and aliases. It saves the subject’s item-valued statements together, so another question about the same subject can reuse the revision. The published question specifies what Wikidata lists. Its answer bank uses the best-ranked statements for that property and records the statement IDs. A bank qualifies as complete for that revision when every listed item has a verified name and the source lists no unknown values. An older graph can supply an explicitly partial bank while the builder checks the source.
+
 ```sh
 python scripts/knowledge/catalogue.py
 python scripts/knowledge/catalogue.py --watch
