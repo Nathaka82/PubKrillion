@@ -18,7 +18,7 @@ from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
 FORMAT = int(Path(__file__).with_name("catalogue-format").read_text(encoding="ascii"))
-RULE_REVISION = "entity-owned-answer-names-1"
+RULE_REVISION = "wikimedia-revision-names-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -408,7 +408,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 hierarchy = taxonomy.attach(db,taxonomy.location(output.parent),fingerprint)
             name_revision = attested_names.install(db,output.parent,output) if world is not None else None
             if world is not None:
-                watched.append(("entity-labels",entity_labels.publish(db,output.parent,output)))
+                watched.append(("entity-labels",entity_labels.collect(db,output.parent,output)))
             rank_path, rank_release = attention.source(output.parent, output)
             edition = digest([FORMAT, RULE_REVISION, BANK_FORMAT, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,name_revision,rank_release])
             reuse_world = False
@@ -434,6 +434,8 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
                 else:
                     print("Indexing direct class and relationship evidence", flush=True)
                     compile_world(db)
+                entity_labels.index_names(db,reuse_world and db.execute(
+                    "SELECT 1 FROM prior.sqlite_master WHERE name='label_record'").fetchone())
                 world_classes.publish(db, current_taxonomy=bool(hierarchy))
                 print("Indexing individual entity relationships and their names", flush=True)
                 reuse_links = reuse_world and db.execute("SELECT format FROM prior.publication").fetchone()[0] >= 17
@@ -482,6 +484,7 @@ def summary(db):
         "resolvedTargets": db.execute("SELECT count(*) FROM current_target").fetchone()[0] if file_format>=25 else 0,
         "recordedNames": db.execute("SELECT count(*) FROM attested_name").fetchone()[0] if file_format>=22 else 0,
         "checkedNameEntities": db.execute("SELECT count(*) FROM label_record").fetchone()[0] if file_format>=33 else 0,
+        "dumpNameEntities": db.execute("SELECT count(*) FROM label_record WHERE origin GLOB 'dump:*'").fetchone()[0] if file_format>=33 else 0,
         "dateStatements": db.execute("SELECT count(DISTINCT statement) FROM date_fact").fetchone()[0] if file_format>=20 else 0,
         "dateProperties": db.execute("SELECT count(*) FROM date_property").fetchone()[0] if file_format>=20 else 0,
         "datedRelationshipQuestions": db.execute("SELECT count(*) FROM current_question WHERE rule GLOB 'during:*'").fetchone()[0] if file_format>=24 else 0,
@@ -1494,6 +1497,14 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
                         relationship_proof=proof,unnamed_members=unnamed)
 
 
+def refresh_bulk_names(world,storage):
+    import bulk_names
+    try:
+        return bulk_names.tick(world,storage)
+    except bulk_names.UPDATE_ERRORS as error:
+        print(f"Wikimedia name capture deferred: {error}", flush=True)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, default=Path(os.environ.get("DB_PATH", "storage/quiz.sqlite")),
@@ -1527,6 +1538,7 @@ if __name__ == "__main__":
             if world is not None and not args.offline and not args.watch:
                 import taxonomy
                 taxonomy.tick(world,taxonomy.location((args.output or catalogue_path(args.db)).parent),pages=None)
+                refresh_bulk_names(world,(args.output or catalogue_path(args.db)).parent)
             result = build(world, args.output or catalogue_path(args.db),
                            args.feeds or args.db.parent / (args.db.name + ".knowledge") / "feeds",
                            offline=args.offline, include_bundled=not args.feeds_only, measurements=args.measurements,
@@ -1548,5 +1560,7 @@ if __name__ == "__main__":
                 from watched_rules import due_requests
                 storage = (args.output or catalogue_path(args.db)).parent
                 import attested_names, date_discovery, entity_labels, target_discovery
+                if refresh_bulk_names(world,storage) and not result.get("dumpNameEntities"):
+                    break
                 if taxonomy.tick(world,taxonomy.location(storage)) or due_requests(storage,args.output or catalogue_path(args.db)) or date_discovery.is_due(storage) or target_discovery.is_due(storage) or attested_names.is_due(storage) or entity_labels.due(storage):
                     break

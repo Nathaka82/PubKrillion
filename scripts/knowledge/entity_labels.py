@@ -109,21 +109,22 @@ def stage(graph, publication):
         return False
     graph.execute("DROP TABLE IF EXISTS temp.candidate_labels")
     graph.execute(
-        "CREATE TEMP TABLE candidate_labels(id TEXT PRIMARY KEY,forms TEXT,checked INTEGER,variants TEXT) WITHOUT ROWID"
+        "CREATE TEMP TABLE candidate_labels(id TEXT PRIMARY KEY,forms TEXT,checked INTEGER,variants TEXT,origin TEXT) WITHOUT ROWID"
     )
     candidates = graph.execute("""SELECT CAST(substr(id,5) AS INTEGER) FROM candidate
         WHERE id='wd:Q'||CAST(substr(id,5) AS INTEGER)""")
     while batch := candidates.fetchmany(1000):
         labels = publication.execute(
-            """SELECT 'wd:Q'||id,forms,checked,variants FROM audited_label
-            WHERE id IN (SELECT value FROM json_each(?))""",
+            """SELECT 'wd:Q'||a.id,a.forms,a.checked,a.variants,l.origin FROM audited_label a
+            JOIN label_record l USING(id) WHERE a.id IN (SELECT value FROM json_each(?))""",
             (json.dumps([r[0] for r in batch]),),
         )
-        graph.executemany("INSERT INTO candidate_labels VALUES(?,?,?,?)", labels)
+        graph.executemany("INSERT INTO candidate_labels VALUES(?,?,?,?,?)", labels)
     return True
 
 
-def publish(db, storage, previous):
+def collect(db, storage, previous):
+    import bulk_names
     # Every row in these captures came from a name lookup on the matching Wikidata ID.
     for table, scope in (("date_member", "date_scope"), ("current_member", "current_class")):
         records = db.execute(f"""SELECT m.id,m.name,m.aliases,s.captured,m.rule FROM {table} m
@@ -138,26 +139,39 @@ def publish(db, storage, previous):
     for key, checked, blob in db.execute("SELECT key,captured,release FROM live_rule"):
         rows = json.loads(gzip.decompress(blob))["rows"]
         put(db, ((int(qid[1:]), forms(name, aliases), checked, key) for qid, name, aliases in rows))
-    for path in (previous, file(storage)):
+    for path in (previous, file(storage), bulk_names.path(storage)):
         if not path or not path.is_file():
             continue
         with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as source:
             if source.execute("SELECT 1 FROM sqlite_master WHERE name='label_record'").fetchone():
                 # Scoped observations come solely from the installed source releases.
-                put(db, source.execute("SELECT * FROM label_record WHERE origin='~wikidata'"))
+                put(db, source.execute("SELECT * FROM label_record WHERE origin='~wikidata' OR origin GLOB 'dump:*'"))
     signature = hashlib.sha256()
-    records = db.execute("""SELECT l.id,l.forms,e.names FROM label_record l LEFT JOIN world.entity e ON e.id=l.id
-        ORDER BY l.id""")
+    for record in db.execute("SELECT * FROM label_record ORDER BY id"):
+        signature.update(json.dumps(tuple(record),ensure_ascii=False).encode() + b"\n")
+    return signature.hexdigest()
+
+
+def index_names(db, reuse):
+    if reuse:
+        db.execute("""CREATE TEMP TABLE reusable_labels AS SELECT c.id FROM label_record c JOIN prior.label_record p
+            ON p.id=c.id AND p.forms=c.forms""")
+        db.execute("CREATE UNIQUE INDEX reusable_id ON reusable_labels(id)")
+        db.execute("""INSERT INTO label_variant SELECT v.* FROM prior.label_variant v
+            JOIN reusable_labels r ON r.id=v.id""")
+        db.execute("""INSERT INTO label_term SELECT t.* FROM prior.label_term t
+            CROSS JOIN reusable_labels r ON r.id=t.id""")
+    pending = "WHERE NOT EXISTS(SELECT 1 FROM reusable_labels r WHERE r.id=l.id)" if reuse else ""
+    records = db.execute(f"""SELECT l.id,l.forms,e.names FROM label_record l LEFT JOIN world.entity e ON e.id=l.id
+        {pending} ORDER BY l.id""")
     for item, names, archive in records:
         variants = qualified_forms(names, archive)
         if variants:
             db.execute("INSERT INTO label_variant VALUES(?,?)", (item, "\t".join(variants)))
-        signature.update(json.dumps([item, names, variants], ensure_ascii=False).encode() + b"\n")
         db.executemany(
             "INSERT OR IGNORE INTO label_term VALUES(?,?)",
             ((folded_spelling(name), item) for name in [*names.split("\t"), *variants] if name),
         )
-    return signature.hexdigest()
 
 
 def request(storage, publication, game, bank):

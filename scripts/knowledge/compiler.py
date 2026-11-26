@@ -6,7 +6,7 @@ import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
-BANK_FORMAT = 34
+BANK_FORMAT = 35
 
 
 def noun(text):
@@ -474,8 +474,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     import entity_labels
     from world_index import SOURCE as world_archive
     checked_labels = entity_labels.stage(db,name_catalogue)
-    label_fields = ("l.forms,l.checked AS names_checked,l.variants" if checked_labels
-                    else "NULL AS forms,NULL AS names_checked,NULL AS variants")
+    label_fields = ("l.forms,l.checked AS names_checked,l.variants,l.origin" if checked_labels
+                    else "NULL AS forms,NULL AS names_checked,NULL AS variants,NULL AS origin")
     label_join = "LEFT JOIN candidate_labels l ON l.id=e.id" if checked_labels else ""
     joined = db.execute(f"""SELECT e.*, {label_fields}, (SELECT json_group_array(m.class) FROM membership m
             WHERE m.id=e.id AND m.source=e.source) AS classes FROM {candidates} c CROSS JOIN entity e ON e.id=c.id
@@ -485,6 +485,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         rows = list(records)
         names = {r["name"] for r in rows}
         names_checked = None
+        name_origin = ""
         variants = None
         for row in rows:
             source = row["source"]
@@ -493,6 +494,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
                     and row["names_checked"] >= sources[source]["checked"]):
                 names.update(filter(None,row["forms"].split("\t")))
                 names_checked = row["names_checked"]
+                name_origin = row["origin"]
                 variants = row["variants"]
             else:
                 names.update(json.loads(row["aliases"]))
@@ -603,8 +605,11 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             evidence.extend(edges)
         selected.update(r["source"] for r in evidence)
         if names_checked is not None:
+            url = "https://www.wikidata.org/wiki/"+eid[3:]
+            if name_origin.startswith("dump:") and (revision := name_origin.rsplit(":",1)[1]).isdecimal():
+                url = "https://www.wikidata.org/w/index.php?title="+eid[3:]+"&oldid="+revision
             evidence.append({"source":"Wikidata","namesChecked":names_checked,
-                             "url":"https://www.wikidata.org/wiki/"+eid[3:]})
+                             "url":url})
             if variants:
                 evidence.append({"source":"Wikidata5M","qualifiedNames":variants.split("\t"),
                                  "url":world_archive})

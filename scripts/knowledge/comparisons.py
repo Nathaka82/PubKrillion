@@ -125,25 +125,26 @@ def compile_shared_names(db, has_world):
             yield folded_spelling(name), item, name, 1
             for alias in json.loads(aliases):
                 yield folded_spelling(alias), item, alias, 0
-        if has_world:
-            # Include names from unmeasured items, including aliases shared only
-            # between a specialist source and the general graph.
-            extra = """WITH external_terms AS MATERIALIZED (SELECT DISTINCT term FROM entity_name),
-                ids(id) AS (SELECT id FROM world_homonym UNION SELECT id FROM label_record UNION
-                SELECT a.id FROM external_terms e CROSS JOIN world.entity_alias a ON a.term=e.term UNION
-                SELECT t.id FROM external_terms e CROSS JOIN world.title t ON t.term=e.term)
-                SELECT i.id,i.name,i.aliases FROM ids CROSS JOIN answer_item i ON i.id=ids.id
-                WHERE NOT EXISTS(SELECT 1 FROM measured_id m WHERE m.id=i.id)"""
-            for item, name, aliases in db.execute(extra):
+    insert = """INSERT INTO names_to_check VALUES(?,?,?,?) ON CONFLICT(term,id,display)
+        DO UPDATE SET preferred=max(preferred,excluded.preferred)"""
+    db.executemany(insert, forms())
+    if has_world:
+        # Only an owner of a spelling actually in play can affect a measurement decision.
+        db.execute("CREATE TEMP TABLE measured_spellings(term TEXT PRIMARY KEY) WITHOUT ROWID")
+        db.execute("INSERT INTO measured_spellings SELECT DISTINCT term FROM names_to_check")
+        owners = db.execute("""WITH ids AS (
+            SELECT n.id FROM measured_spellings s CROSS JOIN world_name n ON n.term=s.term
+            WHERE n.preferred=1 OR NOT EXISTS(SELECT 1 FROM label_record l WHERE l.id=n.id)
+            UNION SELECT t.id FROM measured_spellings s CROSS JOIN label_term t ON t.term=s.term)
+            SELECT i.id,i.name,i.aliases FROM ids CROSS JOIN answer_item i ON i.id=ids.id
+            WHERE NOT EXISTS(SELECT 1 FROM measured_id m WHERE m.id=i.id)""")
+        def outside():
+            for item, name, aliases in owners:
                 for pos, alias in enumerate((name, *aliases.split("\t"))):
                     if alias and len(alias) <= 140:
                         yield folded_spelling(alias), "wd:Q" + str(item), alias, pos == 0
-
-    db.executemany(
-        """INSERT INTO names_to_check VALUES(?,?,?,?) ON CONFLICT(term,id,display)
-                      DO UPDATE SET preferred=max(preferred,excluded.preferred)""",
-        forms(),
-    )
+        db.executemany(insert, outside())
+        db.execute("DROP TABLE measured_spellings")
     db.execute("""WITH shared AS MATERIALIZED (SELECT term FROM names_to_check GROUP BY term HAVING min(id)<>max(id))
         INSERT INTO measure_ambiguous SELECT n.* FROM shared s CROSS JOIN names_to_check n ON n.term=s.term""")
     db.execute("DROP TABLE names_to_check")

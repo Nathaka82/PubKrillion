@@ -35,13 +35,13 @@ def retry_wait(origin):
     return max(0, int(_retry_after.get(origin, 0) - time.monotonic() + 1))
 
 
-def fetch(url, limit=8_000_000, timeout=20):
+def open_source(request, timeout):
+    url = request.full_url
     origin = urllib.parse.urlsplit(url).netloc.lower()
     if _retry_after.get(origin, 0) > time.monotonic():
         raise OSError(f"{origin} requested a pause before the next download.")
-    request = urllib.request.Request(url, headers={"User-Agent": AGENT})
     try:
-        response = urllib.request.urlopen(request, timeout=timeout)
+        return urllib.request.urlopen(request, timeout=timeout)
     except urllib.error.HTTPError as error:
         header = (error.headers or {}).get("Retry-After", "")
         if error.code == 429 or error.code == 503 and header:
@@ -52,7 +52,11 @@ def fetch(url, limit=8_000_000, timeout=20):
                 delay = 900
             _retry_after[origin] = time.monotonic() + max(1, delay)
         raise
-    with response:
+
+
+def fetch(url, limit=8_000_000, timeout=20):
+    request = urllib.request.Request(url, headers={"User-Agent": AGENT})
+    with open_source(request, timeout) as response:
         if int(response.headers.get("Content-Length") or 0) > limit:
             raise DownloadTooLarge("Source exceeds download budget.")
         data = response.read(limit + 1)
@@ -629,6 +633,16 @@ def name_text(value, lang):
     return value["value"]
 
 
+def entity_name_record(item, entity, *, required):
+    labels = {lang:name_text(v,lang) for lang,v in language_map(entity,"labels",required).items()}
+    aliases = {}
+    for lang,values in language_map(entity,"aliases",required).items():
+        if not isinstance(values,list):
+            raise ValueError("Wikidata returned malformed aliases.")
+        aliases[lang] = [name_text(v,lang) for v in values]
+    return named_record(item,labels,aliases)
+
+
 def entity_name_records(ids, *, allow_missing=False):
     if not all(re.fullmatch(r"Q[1-9]\d*", item) for item in ids):
         raise ValueError("Unexpected Wikidata entity identifier.")
@@ -663,13 +677,7 @@ def entity_name_records(ids, *, allow_missing=False):
                 continue
             if entity.get("id") != item or "missing" in entity:
                 raise ValueError("The Wikidata names no longer belong to the requested entity.")
-            labels = {lang:name_text(v,lang) for lang,v in language_map(entity,"labels",allow_missing).items()}
-            aliases = {}
-            for lang,values in language_map(entity,"aliases",allow_missing).items():
-                if not isinstance(values,list):
-                    raise ValueError("Wikidata returned malformed aliases.")
-                aliases[lang] = [name_text(v,lang) for v in values]
-            yield item, named_record(item,labels,aliases)
+            yield item, entity_name_record(item,entity,required=allow_missing)
     for start in range(0, len(ids), 50):
         yield from batches(ids[start:start+50])
 
