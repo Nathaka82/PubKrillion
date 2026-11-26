@@ -18,7 +18,7 @@ from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
 FORMAT = int(Path(__file__).with_name("catalogue-format").read_text(encoding="ascii"))
-RULE_REVISION = "wikimedia-revision-names-1"
+RULE_REVISION = "wikimedia-production-company-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -522,6 +522,7 @@ RELATION_PHRASES = {
     123: "published by", 127: "owned by", 131: "in the administrative area of", 136: "in the genre",
     161: "whose cast includes", 162: "produced by", 170: "created by", 175: "performed by",
     176: "manufactured by", 178: "developed by", 179: "in the series", 264: "on the record label",
+    272: "from the production company",
     291: "published in", 375: "launched using", 400: "released for", 421: "in the time zone", 449: "originally broadcast on",
     495: "whose country of origin is", 725: "with a voice performance by", 750: "distributed by",
     676: "with lyrics by", 793: "whose recorded events include", 840: "set in", 915: "filmed in",
@@ -948,7 +949,7 @@ def match_question(db, prompt):
         relation = match_relation(db,folded_spelling(body),body,(edition,file_format),request_target=True)
         if not relation and file_format >= 26:
             import topic_sources
-            if topic := topic_sources.parse(db,prompt,bare=False):
+            if topic := topic_sources.parse(db,prompt,bare=False,edition=edition):
                 topic_sources.choices(db,topic,edition)
         return relation
     return next(iter(options.values()), None)

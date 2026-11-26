@@ -19,7 +19,8 @@ CREATE TABLE source_topic_rule(topic TEXT,rule TEXT,position INTEGER,PRIMARY KEY
 """
 
 # Authorship and artistic/technical credits. The selected question always names the exact credit.
-CREDITS = (50, 57, 58, 84, 86, 87, 110, 162, 170, 175, 176, 178, 287, 676, 943)
+CREDITS = (50, 57, 58, 84, 86, 87, 110, 162, 170, 175, 176, 178, 272, 287, 676, 943)
+DISCOVERY_VERSION = 4
 # Some source records describe a work's form or genre as a separate statement.
 CLASSIFICATIONS = (7937, 136)
 MAX_NAMES = 6
@@ -60,17 +61,89 @@ class Topic:
         return topic if topic.key == key else None
 
 
-def parse(db, text, *, bare):
-    from catalogue import COMMAND
+def credit_subjects(db, subject):
+    """Keep the source's alternate meanings of a noun until the creator can disambiguate it."""
     from date_subjects import resolve
+    literal = spelling(subject)
+    term = folded_spelling(literal)
+    classes = set(resolve(db, term, literal=literal))
+    if not re.fullmatch(r"[\w]+(?:[ -][\w]+)*", literal) or QID.fullmatch(literal):
+        return sorted(classes)
+    forms = {literal}
+    if literal.endswith("s") and not literal.endswith(("ss", "us", "is", "series", "species")):
+        forms.add(literal[:-1])
+        if literal.endswith("ies"):
+            forms.add(literal[:-3] + "y")
+        if literal.endswith(("ches", "shes", "xes", "zes", "sses", "oes")):
+            forms.add(literal[:-2])
+    current_names = db.execute("SELECT 1 FROM sqlite_master WHERE name='source_vocabulary'").fetchone()
+    for form in sorted(forms):
+        base = folded_spelling(form)
+        if form != literal:
+            classes.update(resolve(db, base, literal=form))
+        # A source label such as "Play (theatre)" has an indexed spelling beginning
+        # with "play ". Verify the original punctuation before treating it as a class name.
+        source = "SELECT DISTINCT cls FROM world_class_name WHERE term>=? AND term<?"
+        names = """SELECT c.cls,i.name,i.aliases FROM candidates c CROSS JOIN item i ON i.id=c.cls"""
+        if current_names:
+            names += """ UNION ALL SELECT c.cls,v.name,
+                (SELECT group_concat(value,char(9)) FROM json_each(v.aliases))
+                FROM candidates c CROSS JOIN source_vocabulary v ON v.token='Q'||c.cls WHERE v.name IS NOT NULL"""
+        for cls, name, aliases in db.execute(f"WITH candidates AS ({source}) {names}", (base + " ", base + "!")):
+            if any(spelling(label[:label.rfind(" (")]) == form for label in (name, *(aliases or "").split("\t"))
+                   if label.endswith(")") and " (" in label):
+                classes.add(cls)
+    return sorted(classes)
+
+
+def choose_credit_subject(db, name, classes, edition):
+    from catalogue import RuleWithdrawn, UnverifiedRule
+    from date_rules import DateChoices
+    from watched_rules import predicates
+    exact, revised, pending, refresh = {}, {}, set(), set()
+    for cls in classes:
+        try:
+            choices(db, Topic(name, cls), edition)
+        except DateChoices as options:
+            refresh.update(options.refresh)
+            for card in options.cards:
+                matching = any(c == cls or (p in CLASSIFICATIONS and target == cls)
+                               for c, p, target in predicates(card["key"]))
+                (exact if matching else revised)[card["key"]] = card
+        except UnverifiedRule as waiting:
+            pending.update(waiting.requests)
+        except RuleWithdrawn:
+            continue
+    cards = sorted((exact or revised).values(), key=lambda c: (-c["records"], c["prompt"], c["key"]))
+    if cards:
+        if len(pending | refresh) <= MAX_NAMES:
+            refresh.update(pending)
+        message = ("Choose the subject and credit for your question." if exact else
+                   "The source records these credits under different subjects. Choose a revised question.")
+        raise DateChoices(cards[:MAX_NAMES], message, refresh=sorted(refresh)[:MAX_NAMES])
+    if pending:
+        if len(pending) > MAX_NAMES:
+            examples = [row[0] for row in db.execute("""SELECT i.name FROM json_each(?) c
+                CROSS JOIN item i ON i.id=c.value ORDER BY length(i.name),i.name LIMIT 3""", (json.dumps(classes),))]
+            hint = " Try a more specific subject such as " + ", ".join(examples) + "." if examples else ""
+            raise ValueError("Several source subjects use that name." + hint)
+        keys = sorted(pending)
+        raise UnverifiedRule(keys[0], "The builder can check which subjects have works credited to this name.", requests=keys)
+    raise RuleWithdrawn("The published sources have no playable credit for these subjects and this name.")
+
+
+def parse(db, text, *, bare, edition=None):
+    from catalogue import COMMAND
 
     term = spelling(text).removesuffix("?").strip()
     body = COMMAND.sub("", term, count=1)
     if match := re.fullmatch(r"(.+?) by (.+)", body):
         if name_phrase(match[2]):
-            classes = resolve(db, folded_spelling(match[1]), literal=match[1])
+            classes = credit_subjects(db, match[1])
             if len(classes) == 1:
                 return Topic(match[2], classes[0])
+            if classes and edition is not None:
+                choose_credit_subject(db, match[2], classes, edition)
         return None
     if bare and body == term:
         term = re.sub(r"^(?:an? )?(?:quiz|round|questions?|topic) (?:about|on) ", "", term)
@@ -176,7 +249,7 @@ def capture(topic, seeds=(), *, identity=None):
     rows = [] if crowded else [forms[i] for i in sorted(forms)]
     content = [topic.key, rows, crowded, proposals, descriptions, scoped_identity]
     return dict(key=topic.key, rows=rows, crowded=crowded, proposals=proposals, descriptions=descriptions,
-                revision=digest(content), checked=int(time.time()), namedAt=named_at, discoveryVersion=3,
+                revision=digest(content), checked=int(time.time()), namedAt=named_at, discoveryVersion=DISCOVERY_VERSION,
                 scopedIdentity=scoped_identity)
 
 
@@ -265,7 +338,7 @@ def collect(db, storage, offline, previous=None):
                     and time.time() - 86400 < named_at and named_at >= identities.get(topic.term, (0,))[0]):
                 identities[topic.term] = (named_at, saved)
             # A current name search can also be used to discover newly supported credit rules.
-            if topic.cls and saved.get("discoveryVersion", 1) < 3:
+            if topic.cls and saved.get("discoveryVersion", 1) < DISCOVERY_VERSION:
                 attempt = file.with_suffix(".attempt")
                 due = attempt.stat().st_mtime + 900 if attempt.exists() else 0
         pending.append((due, topic.key, topic, file, saved))
@@ -288,7 +361,7 @@ def collect(db, storage, offline, previous=None):
             continue
         db.execute("INSERT INTO source_topic VALUES(?,?,?,?)",
                    (key, json.dumps([i for i, _, _ in data["rows"]]), data["crowded"],
-                    bool(topic.cls and data.get("discoveryVersion", 1) < 3)))
+                    bool(topic.cls and data.get("discoveryVersion", 1) < DISCOVERY_VERSION)))
         captures.append(data)
     source_vocabulary.collect(db, storage, ((d["key"], vocabulary_terms(d["proposals"])) for d in captures), offline)
     for data in captures:
@@ -444,7 +517,7 @@ def choices(db, topic, edition):
             details.append(f"Q{i} ({hint[0]})" if hint else f"Q{i}")
         note = "Several entities share this name. " + ", ".join(details) + ". " + note
     if cards:
-        raise DateChoices(cards, note, refresh=topic.key if row is None else None)
+        raise DateChoices(cards, note, refresh=(topic.key,) if row is None else ())
     pending = [key for key, n, _ in rows if n is None]
     if pending:
         raise UnverifiedRule(topic.key, "The builder is checking the answer lists for this topic.")

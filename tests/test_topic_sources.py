@@ -41,6 +41,71 @@ class SourceTopics(unittest.TestCase):
     def publish(self):
         return catalogue.build(self.world, self.pub, self.root, include_bundled=False, offline=True)
 
+    def test_plural_subjects_use_credited_works_even_with_many_source_meanings(self):
+        with closing(sqlite3.connect(self.world)) as db:
+            db.execute("INSERT INTO property VALUES(86,'composer'),(272,'production company'),(162,'producer')")
+            db.execute("INSERT INTO entity VALUES(80,'Symphony'),(81,'Symphonie'),(90,'Cedar House')")
+            db.executemany("INSERT INTO entity VALUES(?,?)",
+                           [(i, f"Composition ({i})") for i in range(100, 108)])
+            db.executemany("INSERT INTO triple VALUES(?,?,?)",
+                           [(1,31,i) for i in range(100,108)] +
+                           [(1,31,80),(2,31,80),(3,31,81),(2,31,107),(1,86,90),(2,86,90),
+                            (1,272,90),(2,272,90),(3,162,90),(4,162,90)])
+            db.commit()
+        self.publish()
+        with closing(catalogue.reader(self.pub)) as db, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            def suggest(text):
+                return ideas.published_suggestions(db, {"idea": text, "completeOnly": False})
+            for subject, cls in [("symphonies", 80), ("compositions", 107)]:
+                cards = suggest(subject + " by Cedar House")
+                self.assertEqual({c["key"] for c in cards}, {f"w-{cls}-86-90", f"w-{cls}-272-90"})
+                for card in cards:
+                    self.assertEqual(catalogue.match_question(db, card["prompt"])["key"], card["key"])
+            with self.assertRaisesRegex(ValueError, r"more specific subject such as Composition \("):
+                suggest("compositions by Another Name")
+            companies = {c["key"]: c for c in suggest("works by Cedar House")}
+            legacy = 'Name a work with "production company" recorded as Cedar House'
+            self.assertEqual(catalogue.match_question(db, legacy)["key"], "w-10-272-90")
+            for role, wording, expected in [(272, "from the production company", {1, 2}),
+                                           (162, "produced by", {3, 4})]:
+                card = companies[f"w-10-{role}-90"]
+                self.assertIn(wording, card["prompt"])
+                bank, _ = catalogue.play(db, game, card["key"], card["prompt"])
+                rows = game.execute("SELECT entity,evidence FROM kb_member WHERE bank=?", (bank,)).fetchall()
+                self.assertEqual({eid for eid, _ in rows}, {f"wd:Q{i}" for i in expected})
+                self.assertTrue(all(f"#P{role}" in evidence for _, evidence in rows))
+
+    def test_ambiguous_subjects_queue_missing_meanings_and_preserve_qualified_names(self):
+        with closing(sqlite3.connect(self.world)) as db:
+            db.execute("INSERT INTO entity VALUES(80,'Print (art)'),(81,'Print (publishing)'),(90,'Cedar House')")
+            db.executemany("INSERT INTO triple VALUES(?,?,?)",
+                           [(1,31,80),(2,31,80),(1,50,90),(2,50,90),(3,31,81),(4,31,81)])
+            db.commit()
+        self.publish()
+        with closing(sqlite3.connect(self.pub)) as db:
+            db.execute("INSERT INTO source_vocabulary VALUES('Q80','Art print',?,0,1)",
+                       (json.dumps(["Impression (printmaking)"]),))
+            db.execute("INSERT INTO world_class_name VALUES('impression printmaking',80,0)")
+            db.commit()
+        with closing(catalogue.reader(self.pub)) as db:
+            def queued(key):
+                followed.append(key)
+                return True
+            followed = []
+            query = {"idea": "prints by Cedar House", "completeOnly": False}
+            self.assertEqual(topics.credit_subjects(db, "impressions"), [80])
+            cards = ideas.published_suggestions(db, query, follow_topic=queued)
+            self.assertEqual([c["key"] for c in cards], ["w-80-50-90"])
+            self.assertEqual(set(followed), {topics.Topic("cedar house", i).key for i in (80, 81)})
+            self.assertIn("will check", query["sourceNote"])
+            with self.assertRaises(catalogue.UnverifiedRule) as missing:
+                ideas.published_suggestions(db, {"idea": "prints by Someone Else", "completeOnly": False})
+            self.assertEqual(set(missing.exception.requests), {topics.Topic("someone else", i).key for i in (80, 81)})
+            with self.assertRaises(catalogue.UnverifiedRule) as qualified:
+                ideas.published_suggestions(db, {"idea": "Print (publishing) by Cedar House", "completeOnly": False})
+            self.assertEqual(qualified.exception.requests, [topics.Topic("cedar house", 81).key])
+
     def test_uncached_credits_preserve_literal_class_names_roles_and_individual_evidence(self):
         with closing(sqlite3.connect(self.world)) as db:
             db.execute("UPDATE entity SET names=names||char(9)||'folio' WHERE id=10")

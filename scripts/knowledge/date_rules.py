@@ -149,7 +149,7 @@ class DateChoices(ValueError):
         cards,
         message="Specify which date the question uses, such as a release, founding or birth year.",
         *,
-        refresh=None,
+        refresh=(),
     ):
         self.cards = cards
         self.refresh = refresh

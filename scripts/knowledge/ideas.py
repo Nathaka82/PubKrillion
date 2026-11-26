@@ -170,7 +170,7 @@ def published_suggestions(db, request, *, follow_topic=None):
             edition, version = db.execute("SELECT edition,format FROM publication").fetchone()
             if version >= 26 and db.execute("SELECT 1 FROM world_class_name LIMIT 1").fetchone():
                 import topic_sources
-                topic = topic_sources.parse(db, request["idea"], bare=True)
+                topic = topic_sources.parse(db, request["idea"], bare=True, edition=edition)
                 if topic and (topic.cls or db.execute("SELECT 1 FROM source_topic WHERE key=?",(topic.key,)).fetchone()):
                     topic_sources.choices(db,topic,edition)
                 local = search(db,request["idea"],False)
@@ -180,8 +180,10 @@ def published_suggestions(db, request, *, follow_topic=None):
     except DateChoices as choices:
         if choices.cards or complete_only:
             request["sourceNote"] = str(choices)
-            if choices.cards and choices.refresh and not complete_only and follow_topic and follow_topic(choices.refresh):
-                request["sourceNote"] += " The builder will check this topic for additional credits."
+            if choices.cards and choices.refresh and not complete_only and follow_topic:
+                queued = [follow_topic(key) for key in choices.refresh]
+                if any(queued):
+                    request["sourceNote"] += " The builder will check this topic for additional credits."
             return [card for card in choices.cards if card["complete"] or not complete_only]
         raise
     except UnverifiedRule:
