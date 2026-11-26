@@ -185,7 +185,7 @@ def published_suggestions(db, request, *, follow_topic=None):
             if choices.cards and choices.refresh and not complete_only and follow_topic:
                 queued = [follow_topic(key) for key in choices.refresh]
                 if any(queued):
-                    request["sourceNote"] += " The builder will check this topic for additional credits."
+                    request["sourceNote"] += " The builder will check the source for additional questions."
             return [card for card in choices.cards if card["complete"] or not complete_only]
         raise
     except UnverifiedRule:

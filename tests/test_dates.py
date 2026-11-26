@@ -104,6 +104,36 @@ class DatedQuestions(unittest.TestCase):
     def publish(self):
         return catalogue.build(self.world, self.edition, self.root, offline=True, include_bundled=False)
 
+    def test_demonym_keeps_date_country_and_language_scopes_separate(self):
+        import ideas
+        with closing(sqlite3.connect(self.world)) as db, db:
+            db.executescript("""
+                INSERT INTO property VALUES(495,'country of origin'),(364,'original language of film or TV show');
+                INSERT INTO entity VALUES(17,'Japan'),(5287,'Japanese language');
+                INSERT INTO entity_alias VALUES('japan',17),('japanese language',5287);
+                INSERT INTO triple VALUES(1,495,17),(2,364,5287),(3,495,17);
+            """)
+        self.advance(size=20)
+        self.publish()
+        opts = dict(idea="Name a Japanese work released in 1999", completeOnly=False, direct=True)
+        with closing(catalogue.reader(self.edition)) as db, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            choices = ideas.published_suggestions(db, opts)
+            self.assertEqual({card["key"] for card in choices}, {
+                "during:date-10-577-1999-1999+w-10-495-17", "during:date-10-577-1999-1999+w-10-364-5287"})
+            for card in choices:
+                self.assertIn("1999", card["prompt"])
+                bank, _ = catalogue.play(db, game, card["key"], card["prompt"])
+                members = [row[0] for row in game.execute("SELECT name FROM kb_member WHERE bank=?", (bank,))]
+                self.assertEqual(members, ["First"] if card["key"].endswith("-495-17") else ["Second"])
+            self.assertEqual(ideas.published_suggestions(db, {**opts, "idea": "Japanese works released in 1999"}), choices)
+            self.assertEqual(ideas.published_suggestions(db, {**opts, "completeOnly": True}), [])
+            self.assertEqual(ideas.published_suggestions(db, {**opts, "idea": opts["idea"] + " or in 1980"}), [])
+            with self.assertRaises(catalogue.UnverifiedRule) as queued:
+                ideas.published_suggestions(db, {**opts, "idea": opts["idea"].replace("in 1999", "before 1998")})
+            self.assertEqual(set(queued.exception.requests), {
+                "during:date-10-577-1-1997+w-10-495-17", "during:date-10-577-1-1997+w-10-364-5287"})
+
     def test_date_and_relationship_join_by_entity_in_both_orders_and_keep_separate_evidence(self):
         self.facts.append((7, "outside", "1999-01-01", 9))
         self.names[7] = ("Seventh", ["Local title"])

@@ -323,11 +323,12 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             db.executescript(world_links.SCHEMA)
             db.executescript(attested_names.SCHEMA)
             db.executescript(entity_labels.SCHEMA)
-            import current_questions, date_rules, date_updates, date_properties, dated_links
+            import country_words, current_questions, date_rules, date_updates, date_properties, dated_links
             db.executescript(current_questions.SCHEMA)
             db.executescript(date_rules.SCHEMA)
             db.executescript(dated_links.SCHEMA)
             date_dictionary = date_properties.install(db,output.parent)
+            country_dictionary = country_words.install(db, output.parent)
             db.executescript(class_updates.SCHEMA)
             measurement_digest = comparisons.export_signature(db, measurements)
             print("Validating source registers", flush=True)
@@ -412,7 +413,7 @@ def build(world, output, feeds, *, offline=False, include_bundled=True, measurem
             if world is not None:
                 watched.append(("entity-labels",entity_labels.collect(db,output.parent,output)))
             rank_path, rank_release = attention.source(output.parent, output)
-            edition = digest([FORMAT, RULE_REVISION, BANK_FORMAT, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,name_revision,rank_release])
+            edition = digest([FORMAT, RULE_REVISION, BANK_FORMAT, fingerprint, revisions, feeds_signature, watched, measurement_digest,hierarchy,date_dictionary,country_dictionary,name_revision,rank_release])
             reuse_world = False
             if output.is_file():
                 with closing(reader(output)) as previous:
@@ -751,6 +752,9 @@ def search(db, idea, complete_only=False, *, comparisons=True):
                 return [dated]
             if dated := date_rules.match(db,topic_subject(spelling(idea)),edition_id):
                 return [dated,*dated_links.alternatives(db,dated)]
+            if file_format >= 27:
+                from country_words import choices as country_choices
+                country_choices(db, topic_subject(spelling(idea)), (edition_id, file_format))
         except date_rules.DateChoices as choices:
             if choices.cards:
                 return choices.cards
@@ -901,6 +905,9 @@ def match_question(db, prompt):
         if measured:
             return measured
     direct = match_single(db, prompt, include_empty=True)
+    if file_format >= 27 and not direct and not COMMAND.match(folded_spelling(prompt)):
+        from country_words import choices
+        choices(db, topic_subject(spelling(prompt)), (edition, file_format))
     if (direct and direct["records"]) or not COMMAND.match(folded_spelling(prompt)):
         return direct
     missing = direct["key"] if direct else None
@@ -951,6 +958,9 @@ def match_question(db, prompt):
         relation = match_relation(db,folded_spelling(body),body,(edition,file_format),request_target=True)
         if not relation and file_format >= 26:
             import topic_sources
+            if file_format >= 27:
+                from country_words import choices
+                choices(db, body, (edition, file_format))
             if topic := topic_sources.parse(db,prompt,bare=False,edition=edition):
                 topic_sources.choices(db,topic,edition)
             if file_format >= 27:
@@ -1563,6 +1573,11 @@ if __name__ == "__main__":
                     date_properties.refresh((args.output or catalogue_path(args.db)).parent)
                 except (OSError,ValueError,KeyError) as error:
                     print(f"Date-property update deferred: {error}",flush=True)
+                import country_words
+                try:
+                    country_words.refresh((args.output or catalogue_path(args.db)).parent)
+                except (OSError, ValueError, KeyError) as error:
+                    print(f"Country-word update deferred: {error}", flush=True)
             if world is not None and not args.offline and not args.watch:
                 import taxonomy
                 taxonomy.tick(world,taxonomy.location((args.output or catalogue_path(args.db)).parent),pages=None)
