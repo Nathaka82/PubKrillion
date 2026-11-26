@@ -42,8 +42,17 @@ CREATE TABLE IF NOT EXISTS scan(id INTEGER PRIMARY KEY, release TEXT, parts TEXT
 INSERT OR IGNORE INTO scan VALUES(1,'','[]',0,0,'',0);
 CREATE TABLE IF NOT EXISTS task(start INTEGER PRIMARY KEY,stop INTEGER,blocks TEXT,density INTEGER);
 CREATE INDEX IF NOT EXISTS task_order ON task(density,start);
+CREATE TABLE IF NOT EXISTS deferred(part INTEGER,start INTEGER,stop INTEGER,blocks TEXT,
+    attempts INTEGER,due INTEGER,error TEXT,PRIMARY KEY(part,start)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS deferred_by_due ON deferred(due,part,start);
+CREATE TABLE IF NOT EXISTS release_check(id INTEGER PRIMARY KEY,next INTEGER);
+INSERT OR IGNORE INTO release_check VALUES(1,0);
 """
 )
+
+
+class InvalidBlock(ValueError):
+    """The indexed range was served, but its entity data failed validation."""
 
 
 def path(storage):
@@ -238,13 +247,19 @@ def read_block(response, length, pages, release, last):
     while length:
         raw = response.read(min(65536, length))
         if not raw:
-            raise ValueError("Wikidata dump range ended early.")
+            raise OSError("Wikidata dump range ended early.")
         length -= len(raw)
         if decoder.eof:
             footer.extend(raw)
         else:
             while True:
-                xml.feed(decoder.decompress(raw, max_length=262144))
+                try:
+                    chunk = decoder.decompress(raw, max_length=262144)
+                except OSError as error:
+                    raise InvalidBlock(
+                        "Wikidata bzip2 member failed validation."
+                    ) from error
+                xml.feed(chunk)
                 for event, page in xml.read_events():
                     if event == "end" and page.tag == "page":
                         record = page_record(page, expected, release, captured)
@@ -261,8 +276,13 @@ def read_block(response, length, pages, release, last):
             raise ValueError("Unexpected content beyond an indexed bzip2 member.")
     if not decoder.eof or expected:
         raise ValueError("Wikidata dump block is incomplete.")
-    if footer and (not last or bz2.decompress(footer).strip() != b"</mediawiki>"):
-        raise ValueError("Unexpected trailing Wikidata dump member.")
+    if footer:
+        try:
+            valid = last and bz2.decompress(footer).strip() == b"</mediawiki>"
+        except OSError as error:
+            raise InvalidBlock("Wikidata dump footer failed validation.") from error
+        if not valid:
+            raise ValueError("Unexpected trailing Wikidata dump member.")
     xml.feed("</root>")
     xml.close()
 
@@ -289,18 +309,84 @@ def capture(db, release, xml, task):
             )
         groups = json.loads(blocks)
         for (offset, pages), end in zip(groups, [g[0] for g in groups[1:]] + [stop]):
-            entity_labels.put(
-                db,
-                read_block(response, end - offset, pages, release, end == xml["size"]),
-            )
+            try:
+                entity_labels.put(
+                    db,
+                    read_block(
+                        response, end - offset, pages, release, end == xml["size"]
+                    ),
+                )
+            except (ValueError, ET.ParseError, EOFError) as error:
+                raise InvalidBlock(str(error)) from error
         if response.read(1):
             raise ValueError("Wikidata dump range exceeds its declared boundary.")
-        db.execute("DELETE FROM task WHERE start=?", (start,))
+
+
+def process(db, release, parts, part, task, *, retry=False):
+    start, stop, blocks = task
+    try:
+        with db:
+            capture(db, release, parts[part][2], task)
+            if retry:
+                db.execute(
+                    "DELETE FROM deferred WHERE part=? AND start=?", (part, start)
+                )
+            else:
+                db.execute("DELETE FROM task WHERE start=?", (start,))
+        return stop - start
+    except InvalidBlock as error:
+        # Retry a bad group independently. Other shards can still contribute
+        # checked names, but this gap must prevent any inference of absence.
+        groups = json.loads(blocks)
+        if not retry and len(groups) > 1:
+            # The release index gives the exact boundary of each independently
+            # compressed member. Keep healthy siblings eligible for this pass.
+            middle = len(groups) // 2
+            with db:
+                db.execute("DELETE FROM task WHERE start=?", (start,))
+                for half, end in (
+                    (groups[:middle], groups[middle][0]),
+                    (groups[middle:], stop),
+                ):
+                    begin = half[0][0]
+                    owners = sum(len(pages) for _, pages in half)
+                    db.execute(
+                        "INSERT INTO task VALUES(?,?,?,?)",
+                        (begin, end, json.dumps(half), (end - begin) // owners),
+                    )
+            return 0
+        with db:
+            db.execute(
+                """INSERT INTO deferred VALUES(?,?,?,?,1,unixepoch()+900,?)
+                ON CONFLICT(part,start) DO UPDATE SET attempts=attempts+1,
+                due=unixepoch()+min(86400,900*(1<<min(attempts,7))),error=excluded.error""",
+                (part, start, stop, blocks, str(error)),
+            )
+            if not retry:
+                db.execute("DELETE FROM task WHERE start=?", (start,))
+        print(
+            f"Wikidata {release}, shard {part + 1}, bytes {start}-{stop - 1} deferred: {error}",
+            flush=True,
+        )
+        return 0
+
+
+def retire_absent(db, release):
+    if db.execute("SELECT 1 FROM deferred LIMIT 1").fetchone():
+        return
+    captured = int(datetime.strptime(release, "%Y%m%d").replace(tzinfo=UTC).timestamp())
+    db.execute(
+        """UPDATE label_record SET forms='',origin=?,checked=? WHERE checked<=?
+        AND origin NOT LIKE ? AND id IN (SELECT id FROM world.entity)""",
+        (f"dump:{release}:absent", captured, captured, f"dump:{release}:%"),
+    )
 
 
 def reset(db, release, parts, world):
     with db:
         db.execute("DELETE FROM task")
+        db.execute("DELETE FROM deferred")
+        db.execute("UPDATE release_check SET next=0")
         db.execute(
             "UPDATE scan SET release=?,parts=?,part=0,indexed=0,world=?,next=0",
             (release, json.dumps(parts), world),
@@ -312,12 +398,34 @@ def advance(db, world_key, budget):
         "SELECT release,parts,part,indexed,world FROM scan"
     ).fetchone()
     parts = json.loads(parts)
+    verified = spent = 0
+    if parts and world == world_key:
+        # Reserve at most one retry per pass while fresh shards are available.
+        retry = db.execute("""SELECT part,start,stop,blocks FROM deferred WHERE due<=unixepoch()
+            ORDER BY due,part,start LIMIT 1""").fetchone()
+        if retry:
+            verified = process(db, release, parts, retry[0], retry[1:], retry=True)
+            spent = retry[2] - retry[1]
+            if verified and part == len(parts):
+                with db:
+                    retire_absent(db, release)
     if world_key != world or part >= len(parts):
-        new = discover(release if world_key == world else "")
-        if not new:
+        now = int(time.time())
+        check = db.execute("SELECT next FROM release_check").fetchone()[0]
+        new = None
+        if world_key != world or now >= check:
+            new = discover(release if world_key == world else "")
             with db:
-                db.execute("UPDATE scan SET next=?", (int(time.time()) + 86400,))
-            return 0
+                check = now + 86400
+                db.execute("UPDATE release_check SET next=?", (check,))
+        if not new:
+            due = db.execute("SELECT min(due) FROM deferred").fetchone()[0]
+            with db:
+                db.execute(
+                    "UPDATE scan SET next=?",
+                    (min(due, check) if due is not None else check,),
+                )
+            return verified
         release, parts = new
         reset(db, release, parts, world_key)
         part, indexed = 0, False
@@ -326,8 +434,7 @@ def advance(db, world_key, budget):
         with db:
             db.executemany("INSERT INTO task VALUES(?,?,?,?)", index_tasks(db, shard))
             db.execute("UPDATE scan SET indexed=1")
-    used = 0
-    while used < budget:
+    while spent < budget:
         task = db.execute(
             "SELECT start,stop,blocks FROM task ORDER BY density,start LIMIT 1"
         ).fetchone()
@@ -335,27 +442,11 @@ def advance(db, world_key, budget):
             with db:
                 db.execute("UPDATE scan SET part=part+1,indexed=0")
                 if part + 1 == len(parts):
-                    # Only a complete pass can establish disappearance from the dump.
-                    captured = int(
-                        datetime.strptime(release, "%Y%m%d")
-                        .replace(tzinfo=UTC)
-                        .timestamp()
-                    )
-                    db.execute(
-                        """UPDATE label_record SET forms='',origin=?,checked=? WHERE checked<=?
-                        AND origin NOT LIKE ? AND id IN (SELECT id FROM world.entity)""",
-                        (
-                            f"dump:{release}:absent",
-                            captured,
-                            captured,
-                            f"dump:{release}:%",
-                        ),
-                    )
+                    retire_absent(db, release)
             break
-        with db:
-            capture(db, release, shard[2], task)
-        used += task[1] - task[0]
-    return used
+        verified += process(db, release, parts, part, task)
+        spent += task[1] - task[0]
+    return verified
 
 
 def tick(world, storage, budget=32_000_000):
@@ -407,12 +498,17 @@ if __name__ == "__main__":
     with closing(sqlite3.connect(path(args.storage))) as db:
         release, part = db.execute("SELECT release,part FROM scan").fetchone()
         count = db.execute("SELECT count(*) FROM label_record").fetchone()[0]
+        deferred = db.execute("SELECT count(*) FROM deferred").fetchone()[0]
+        incomplete = db.execute(
+            "SELECT count(DISTINCT part) FROM deferred WHERE part<?", (part,)
+        ).fetchone()[0]
         print(
             json.dumps(
                 {
                     "release": release,
-                    "completedShards": part,
+                    "completedShards": part - incomplete,
                     "observedEntities": count,
+                    "deferredRanges": deferred,
                     "compressedBytes": used,
                 }
             )

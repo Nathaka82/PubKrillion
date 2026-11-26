@@ -189,13 +189,11 @@ class BulkNames(unittest.TestCase):
             prior = list(db.execute("SELECT * FROM label_record"))
             pending = list(db.execute("SELECT * FROM task"))
         normal = self.source
-        for damage in ("ignored range", "truncated", "wrong content range", "crc"):
+        for damage in ("ignored range", "truncated", "wrong content range"):
 
             def corrupt(request, timeout, damage=damage):
                 source = normal(request, timeout)
                 data = source.read()
-                if damage == "crc":
-                    data = data[:9] + bytes([data[9] ^ 32]) + data[10:]
                 if damage == "truncated":
                     data = data[: len(data) // 2]
                 return Response(
@@ -218,6 +216,173 @@ class BulkNames(unittest.TestCase):
                 db.execute("UPDATE scan SET next=0")
                 db.commit()
         self.assertGreater(self.tick(), 0)
+
+    def test_bad_group_cannot_block_other_groups_or_certify_a_withdrawal(self):
+        normal = self.source
+
+        def one_bad_group(request, timeout):
+            result = normal(request, timeout)
+            if len(self.requests) > 1:
+                return result
+            raw = result.read()
+            return Response(
+                raw[:9] + bytes([raw[9] ^ 32]) + raw[10:],
+                result.headers["Content-Range"],
+            )
+
+        with patch.object(self, "source", side_effect=one_bad_group):
+            self.assertEqual(self.tick(1), 0)
+        with closing(sqlite3.connect(bulk.path(self.root))) as db:
+            entity_labels.put(db, [(2, "Previous name", 1, "dump:20261001:10")])
+            db.commit()
+            self.assertEqual(
+                db.execute("SELECT attempts FROM deferred").fetchone()[0], 1
+            )
+        self.assertGreater(self.tick(), 0)
+        with closing(sqlite3.connect(bulk.path(self.root))) as db:
+            self.assertEqual(db.execute("SELECT part FROM scan").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute("SELECT forms FROM label_record WHERE id=2").fetchone()[0],
+                "Previous name",
+            )
+            self.assertTrue(
+                db.execute("SELECT id FROM label_record WHERE id<>2").fetchone()
+            )
+            self.assertEqual(
+                db.execute("SELECT count(*) FROM deferred").fetchone()[0], 1
+            )
+            db.execute("UPDATE deferred SET due=0")
+            db.commit()
+        with (
+            patch.object(bulk, "discover", return_value=None),
+            patch.object(bulk.sources, "open_source", side_effect=normal),
+        ):
+            self.assertGreater(bulk.tick(self.world, self.root), 0)
+        with closing(sqlite3.connect(bulk.path(self.root))) as db:
+            self.assertFalse(db.execute("SELECT 1 FROM deferred").fetchone())
+            self.assertEqual(
+                db.execute("SELECT origin FROM label_record WHERE id=2").fetchone()[0],
+                "dump:20261101:absent",
+            )
+            self.assertEqual(
+                db.execute("SELECT count(*) FROM label_record").fetchone()[0], 4
+            )
+
+    def test_corrupt_member_isolated_within_a_single_network_range(self):
+        with closing(sqlite3.connect(self.world)) as world:
+            world.execute("INSERT INTO entity VALUES(999,'Another item')")
+            world.commit()
+        bad_byte = int(bz2.decompress(self.index).splitlines()[1].split(b":", 1)[0]) + 9
+        normal = self.source
+
+        def corrupt(request, timeout):
+            stream = normal(request, timeout)
+            start, stop = self.requests[-1]
+            if not start <= bad_byte <= stop:
+                return stream
+            raw = stream.read()
+            pos = bad_byte - start
+            return Response(
+                raw[:pos] + bytes([raw[pos] ^ 32]) + raw[pos + 1 :],
+                stream.headers["Content-Range"],
+            )
+
+        with patch.object(self, "source", side_effect=corrupt):
+            self.assertGreater(self.tick(), 0)
+        with closing(sqlite3.connect(bulk.path(self.root))) as db:
+            self.assertEqual(
+                list(db.execute("SELECT id FROM label_record ORDER BY id")),
+                [(1,), (6,), (7,)],
+            )
+            held = db.execute("SELECT start,stop,blocks FROM deferred").fetchone()
+            self.assertEqual(len(json.loads(held[2])), 1)
+            self.assertLess(
+                held[1] - held[0], self.requests[0][1] + 1 - self.requests[0][0]
+            )
+
+    def test_retry_uses_its_original_shard_and_preserves_other_tasks_at_the_same_offset(
+        self,
+    ):
+        header = bz2.compress(b"<mediawiki>")
+        later_bytes = (
+            header
+            + bz2.compress(page(800, "Q3", [("en", "Later work")]))
+            + bz2.compress(b"</mediawiki>")
+        )
+        later_index = bz2.compress(f"{len(header)}:800:Q3\n".encode())
+        later = [
+            800,
+            800,
+            {"url": "/later", "size": len(later_bytes)},
+            {
+                "url": "/later-index",
+                "sha1": hashlib.sha1(later_index).hexdigest(),
+                "size": len(later_index),
+            },
+        ]
+        failing = True
+
+        def source(request, timeout):
+            if request.full_url.endswith("/later"):
+                start, stop = map(int, request.get_header("Range")[6:].split("-"))
+                return Response(
+                    later_bytes[start : stop + 1],
+                    f"bytes {start}-{stop}/{len(later_bytes)}",
+                )
+            stream = self.source(request, timeout)
+            if failing and self.requests[-1][0] == len(header):
+                raw = stream.read()
+                return Response(
+                    raw[:9] + bytes([raw[9] ^ 32]) + raw[10:],
+                    stream.headers["Content-Range"],
+                )
+            return stream
+
+        with (
+            patch.object(
+                bulk,
+                "discover",
+                side_effect=lambda after: (
+                    None if after else ("20261101", [self.shard, later])
+                ),
+            ),
+            patch.object(
+                bulk.sources,
+                "fetch",
+                side_effect=lambda url, *a, **k: (
+                    later_index if url.endswith("/later-index") else self.index
+                ),
+            ),
+            patch.object(bulk.sources, "open_source", side_effect=source),
+        ):
+            self.assertGreater(bulk.tick(self.world, self.root), 0)
+            with closing(sqlite3.connect(bulk.path(self.root))) as db:
+                self.assertEqual(db.execute("SELECT part FROM scan").fetchone()[0], 1)
+                self.assertEqual(
+                    db.execute("SELECT part,start FROM deferred").fetchone(),
+                    (0, len(header)),
+                )
+                db.execute("ATTACH DATABASE ? AS world", (str(self.world),))
+                db.executemany(
+                    "INSERT INTO task VALUES(?,?,?,?)", bulk.index_tasks(db, later)
+                )
+                db.execute("UPDATE scan SET indexed=1")
+                db.execute("UPDATE deferred SET due=0")
+                db.commit()
+            failing = False
+            self.assertGreater(bulk.tick(self.world, self.root, 1), 0)
+            with closing(sqlite3.connect(bulk.path(self.root))) as db:
+                self.assertEqual(
+                    db.execute("SELECT start FROM task").fetchone()[0], len(header)
+                )
+            self.assertGreater(bulk.tick(self.world, self.root), 0)
+        with closing(sqlite3.connect(bulk.path(self.root))) as db:
+            self.assertEqual(
+                db.execute("SELECT forms FROM label_record WHERE id=3").fetchone()[0],
+                "Later work",
+            )
+            self.assertEqual(db.execute("SELECT part FROM scan").fetchone()[0], 2)
+            self.assertFalse(db.execute("SELECT 1 FROM deferred").fetchone())
 
     def test_index_and_entity_identity_are_verified(self):
         self.shard[3]["sha1"] = "0" * 40
