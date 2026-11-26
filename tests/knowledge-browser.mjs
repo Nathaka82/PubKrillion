@@ -81,6 +81,10 @@ try {
         true,
       );
       const path = "/rooms/" + code;
+      await p.locator("#help-button").click();
+      await p.getByText(/The game checks answers against the round’s sources/).waitFor();
+      assert.equal(await p.getByText(/Ask host to review/).count(), 0);
+      await p.getByRole("button", { name: "Got it" }).click();
       const current = (await players[0](path + "/state")).data.round;
       const receipts = await Promise.all(
         players.map((request, i) =>

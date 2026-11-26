@@ -41,16 +41,21 @@ function foldedSpelling(value: string) {
     .trim().replace(/\s+/gu, " ");
 }
 
-function nameDecision(db: DatabaseSync, bank: string, raw: string) {
-  const select = db.prepare("SELECT entity,name,depth FROM kb_answer_key WHERE bank=? AND form=? AND term=?");
-  return select.get(bank, 0, spelling(raw)) ?? select.get(bank, 1, foldedSpelling(raw));
+// A typo can change a letter while still preserving the source's numbers, symbols and vowel marks.
+function spellingDetails(value: string) {
+  const parts = foldedSpelling(value).normalize("NFD").match(/[+-]?\p{Nd}+(?:[.,]\p{Nd}+)*|[^\p{L}\p{N}\s]/gu);
+  return (parts ?? []).join("\u001f");
 }
 
 export function lookup(db: DatabaseSync, bank: string, raw: string) {
-  const key = normal(raw) || spelling(raw);
+  const plain = normal(raw);
+  const key = plain || spelling(raw);
   const checked = db.prepare("SELECT 1 FROM kb_answer_key WHERE bank=? LIMIT 1").get(bank);
+  const select = checked && db.prepare("SELECT entity,name,depth FROM kb_answer_key WHERE bank=? AND form=? AND term=?");
+  const decisionFor = (name: string) => select?.get(bank, 0, spelling(name)) ?? select?.get(bank, 1, foldedSpelling(name));
+  const folded = foldedSpelling(raw);
   if (checked) {
-    const decision = nameDecision(db, bank, raw);
+    const decision = decisionFor(raw);
     if (decision) {
       if (decision.entity === null) return null;
       return { answer: { name: String(decision.name), depth: Number(decision.depth), aliases: [] },
@@ -65,9 +70,8 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
           " LIMIT 2",
       )
       .all(bank, key, ...(prefix ? [key + "\u{10ffff}"] : []));
-  const exact = byTerm(false);
+  const exact = checked ? [] : byTerm(false);
   if (exact.length > 1) {
-    if (checked) return undefined;
     const group = db
       .prepare("SELECT name,depth FROM kb_group WHERE bank=? AND term=?")
       .get(bank, key);
@@ -83,33 +87,36 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
         }
       : null;
   }
-  const list = exact.length || key.length < 4 ? exact : byTerm(true);
-  const confirmation = (answer: Answer, entity: string, prefix: boolean) => {
-    const owned = (name: string) => nameDecision(db, bank, name)?.entity === entity;
-    if (!checked || owned(answer.name)) return answer;
-    const row = db.prepare("SELECT aliases FROM kb_member WHERE bank=? AND entity=?").get(bank, entity);
-    const names: string[] = JSON.parse(String(row?.aliases ?? "[]"));
-    // A shared title would submit a different score. Confirm a recorded spelling
-    // that matches the player's input and resolves uniquely to the intended entity.
-    if (prefix) {
-      const matches = names.filter(name => (normal(name) || spelling(name)).startsWith(key))
-        .sort((a, b) => a.length - b.length);
-      const name = matches.find(owned);
-      if (name) return { ...answer, name };
+  let list = exact;
+  if (!list.length && Array.from(checked ? folded : key).length >= 4) {
+    if (checked) {
+      // Include shared and blocked spellings. One eligible title can still have an ineligible namesake.
+      const prefixes = db.prepare("SELECT DISTINCT entity,name,depth FROM kb_answer_key " +
+        "WHERE bank=? AND form=? AND term>=? AND term<? LIMIT 2");
+      list = prefixes.all(bank, 1, folded, folded + "\u{10ffff}");
+      if (!list.length) {
+        const literal = spelling(raw);
+        list = prefixes.all(bank, 0, literal, literal + "\u{10ffff}");
+      }
+      if (list.length > 1 || list[0]?.entity === null) return undefined;
+    } else {
+      list = byTerm(true);
     }
-    const options = names.map(name => ({ name, aliases: [], depth: answer.depth }));
-    const match = resolveAnswer(raw, options, "full");
-    if (match && owned(match.answer.name)) return match.answer;
-  };
+  }
+  const member = db.prepare("SELECT name,aliases,depth FROM kb_member WHERE bank=? AND entity=?");
+  const owned = (name: string, entity: string) => decisionFor(name)?.entity === entity;
   if (list.length === 1) {
-    const answer = {
-      name: String(list[0].name),
-      aliases: [],
-      depth: Number(list[0].depth),
-    };
+    const name = String(list[0].name);
     const entity = String(list[0].entity);
-    const confirmed = confirmation(answer, entity, true);
-    if (confirmed) return { answer: confirmed, exact: !checked && exact.length === 1, entity };
+    const depth = Number(list[0].depth);
+    if (!checked) return { answer: { name, depth, aliases: [] }, exact: exact.length === 1, entity };
+    const canonical = decisionFor(name);
+    if (canonical?.entity === entity && canonical.depth === depth)
+      return { answer: { name, depth, aliases: [] }, exact: false, entity };
+    if (!entity) return undefined;
+    const aliases: string[] = JSON.parse(String(member.get(bank, entity)!.aliases));
+    const matching = aliases.find(form => foldedSpelling(form).startsWith(folded) && owned(form, entity));
+    if (matching) return { answer: { name: matching, depth, aliases: [] }, exact: false, entity };
   }
   // Limit typo correction to a small indexed neighbourhood. Always ask for confirmation.
   if (key.length >= 5) {
@@ -124,29 +131,35 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
       .all(bank, chars.slice(-3).join(""), chars.length - 2, chars.length + 2);
     const nearby = [...(leading.length <= 80 ? leading : []), ...(ending.length <= 80 ? ending : [])];
     if (nearby.length) {
-      const shortlist = new Map<string, Answer>();
+      const terms = new Map<string, Set<string>>();
       for (const r of nearby) {
         const entity = String(r.entity);
-        if (!shortlist.has(entity)) {
-          const m = db
-            .prepare(
-              "SELECT name,depth FROM kb_member WHERE bank=? AND entity=?",
-            )
-            .get(bank, entity)!;
-          shortlist.set(entity, {
-            name: String(m.name),
-            depth: Number(m.depth),
-            aliases: [],
-          });
+        if (!terms.has(entity)) terms.set(entity, new Set());
+        terms.get(entity)!.add(String(r.term));
+      }
+      const shortlist = new Map<Answer, string>();
+      const details = spellingDetails(raw);
+      for (const [entity, neighbours] of terms) {
+        const row = member.get(bank, entity)!;
+        const name = String(row.name), depth = Number(row.depth);
+        if (!checked) {
+          shortlist.set({ name, depth, aliases: [...neighbours] }, name);
+          continue;
         }
-        shortlist.get(entity)!.aliases.push(String(r.term));
+        const aliases: string[] = JSON.parse(String(row.aliases));
+        const forms = [name, ...aliases].filter(form => {
+          const broad = normal(form) || spelling(form);
+          if (!neighbours.has(broad) || spellingDetails(form) !== details) return false;
+          if (broad.startsWith(key) && !foldedSpelling(form).startsWith(folded)) return false;
+          return owned(form, entity);
+        });
+        if (forms.length) {
+          // A shared display title could submit a different score. Offer a spelling owned by this entry.
+          shortlist.set({ name: forms[0], depth, aliases: forms.slice(1) }, owned(name, entity) ? name : forms[0]);
+        }
       }
-      const match = resolveAnswer(raw, [...shortlist.values()], "full");
-      if (match) {
-        const owner = [...shortlist].find(([, answer]) => answer === match.answer);
-        const confirmed = owner && confirmation(owner[1], owner[0], false);
-        if (confirmed) return { answer: confirmed, exact: false };
-      }
+      const match = resolveAnswer(raw, [...shortlist.keys()], "full");
+      if (match) return { answer: { ...match.answer, name: shortlist.get(match.answer)! }, exact: false };
     }
   }
   return undefined;

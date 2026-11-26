@@ -1232,7 +1232,7 @@ $("#modal").addEventListener("close", () => {
   if (unseenDive() && !state.room.finished && !document.hidden)
     void pollRoom(page, false, true);
 });
-$("#help-button").addEventListener("click", how);
+$("#help-button").addEventListener("click", () => how(state?.round?.sourceJudged));
 document.addEventListener("input", (e) => {
   const t = e.target;
   if (t.name === "answer" && state?.round) {

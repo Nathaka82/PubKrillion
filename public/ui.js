@@ -178,10 +178,13 @@ export function modal(title, body) {
 export function closeModal() {
   if ($("#modal").open) $("#modal").close();
 }
-export function how() {
+export function how(sourceJudged) {
+  const missing = sourceJudged
+    ? "The game checks answers against the round’s sources. If it asks for a fuller name, try the complete title or another recorded spelling."
+    : "When Ask host to review appears, you can send your last guess to the host.";
   modal(
     "How to play",
-    '<ol class="how"><li><strong>Join a crew</strong><p>Use the host’s room code and choose a team name. One phone is enough for your whole team.</p></li><li><strong>Think of a rare answer</strong><p>Tap Dive to lock in your answer. If you see “Did you mean?”, tap the suggested answer to confirm it. Your first accepted answer is final. If a name is missing, select Ask host to review. The host can also check your last submitted guess.</p></li><li><strong>Watch the dive</strong><p>Teams start side by side with their current scores and dive together. Answers share five rarity bands. Several answers can tie. Scores are set before play using recall data or estimates of how familiar a name is. A miss stays at the surface.</p></li></ol><button class="primary wide" data-close>Got it</button>',
+    '<ol class="how"><li><strong>Join a crew</strong><p>Use the host’s room code and choose a team name. One phone is enough for your whole team.</p></li><li><strong>Think of a rare answer</strong><p>Tap Dive to submit. If you see “Did you mean?”, confirm the suggestion or edit your answer. Your first accepted answer is final. ' + missing + '</p></li><li><strong>Watch the dive</strong><p>Teams start side by side with their current scores and dive together. Answers share five rarity bands. Several answers can tie. Scores are set before play using recall data or estimates of how familiar a name is. A miss stays at the surface.</p></li></ol><button class="primary wide" data-close>Got it</button>',
   );
 }
 export const splitHosting =

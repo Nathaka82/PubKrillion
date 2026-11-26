@@ -138,7 +138,8 @@ test("source decisions distinguish symbols, scripts, typos and partially qualify
   const f = await fixture(undefined, { QUIZ_SEMANTIC: "off", OPENAI_API_KEY: "" });
   t.after(() => f.close());
   const names = ["C", "C#", "C++", "का", "कि", "!!!", "Églantine"];
-  const records = names.map((name, i) => ({ id: String(i), name, types: ["notation"],
+  const titles = ["Open C# Reference", "Open C++ Guide", "Annual 5.25 Record", "मेरी किताब", "Bright Stars", "Bright Starfish"];
+  const records = [...names, ...titles].map((name, i) => ({ id: String(i), name, types: ["notation"],
     aliases: i === 0 ? ["Regional notation"] : [], edges: [["used in", "Open Studio"]] }));
   records.push({ id: "excluded", name: "Another notation", types: ["notation"], aliases: ["Regional notation"], edges: [] });
   await writeFile(join(f.dir, "notations.json"), JSON.stringify(records));
@@ -151,7 +152,7 @@ test("source decisions distinguish symbols, scripts, typos and partially qualify
   const players = names.map(() => client(f));
   for (const [i, player] of players.entries()) await ok(player(root + "/join", "POST", { name: "Crew " + i }));
   const { jobs: [job] } = await ok(host(root + "/drafts", "POST", { idea: "Open Studio" }));
-  assert.equal(job.records, 7);
+  assert.equal(job.records, names.length + titles.length);
   let preview;
   for (let i = 0; i < 100; i++) {
     const result = await ok(host(root + "/generate/" + job.id));
@@ -159,7 +160,7 @@ test("source decisions distinguish symbols, scripts, typos and partially qualify
     if (result.preview) { preview = result.preview; break; }
     await new Promise(resolve => setTimeout(resolve, 70));
   }
-  assert.equal(preview?.answerCount, 7);
+  assert.equal(preview?.answerCount, names.length + titles.length);
   for (const name of ["C#", "C++", "का", "कि", "!!!"]) {
     const page = await ok(host(root + "/generate/" + job.id + "/answers?q=" + encodeURIComponent(name)));
     assert.deepEqual(page.answers.map(row => row.name), [name]);
@@ -168,6 +169,16 @@ test("source decisions distinguish symbols, scripts, typos and partially qualify
   const { id } = await ok(host(root + "/start", "POST", { questionId: saved.id, previous: null, seconds: 0 }));
   const path = root + "/rounds/" + id;
   const submit = (p, answer) => p(path + "/answer", "POST", { answer, revision: 0 });
+  for (const [input, expected] of [
+    ["Open C# Ref", titles[0]], ["Open C# Refernce", titles[0]], ["Open C++ Gui", titles[1]],
+    ["Annual 5.25 Rec", titles[2]], ["मेरी कि", titles[3]],
+    ["Open C++ Reference", undefined], ["Open C# Guide", undefined], ["Annual 5 25 Rec", undefined],
+    ["मिरी कि", undefined], ["Regional notatio", undefined], ["Reginal notation", undefined], ["Bright Star", undefined],
+  ]) {
+    const reply = await submit(players[0], input);
+    assert.equal(reply.status, 422, input);
+    assert.equal(reply.data.suggestion, expected, input);
+  }
   const mixed = await submit(players[0], "Regional notation");
   assert.equal(mixed.status, 422);
   assert.match(mixed.data.error, /specific/);
