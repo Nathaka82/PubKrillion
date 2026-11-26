@@ -146,6 +146,59 @@ class CatalogueTests(unittest.TestCase):
             world.commit()
         self.assertEqual(taxonomy.due(self.world,snapshot),0)
 
+    def test_named_examples_and_types_share_a_bank_with_independently_refreshed_scopes(self):
+        import ideas
+        with closing(sqlite3.connect(self.world)) as db:
+            db.executescript("""INSERT INTO entity VALUES(100,'fixture instrument'),(101,'reed'),(102,'reed pipe'),
+                    (103,'Ochre Pipe'),(104,'Blue Pipe');
+                INSERT INTO triple VALUES(101,279,100),(102,279,101),(102,31,100),(103,31,102),(104,31,100);""")
+            db.commit()
+        self.publish()
+        root = "Name a fixture instrument"
+        question = {"idea": root, "completeOnly": False}
+
+        def verify(expected, evidence=()):
+            with closing(catalogue.reader(self.published)) as db, closing(sqlite3.connect(":memory:")) as game:
+                game.executescript((ROOT / "server/knowledge.sql").read_text())
+                cards = ideas.published_suggestions(db, question)
+                self.assertEqual([c["key"] for c in cards], ["examples:Q100", "kind:Q100", "type:Q100"])
+                for card, ids in zip(cards, expected):
+                    self.assertEqual(catalogue.match_question(db, card["prompt"])["key"], card["key"])
+                    self.assertEqual(card["records"], len(ids))
+                    bank, meta = catalogue.play(db, game, card["key"], card["prompt"], card["edition"])
+                    members = dict(game.execute("SELECT entity,evidence FROM kb_member WHERE bank=?", (bank,)))
+                    self.assertEqual(set(members), {f"wd:Q{i}" for i in ids})
+                    if card is cards[0]:
+                        self.assertIn("type", meta["playerRule"])
+                        for entity, term in evidence:
+                            self.assertIn(term, members[f"wd:Q{entity}"])
+                self.assertEqual(ideas.published_suggestions(db, {**question,"completeOnly":True}), [])
+
+        verify([{101,102,103,104},{101,102},{102,103,104}], [(102, "#P31"), (102, "#P279")])
+        self.assertTrue(watched_rules.follow(self.root,"examples:Q100"))
+        self.assertEqual({k for k,_ in class_updates.registered(self.root)}, {"type:Q100","kind:Q100"})
+        with closing(sqlite3.connect(self.published)) as db:
+            db.execute("INSERT INTO current_class VALUES('type:Q100','instances-v2',100,2,3)")
+            db.executemany("INSERT INTO current_member VALUES('type:Q100',?,?,'[]')",[(104,"Blue Pipe"),(110,"New Pipe")])
+            db.commit()
+        verify([{101,102,104,110},{101,102},{104,110}])
+        with closing(sqlite3.connect(self.published)) as db:
+            db.execute("INSERT INTO current_class VALUES('kind:Q100','types-v2',101,2,3)")
+            db.executemany("INSERT INTO current_member VALUES('kind:Q100',?,?,'[]')",[(102,"reed pipe"),(110,"New Pipe")])
+            db.commit()
+        verify([{102,104,110},{102,110},{104,110}], [(110,"wikidata-query-kinds-100"),(110,"wikidata-query-class-100")])
+        with closing(sqlite3.connect(self.published)) as db:
+            db.execute("DELETE FROM current_member WHERE rule='type:Q100'")
+            db.execute("UPDATE current_class SET n=0,scanned=0 WHERE rule='type:Q100'")
+            db.commit()
+        with closing(catalogue.reader(self.published)) as db, closing(sqlite3.connect(":memory:")) as game:
+            only, = ideas.published_suggestions(db, question)
+            self.assertEqual(only["key"], "kind:Q100")
+            self.assertEqual(catalogue.match_question(db, "Name a kind of fixture instrument")["key"], only["key"])
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            with self.assertRaises(catalogue.RuleWithdrawn):
+                catalogue.play(db, game, "examples:Q100", root)
+
     def test_prepared_catalogue_bank_reopens_and_rechecks_the_exact_scoring_sample(self):
         edition = self.publish()["edition"]
         prompt, rule = "Name a work", "type:Q10"

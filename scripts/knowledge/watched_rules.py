@@ -56,6 +56,10 @@ def replace(file, data):
 
 def follow(storage, key):
     from class_updates import KEY
+    if combined := re.fullmatch(r"examples:(Q[1-9]\d{0,11})", key):
+        members = follow(storage, "type:" + combined[1])
+        kinds = follow(storage, "kind:" + combined[1])
+        return members and kinds
     from date_rules import Rule
     if key.startswith(("lookup:", "topic:")):
         from target_lookup import Request

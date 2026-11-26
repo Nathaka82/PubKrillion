@@ -171,15 +171,20 @@ def discovered_subjects(db, subject, mode="subject"):
 def discover_class_question(db, body):
     from catalogue import RuleWithdrawn, UnverifiedRule
     from date_rules import DateChoices
-    from world_classes import card
-    kinds = body.startswith("type of ")
-    subject = body[8:] if kinds else body
+    from world_classes import BOTH_SUFFIX, NAMED_PREFIX, question, scope_phrase
+    mode, subject = scope_phrase(body)
+    kinds = mode == "kind"
     ids = discovered_subjects(db, subject, "kind" if kinds else "type")
     cards, revised, pending = [], [], []
     for cls in ids:
         key = ("kind:" if kinds else "type:") + f"Q{cls}"
         try:
-            candidate = card(db, ("type of " if kinds else "") + f"q{cls}", strict=True)
+            phrase = f"q{cls}"
+            if mode in ("kind", "both"):
+                phrase = "type of " + phrase + (BOTH_SUFFIX if mode == "both" else "")
+            elif mode == "named":
+                phrase = NAMED_PREFIX + phrase
+            candidate = question(db, phrase, phrase)
         except UnverifiedRule as error:
             pending.extend(error.requests)
         except DateChoices as options:
@@ -195,7 +200,7 @@ def discover_class_question(db, body):
     if len(cards) == 1 and len(ids) == 1:
         return cards[0]
     if cards:
-        raise DateChoices(cards, "Choose the source subject meant by this name.", refresh=pending)
+        raise DateChoices(cards + revised, "Choose the source subject meant by this name.", refresh=pending)
     if revised:
         raise DateChoices(revised, "Select a revised question to play with its documented answers.", refresh=pending)
     if pending:

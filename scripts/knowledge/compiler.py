@@ -878,7 +878,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         ).fetchone()
         if label:
             reference_label = label[0]
-    interpretation = ("Types of " if plan.get("catalogueKey","").startswith("kind:") else "Members of ") + plan.get("classLabel",cls)
+    scope = plan.get("catalogueKey", "").partition(":")[0]
+    interpretation = {"kind": "Types of ", "examples": "Types and named examples of "}.get(scope, "Members of ") + plan.get("classLabel",cls)
     player_comparison = ""
     if comparing:
         bound = ref_high if plan["op"] in ("gt","ge") else ref_low
@@ -937,6 +938,9 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     if unnamed_members:
         noun = "member" if unnamed_members == 1 else "members"
         coverage += f" The source lists {unnamed_members:,} additional {noun} without a usable name."
+    if counts_by_scope := plan.get("unnamedByScope"):
+        coverage += (f" Records without a usable name include {counts_by_scope['type']:,} individual examples "
+                     f"and {counts_by_scope['kind']:,} types.")
     if unnamed_forms := plan.get("unnamedFormRecords"):
         noun = "record" if unnamed_forms == 1 else "records"
         coverage += f" The creative-form check found {unnamed_forms:,} {noun} without a usable name."
@@ -984,7 +988,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         "playerRule": (
             player_comparison if comparing else plan["dateScope"] if "dateScope" in plan else
             plan["geographicScope"] if "geographicScope" in plan else
-            "The source must list the answer as a subclass of the named subject, directly or through another class." if plan.get("catalogueKey","").startswith("kind:") else
+            "Give the name of a type or the name of an individual example. The source must document how it belongs to this group." if scope == "examples" else
+            "The source must list the answer as a subclass of the named subject, directly or through another class." if scope == "kind" else
             "The source must list the answer’s type or occupation in this class or one of its subclasses." if plan.get("catalogueKey","").startswith("type:") else
             "Answers must be listed in the Wikidata class or its subclasses and meet every stated condition." if "liveClass" in plan else
             "Each answer must belong to the source class or a subclass and meet every stated condition." if "conditions" in plan else

@@ -779,11 +779,13 @@ def search(db, idea, complete_only=False, *, comparisons=True):
         edition = db.execute("SELECT edition,format FROM publication").fetchone()
         cards = suggestions(db,topic_subject(folded_spelling(idea)),edition)
     if file_format>=14 and not complete_only and not any(c["key"].startswith(("r-","c-")) for c in cards):
-        from world_classes import card as class_card
+        from world_classes import card as class_card, scope_choices
         subject = topic_subject(folded_spelling(idea))
         raw_subject = topic_subject(spelling(idea)).removesuffix("?").strip()
         candidate = class_card(db,subject,literal=raw_subject) or class_card(db,"type of "+subject,literal="type of "+raw_subject)
         if candidate:
+            if scopes := scope_choices(db, candidate):
+                return scopes
             cards = [candidate,*cards][:3]
     if file_format >= 19 and not complete_only:
         import current_questions
@@ -908,9 +910,9 @@ def match_question(db, prompt):
         if combined:
             return combined
     if db.execute("SELECT format FROM publication").fetchone()[0] >= 14:
-        from world_classes import card as class_card
-        direct = class_card(db,prompt_term(prompt).rstrip("?").strip(),strict=True,
-                            literal=COMMAND.sub("",spelling(prompt),count=1).removesuffix("?").strip())
+        from world_classes import question as class_question
+        direct = class_question(db,prompt_term(prompt).rstrip("?").strip(),
+                                COMMAND.sub("",spelling(prompt),count=1).removesuffix("?").strip())
         if direct:
             return direct
     # Keep "and" inside source names intact. A split is valid only when both
@@ -1270,7 +1272,7 @@ def prepare_bank(db, game, key, prompt, release):
     if key.startswith("mixed:") and release[1]>=16:
         from measured_rules import play as play_mixed
         return play_mixed(db,game,key,prompt)
-    if key.startswith(("type:","kind:")) and release[1] >= 14:
+    if key.startswith(("type:","kind:","examples:")) and release[1] >= 14:
         from world_classes import play as play_class
         return play_class(db,game,key,prompt)
     if key.startswith("compare:") and release[1] >= 10:

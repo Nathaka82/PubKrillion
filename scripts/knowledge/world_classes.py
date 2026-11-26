@@ -46,6 +46,25 @@ KINDS = """SELECT p.child AS id,p.parent AS cls,279 AS property FROM scope s CRO
           WHERE p.child<>?"""
 
 
+def roster_ids(db, key, fmt, live):
+    """Selectable entity IDs for one scope, including its published positive evidence."""
+    import work_forms
+    mode, token = key.split(":")
+    kinds, cls = mode == "kind", int(token[1:])
+    if live:
+        query, args = "SELECT id FROM current_member WHERE rule=?", (key,)
+    else:
+        args = (cls, cls) if kinds else (cls,)
+        witnessed = (" UNION SELECT w.id FROM scope CROSS JOIN scope_witness w ON w.cls=scope.id"
+                     if fmt >= 29 and not kinds else "")
+        members = KINDS if kinds else MEMBERS
+        query = DESCENDANTS + f""" SELECT DISTINCT m.id FROM ({members}) m
+                JOIN item i ON i.id=m.id WHERE length(i.name) BETWEEN 1 AND 140{witnessed}"""
+    if fmt >= 30 and not kinds and work_forms.available(db, key):
+        return work_forms.union(db, key, query, args)
+    return query, args
+
+
 def card(db, phrase, *, strict=False, literal=None):
     kinds = phrase.startswith("type of ")
     term = phrase[8:] if kinds else phrase
@@ -78,20 +97,10 @@ def card(db, phrase, *, strict=False, literal=None):
     live = db.execute("SELECT n FROM current_class WHERE rule=?", (key,)).fetchone() if fmt >= 15 else None
     import work_forms
     forms = fmt >= 30 and not kinds and work_forms.available(db,key)
-    if live:
+    if live and not forms:
         count = live[0]
-        if forms:
-            query,args = work_forms.union(db,key,"SELECT id FROM current_member WHERE rule=?",(key,))
-            count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
     else:
-        args = (cls, cls) if kinds else (cls,)
-        members = KINDS if kinds else MEMBERS
-        witnessed = (" UNION SELECT w.id FROM scope CROSS JOIN scope_witness w ON w.cls=scope.id"
-                     if fmt >= 29 and not kinds else "")
-        query = DESCENDANTS + f""" SELECT DISTINCT m.id FROM ({members}) m
-                JOIN item i ON i.id=m.id WHERE length(i.name) BETWEEN 1 AND 140{witnessed}"""
-        if forms:
-            query,args = work_forms.union(db,key,query,args)
+        query, args = roster_ids(db, key, fmt, live)
         count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
     if not count:
         if strict and not kinds:
@@ -135,19 +144,120 @@ def card(db, phrase, *, strict=False, literal=None):
     }
 
 
+NAMED_PREFIX = "individually named "
+BOTH_SUFFIX = " or a specific named example"
+
+
+def scope_phrase(phrase):
+    if phrase.startswith(NAMED_PREFIX):
+        return "named", phrase[len(NAMED_PREFIX):]
+    if phrase.startswith(("type of ", "kind of ")):
+        if phrase.endswith(BOTH_SUFFIX):
+            return "both", phrase[8:-len(BOTH_SUFFIX)]
+        return "kind", phrase[8:]
+    return "", phrase
+
+
+def named_card(member):
+    prompt = member["prompt"]
+    if prompt.startswith("Name one of the "):
+        prompt = prompt.replace("Name one of the ", "Name one of the individually named ", 1)
+    else:
+        prompt = re.sub(r"^Name (?:a|an) ", "Name an individually named ", prompt)
+    return {**member, "prompt": prompt}
+
+
+def scope_choices(db, member, *, explicit=False):
+    """Offer distinct playable interpretations when the source has kinds and individual examples."""
+    if not member or not member["key"].startswith("type:"):
+        return []
+    token = member["key"].split(":")[1]
+    kind = card(db, "type of " + token.lower())
+    if not kind or (not explicit and kind["records"] < 2):
+        return []
+    fmt = db.execute("SELECT format FROM publication").fetchone()[0]
+    rosters = []
+    for key in (member["key"], kind["key"]):
+        live = fmt >= 15 and db.execute("SELECT 1 FROM current_class WHERE rule=?", (key,)).fetchone()
+        rosters.append(roster_ids(db, key, fmt, live))
+    (members, ma), (kinds, ka) = rosters
+    overlap = db.execute(f"SELECT count(*) FROM (SELECT id FROM ({kinds}) INTERSECT SELECT id FROM ({members}))",
+                         (*ka, *ma)).fetchone()[0]
+    if not explicit and overlap == kind["records"]:
+        return []
+    combined = {**kind, "key": "examples:" + token, "prompt": kind["prompt"] + BOTH_SUFFIX,
+                "records": kind["records"] + member["records"] - overlap}
+    options = [combined, kind]
+    if explicit or member["records"] >= 2:
+        options.append(named_card(member))
+    return options
+
+
+def question(db, phrase, literal):
+    """Resolve explicit scopes directly and let the host choose before an unqualified round."""
+    from catalogue import RuleWithdrawn, UnverifiedRule
+    from date_rules import DateChoices
+    mode, phrase = scope_phrase(phrase)
+    _, literal = scope_phrase(literal)
+    if mode == "kind":
+        return card(db, "type of " + phrase, strict=True, literal="type of " + literal)
+    if mode == "named":
+        member = card(db, phrase, strict=True, literal=literal)
+        return named_card(member) if member else None
+    deferred = None
+    try:
+        member = card(db, phrase, strict=True, literal=literal)
+    except (RuleWithdrawn, UnverifiedRule) as error:
+        if mode or isinstance(error, UnverifiedRule) and not error.key.startswith("type:"):
+            raise
+        deferred, member = error, None
+    if not member and not mode:
+        alternate = card(db, "type of " + phrase, literal="type of " + literal)
+        if alternate:
+            raise DateChoices([alternate], "This subject has a published list of types. Select that question to play.",
+                              refresh=getattr(deferred, "requests", ()))
+        if deferred:
+            raise deferred
+    options = scope_choices(db, member, explicit=mode == "both")
+    if mode == "both" and member:
+        if not options:
+            key = "kind:" + member["key"].split(":")[1]
+            if db.execute("SELECT format FROM publication").fetchone()[0] >= 15 and not db.execute(
+                    "SELECT 1 FROM current_class WHERE rule=?", (key,)).fetchone():
+                raise UnverifiedRule(key, "The builder can check which types of this subject have source records.")
+            raise RuleWithdrawn("This edition has no separate lists of types and individually named examples for this subject.")
+        return options[0]
+    if options:
+        raise DateChoices(options, "This subject has both types and individually named examples. Choose what players can submit.")
+    return member
+
+
 def play(db, game, key, prompt):
     from catalogue import RuleWithdrawn
     from compiler import evaluate
 
-    match = re.fullmatch(r"(kind|type):Q([1-9]\d{0,11})", key)
+    match = re.fullmatch(r"(kind|type|examples):Q([1-9]\d{0,11})", key)
     if not match:
         raise RuleWithdrawn("This source class is unavailable.")
     cls = int(match[2])
-    kinds = match[1] == "kind"
     label = db.execute("SELECT name FROM item WHERE id=?", (cls,)).fetchone()
     if not label:
         raise RuleWithdrawn("This source class is no longer in the publication.")
     plan = {"class": "wd:Q" + str(cls), "classLabel": label[0], "catalogueKey": key}
+    combined = match[1] == "examples"
+    scopes = ("type", "kind") if combined else (match[1],)
+    with tempfile.TemporaryDirectory() as folder, closing(open_graph(Path(folder) / "class.sqlite")) as graph:
+        unnamed = {}
+        for scope in scopes:
+            unnamed[scope] = add_scope(db, graph, cls, scope, plan, combined)
+        if combined and any(unnamed.values()):
+            plan["unnamedByScope"] = unnamed
+        return evaluate(graph, game, prompt, plan, unnamed_members=0 if combined else unnamed[match[1]], name_catalogue=db)
+
+
+def add_scope(db, graph, cls, scope, plan, combined):
+    from catalogue import RuleWithdrawn
+    key, kinds = f"{scope}:Q{cls}", scope == "kind"
     file_format = db.execute("SELECT format FROM publication").fetchone()[0]
     import work_forms
     forms = file_format >= 30 and not kinds and work_forms.available(db,key)
@@ -179,27 +289,27 @@ def play(db, game, key, prompt):
                         "depth": 1 if incoming >= 1000 else 2,
                     }
 
-            with (
-                tempfile.TemporaryDirectory() as folder,
-                closing(open_graph(Path(folder) / "class.sqlite")) as graph,
-            ):
-                history = db.execute(
-                    "SELECT revision FROM source WHERE id='wikidata5m-catalogue-input'"
-                ).fetchone()[0]
-                ingest(
-                    graph,
-                    {
-                        "source": "wikidata-query-class-" + str(cls),
-                        "revision": digest([live["revision"], history]),
-                        "captured": live["captured"],
-                        "url": "https://www.wikidata.org/wiki/Q" + str(cls),
-                    },
-                    current_records(), index_names=False,
-                )
-                if forms:
-                    work_forms.add_sources(db,graph,key,plan["class"])
-                unnamed = live["scanned"]-live["n"] if file_format>=16 else 0
-                return evaluate(graph, game, prompt, plan, unnamed_members=unnamed,name_catalogue=db)
+            history = db.execute(
+                "SELECT revision FROM source WHERE id='wikidata5m-catalogue-input'"
+            ).fetchone()[0]
+            ingest(
+                graph,
+                {
+                    "source": ("wikidata-query-kinds-" if combined and kinds else "wikidata-query-class-") + str(cls),
+                    "revision": digest([live["revision"], history]),
+                    "captured": live["captured"],
+                    "url": "https://www.wikidata.org/wiki/Q" + str(cls),
+                },
+                current_records(), index_names=False,
+            )
+            if forms:
+                work_forms.add_sources(db,graph,key,plan["class"])
+            unnamed = live["scanned"]-live["n"] if file_format>=16 else 0
+            return unnamed
+    if combined:
+        sql, params = roster_ids(db, key, file_format, False)
+        if not db.execute(f"SELECT 1 FROM ({sql}) LIMIT 1", params).fetchone():
+            raise RuleWithdrawn("This edition has no named records for one of the two question scopes.")
     db.executescript("DROP TABLE IF EXISTS temp.class_match;")
     args = (cls, cls) if kinds else (cls,)
     db.execute(
@@ -228,37 +338,35 @@ def play(db, game, key, prompt):
                 "depth": 1 if incoming >= 1000 else 2,
             }
 
-    with (
-        tempfile.TemporaryDirectory() as folder,
-        closing(open_graph(Path(folder) / "class.sqlite")) as graph,
-    ):
-        for (prop,) in db.execute("SELECT DISTINCT property FROM class_match"):
-            ingest(
-                graph,
-                {"source": "world5m-membership-" + str(prop), "revision": revision, "url": url},
-                records(prop), index_names=False,
-            )
-        if file_format >= 29 and not kinds:
-            from scope_evidence import add_sources
-            add_sources(db,graph,cls)
-        if forms:
-            work_forms.add_sources(db,graph,key,plan["class"])
-        if not graph.execute("SELECT 1 FROM entity LIMIT 1").fetchone():
-            raise RuleWithdrawn("This edition has no named members of the source class.")
-        # Preserve the actual path connecting each source-reported type to the requested class.
-        taxonomy = "world5m-class-taxonomy"
-        hierarchy = db.execute("SELECT revision,url,checked FROM source WHERE id='wikidata-current-taxonomy'").fetchone()
-        if hierarchy:
-            taxonomy = "wikidata-current-taxonomy"
-        checked = db.execute("SELECT checked FROM source WHERE id='wikidata5m-catalogue-input'").fetchone()[0]
-        graph.execute("INSERT INTO source VALUES(?,?,?,?,'{}')", (taxonomy, *(hierarchy or (revision,url,checked))))
-        edges = db.execute(
-            DESCENDANTS + """ SELECT p.child,p.parent FROM scope s JOIN world_parent p ON p.parent=s.id""",
-            (cls,),
+    for (prop,) in db.execute("SELECT DISTINCT property FROM class_match"):
+        ingest(
+            graph,
+            {"source": "world5m-membership-" + str(prop), "revision": revision, "url": url},
+            records(prop), index_names=False,
         )
-        graph.executemany(
-            "INSERT INTO parent VALUES(?,?,?)",
-            ((taxonomy, "wd:Q" + str(c), "wd:Q" + str(p)) for c, p in edges),
-        )
-        graph.commit()
-        return evaluate(graph, game, prompt, plan,name_catalogue=db)
+    if file_format >= 29 and not kinds:
+        from scope_evidence import add_sources
+        add_sources(db,graph,cls)
+    if forms:
+        work_forms.add_sources(db,graph,key,plan["class"])
+    if not graph.execute("SELECT 1 FROM entity LIMIT 1").fetchone():
+        raise RuleWithdrawn("This edition has no named members of the source class.")
+    # Preserve the actual path connecting each source-reported type to the requested class.
+    taxonomy = "world5m-class-taxonomy"
+    hierarchy = db.execute("SELECT revision,url,checked FROM source WHERE id='wikidata-current-taxonomy'").fetchone()
+    if hierarchy:
+        taxonomy = "wikidata-current-taxonomy"
+    if graph.execute("SELECT 1 FROM source WHERE id=?", (taxonomy,)).fetchone():
+        return 0
+    checked = db.execute("SELECT checked FROM source WHERE id='wikidata5m-catalogue-input'").fetchone()[0]
+    graph.execute("INSERT INTO source VALUES(?,?,?,?,'{}')", (taxonomy, *(hierarchy or (revision,url,checked))))
+    edges = db.execute(
+        DESCENDANTS + """ SELECT p.child,p.parent FROM scope s JOIN world_parent p ON p.parent=s.id""",
+        (cls,),
+    )
+    graph.executemany(
+        "INSERT OR IGNORE INTO parent VALUES(?,?,?)",
+        ((taxonomy, "wd:Q" + str(c), "wd:Q" + str(p)) for c, p in edges),
+    )
+    graph.commit()
+    return 0
