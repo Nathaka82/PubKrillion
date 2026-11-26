@@ -32,11 +32,37 @@ def publish(db):
 
 
 def members(db, rule, query, args):
-    if not db.execute("SELECT 1 FROM relation_witness WHERE rule=? LIMIT 1", (rule,)).fetchone():
-        return query, args
+    query, args = with_archived_edge(rule, query, args)
     return f"""SELECT id FROM ({query}) UNION
         SELECT w.id FROM relation_witness r JOIN scope_witness w ON w.cls=? AND w.origin=r.origin
         WHERE r.rule=?""", (*args, predicates(rule)[0][0], rule)
+
+
+STRICT_CLASS = "(w.origin GLOB 'w-*' OR w.origin GLOB 'and:*+w-*')"
+
+
+def classified_edges(rule):
+    """Join an independently verified instance classification to an archived edge on the same item."""
+    cls, prop, target = predicates(rule)[0]
+    query = DESCENDANTS + f""" SELECT w.id,w.cls,w.origin FROM scope s CROSS JOIN scope_witness w ON w.cls=s.id
+        JOIN live_rule witness ON witness.key=w.origin
+        JOIN world_link l ON (l.id,l.prop,l.target)=(w.id,?,?)
+        JOIN item i ON i.id=w.id
+        WHERE {STRICT_CLASS} AND length(i.name) BETWEEN 1 AND 140
+        AND NOT EXISTS (SELECT 1 FROM world_member m WHERE m.id=w.id AND m.cls IN (SELECT id FROM scope))
+        AND NOT EXISTS (SELECT 1 FROM current_class census
+            WHERE census.rule IN ('type:Q'||w.cls,'type:Q'||?) AND census.captured>=witness.captured
+            AND NOT EXISTS (SELECT 1 FROM current_member cm WHERE (cm.rule,cm.id)=(census.rule,w.id)))
+        AND NOT EXISTS (SELECT 1 FROM live_rule exact
+            WHERE exact.key='w-'||w.cls||'-'||l.prop||'-'||l.target
+            AND NOT EXISTS (SELECT 1 FROM scope_witness h
+                WHERE (h.cls,h.origin,h.id)=(w.cls,exact.key,w.id)))"""
+    return query, (cls, prop, target, cls)
+
+
+def with_archived_edge(rule, query, args):
+    extra, values = classified_edges(rule)
+    return f"SELECT id FROM ({query}) UNION SELECT id FROM ({extra})", (*args, *values)
 
 
 def origins(db, rule):
@@ -44,10 +70,17 @@ def origins(db, rule):
         JOIN live_rule l ON l.key=r.origin WHERE r.rule=? ORDER BY l.captured DESC,l.key""", (rule,))
 
 
-def add_sources(db, graph, cls, *, rule=None, condition=None):
+def add_sources(db, graph, cls, *, rule=None, condition=None, missing_types=None):
     from dated_links import Rule
 
-    if rule:
+    if missing_types is not None:
+        if not missing_types:
+            return
+        captures = db.execute(DESCENDANTS + f""" SELECT l.key,l.revision,l.captured,l.release,s.cls
+            FROM (SELECT DISTINCT w.cls,w.origin FROM scope CROSS JOIN scope_witness w ON w.cls=scope.id
+                WHERE {STRICT_CLASS} AND w.id IN (SELECT value FROM json_each(?))) s
+            JOIN live_rule l ON l.key=s.origin ORDER BY l.key""", (cls, json.dumps(sorted(missing_types))))
+    elif rule:
         captures = ((*row, cls) for row in origins(db, rule))
     else:
         captures = db.execute(DESCENDANTS + """ SELECT l.key,l.revision,l.captured,l.release,s.cls
@@ -69,7 +102,10 @@ def add_sources(db, graph, cls, *, rule=None, condition=None):
         source = {"source": "wikidata-query-witness-" + digest(origin), "revision": revision,
                   "captured": checked, "url": source_url}
         includes_roles = bool(dated) or all(part.startswith("g-") for part in parts)
-        ingest(graph, source, records(db, payload["rows"], supported_cls, condition, includes_roles))
+        rows = payload["rows"]
+        if missing_types is not None:
+            rows = [row for row in rows if int(row[0][1:]) in missing_types]
+        ingest(graph, source, records(db, rows, supported_cls, condition, includes_roles))
 
 
 def records(db, rows, cls, condition, includes_roles):

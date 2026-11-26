@@ -739,6 +739,55 @@ class CatalogueTests(unittest.TestCase):
                     play(db,game,both(publisher,genre),"Name a work in the genre Genre published by Studio")
                 self.assertEqual(game.execute("SELECT count(*) FROM kb_member WHERE bank=?",(old,)).fetchone()[0],7)
 
+    def test_independent_classification_and_archived_relationship_join_on_the_entity(self):
+        import gzip
+        from graph import digest
+        with closing(sqlite3.connect(self.world)) as world, world:
+            world.executescript("""
+                INSERT INTO property VALUES(50,'author'),(57,'director'),(131,'administrative location');
+                INSERT INTO entity VALUES(8,'Unclassified title'),(9,'Other title'),(13,'Creator'),(14,'short work');
+                INSERT INTO triple VALUES(14,279,10),(8,123,11),(9,123,11),(8,57,13),(9,57,13);
+            """)
+        def capture(key, values):
+            self.assertTrue(watched_rules.follow(self.root, key))
+            rows = [[f"Q{i}", name, []] for i, name in values]
+            data = dict(key=key, rows=rows, revision=digest([key, rows]), captured=1000)
+            watched_rules.replace(dict(watched_rules.requests(self.root))[key], gzip.compress(json.dumps(data).encode()))
+        author, director, publisher = "w-14-50-13", "w-10-57-13", "w-10-123-11"
+        capture(author, [(8, "Unclassified title")])
+        # A geographic capture can classify by occupation, which cannot prove an instance claim.
+        capture("g-14-131-11", [(9, "Other title")])
+        self.publish()
+        with closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            with closing(catalogue.reader(self.published)) as db:
+                card = catalogue.match_question(db, "Name a work published by Studio")
+                self.assertEqual(card["records"], 6)
+                bank, _ = catalogue.play(db, game, publisher, card["prompt"])
+                members = dict(game.execute("SELECT entity,evidence FROM kb_member WHERE bank=?", (bank,)))
+                self.assertEqual(set(members), {f"wd:Q{i}" for i in (1, 2, 3, 4, 5, 8)})
+                proof = json.loads(members["wd:Q8"])
+                self.assertTrue(any(p.get("source","").startswith("wikidata-query-witness-")
+                                    and "wd:Q14" in p.get("classes",[]) for p in proof))
+                self.assertTrue(any(p.get("source","").startswith("world5m-") and p.get("target")=="wd:Q11" for p in proof))
+                self.assertFalse(any(p.get("source","").startswith("wikidata-query-witness-") and p.get("target") for p in proof))
+                both = "and:" + "+".join(sorted((director,publisher)))
+                joined, _ = catalogue.play(db, game, both, "Name a work directed by Creator and published by Studio")
+                self.assertEqual([r[0] for r in game.execute("SELECT entity FROM kb_member WHERE bank=?", (joined,))], ["wd:Q8"])
+            capture(director, [(8, "Unclassified title"), (9, "Other title")])
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                joined, _ = catalogue.play(db, game, both, "Name a work directed by Creator and published by Studio")
+                proof = json.loads(game.execute("SELECT evidence FROM kb_member WHERE bank=? AND entity='wd:Q8'", (joined,)).fetchone()[0])
+                self.assertTrue(any(p.get("verifiedBy",{}).get("source")=="Wikidata5M" and
+                                    p.get("classVerifiedBy",{}).get("rule") in (author, director) for p in proof))
+            capture(publisher, [])
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                with self.assertRaises(catalogue.RuleWithdrawn):
+                    catalogue.play(db, game, publisher, card["prompt"])
+            self.assertEqual(game.execute("SELECT count(*) FROM kb_member WHERE bank=?", (bank,)).fetchone()[0], 6)
+
     def test_form_and_primary_class_answers_share_a_bank_with_independent_withdrawals(self):
         import gzip
         import work_forms

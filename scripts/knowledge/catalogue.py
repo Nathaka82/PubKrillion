@@ -1339,6 +1339,9 @@ def prepare_bank(db, game, key, prompt, release):
         from world_links import info,members
         rule = info(db,cls,prop,target)
         query,args = members(db,cls,prop,target)
+        if release[1] >= 29:
+            from scope_evidence import with_archived_edge
+            query,args = with_archived_edge(key,query,args)
     else:
         rule = db.execute("""SELECT c.name,r.name,t.name FROM pattern p JOIN item c ON c.id=p.cls
         JOIN predicate r ON r.id=p.prop JOIN item t ON t.id=p.target WHERE cls=? AND prop=? AND target=?""",
@@ -1399,7 +1402,7 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
                 membership_property = 106
                 types=["wd:Q"+str(row[0]) for row in db.execute(
                     "SELECT r.role FROM link_scope s CROSS JOIN world_role r ON (r.role,r.id)=(s.id,?)",(item,))]
-            url=f"https://www.wikidata.org/wiki/Q{item}#P{membership_property if linked else first['prop']}"
+            url=f"https://www.wikidata.org/wiki/Q{item}#P{membership_property if linked and types else first['prop']}"
             if roles and live:
                 from class_updates import evidence
                 url=evidence(f"type:Q{cls}",f"Q{item}")
@@ -1422,9 +1425,13 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
         ingest(graph, {**source,
                        "terms": {root: [subject], **{c["target"]: [c["label"]] for c in conditions}}},
                records(), index_names=5 <= file_format < 18)
-        if linked and file_format >= 29 and key.startswith("w-"):
+        if linked and file_format >= 29 and any(not c.get("geo") for c in conditions):
             from scope_evidence import add_sources
-            add_sources(db,graph,cls,rule=key,condition=first)
+            if key.startswith("w-"):
+                add_sources(db,graph,cls,rule=key,condition=first)
+            missing = {int(row[0][4:]) for row in graph.execute("""SELECT DISTINCT e.id FROM entity e
+                WHERE NOT EXISTS(SELECT 1 FROM member m WHERE m.id=e.id)""")}
+            add_sources(db,graph,cls,missing_types=missing)
         if form_support:
             included = {int(qid[1:]) for qid,_,_ in joined["rows"]} if joined else None
             work_forms.add_sources(db,graph,key,root,conditions,included)
@@ -1527,6 +1534,8 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
                 part = f"{'g' if condition.get('geo') else 'w'}-{cls}-{condition['prop']}-{condition['target'][4:]}"
                 detail = (geographic_proof(entity,condition) if condition.get("geo") else
                           {"url":f"https://www.wikidata.org/wiki/{qid}#P{condition['prop']}"})
+                if (part,qid) not in provenance and (witness := joined["classEvidence"].get((part,qid))):
+                    detail["classVerifiedBy"] = witness
                 return {**detail,"verifiedBy":provenance.get((part,qid),
                         {"source":"Wikidata5M","revision":world_revision,"url":SOURCE})}
         unnamed=captured["scanned"]-len(captured["rows"]) if "scanned" in captured else 0

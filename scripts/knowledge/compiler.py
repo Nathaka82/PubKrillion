@@ -7,7 +7,7 @@ import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
-BANK_FORMAT = 38
+BANK_FORMAT = 39
 
 
 def publication_batches(game, cursor, size):

@@ -220,6 +220,7 @@ def joined_release(db, keys, query, args):
     import scope_evidence
 
     revisions, names, dates, evidence = [], {}, [], {}
+    class_evidence = {}
     inherited = False
     file_format = db.execute("SELECT format FROM publication").fetchone()[0]
     for key in keys:
@@ -229,6 +230,11 @@ def joined_release(db, keys, query, args):
             for origin,revision,checked,blob in scope_evidence.origins(db,key):
                 captures.append((origin,revision,checked,json.loads(gzip.decompress(blob))["rows"]))
                 inherited = True
+            extra, values = scope_evidence.classified_edges(key)
+            for item, cls, origin, revision, checked in db.execute(f"""SELECT x.id,x.cls,x.origin,l.revision,l.captured
+                    FROM ({extra}) x JOIN live_rule l ON l.key=x.origin ORDER BY l.captured DESC,x.origin""", values):
+                class_evidence.setdefault((key, "Q" + str(item)), {
+                    "class": "Q" + str(cls), "rule": origin, "revision": revision, "checked": checked})
         if file_format >= 30 and key.startswith("w-"):
             import work_forms
             for extra in work_forms.captured(db,key):
@@ -256,9 +262,15 @@ def joined_release(db, keys, query, args):
             name, forms = db.execute(f"SELECT name,aliases FROM {table} WHERE id=?",(item,)).fetchone()
             aliases = set(forms.split("\t")) - {""}
         result.append((qid, name, sorted(aliases - {name})))
+    if class_evidence:
+        used = {qid for qid, _, _ in result}
+        class_evidence = {pair: proof for pair, proof in class_evidence.items() if pair[1] in used and pair not in evidence}
+        revisions.extend(sorted({(part, proof["rule"], proof["revision"]) for (part, _), proof in class_evidence.items()}))
+        dates.extend(proof["checked"] for proof in class_evidence.values())
     joined = {"revision": digest(revisions), "captured": min(dates), "rows": result, "n": len(result)}
-    if inherited:
+    if inherited or class_evidence:
         joined["operandEvidence"] = evidence
+        joined["classEvidence"] = class_evidence
     return joined
 
 
