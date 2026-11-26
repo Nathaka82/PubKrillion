@@ -179,7 +179,7 @@ def play(db, game, key, prompt):
                         "captured": live["captured"],
                         "url": "https://www.wikidata.org/wiki/Q" + str(cls),
                     },
-                    current_records(),
+                    current_records(), index_names=False,
                 )
                 if forms:
                     work_forms.add_sources(db,graph,key,plan["class"])
@@ -221,7 +221,7 @@ def play(db, game, key, prompt):
             ingest(
                 graph,
                 {"source": "world5m-membership-" + str(prop), "revision": revision, "url": url},
-                records(prop),
+                records(prop), index_names=False,
             )
         if file_format >= 29 and not kinds:
             from scope_evidence import add_sources

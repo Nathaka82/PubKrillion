@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { once } from "node:events";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { fixture, client } from "./fixture.mjs";
 const f = await fixture(undefined, { QUIZ_SEMANTIC: "off" });
 try {
@@ -45,7 +46,7 @@ try {
       file: "members.jsonl",
     }),
   );
-  async function preview() {
+  async function preview(onPoll) {
     const job = await ok(
       host(root + "/generate", "POST", { prompt: "Name a registered entry" }),
     );
@@ -53,12 +54,41 @@ try {
       const r = await ok(host(root + "/generate/" + job.id));
       if (r.status === "ready") return { q: r.preview, id: job.id };
       assert.notEqual(r.status, "failed", r.message);
+      if (onPoll) await onPoll();
       await new Promise((done) => setTimeout(done, 100));
     }
     throw Error("Preview timed out");
   }
+  const active = await ok(host("/rooms", "POST", { name: "Game in progress" }));
+  const activeRoot = "/rooms/" + active.code;
+  const clients = Array.from({ length: teams }, () => client(f));
+  await Promise.all(clients.map((c, i) => ok(c(activeRoot + "/join", "POST", { name: "Crew " + i }))));
+  const round = await ok(host(activeRoot + "/start", "POST", {
+    questionId: "summer-hosts", previous: null, seconds: 0,
+  }));
+  const monitor = new DatabaseSync(f.file, { readOnly: true });
+  const publishing = monitor.prepare(
+    "SELECT 1 FROM kb_bank b WHERE metadata='null' AND EXISTS (SELECT 1 FROM kb_member m WHERE m.bank=b.id)",
+  );
+  let duringBuild = [], first;
   const start = performance.now();
-  const first = await preview();
+  try {
+    first = await preview(async () => {
+      if (duringBuild.length || !publishing.get()) return;
+      duringBuild = await Promise.all(clients.map(async (c) => {
+        const sent = performance.now();
+        const answer = await ok(c(activeRoot + "/rounds/" + round.id + "/answer", "POST", {
+          answer: "London", revision: 0,
+        }));
+        assert.equal(answer.canonical ?? answer.raw, "London");
+        return performance.now() - sent;
+      }));
+    });
+  } finally {
+    monitor.close();
+  }
+  assert.equal(duringBuild.length, teams, "All teams must submit during bank publication");
+  const duringP95 = duringBuild.sort((a, b) => a - b)[Math.ceil(0.95 * teams) - 1];
   const cold = performance.now() - start;
   assert.equal(first.q.answerCount, members);
   const warmStart = performance.now();
@@ -68,7 +98,6 @@ try {
   const saved = await ok(
     host(root + "/generate/" + first.id + "/save", "POST", {}),
   );
-  const clients = Array.from({ length: teams }, () => client(f));
   await Promise.all(
     clients.map((c, i) => ok(c(root + "/join", "POST", { name: "Crew " + i }))),
   );
@@ -101,11 +130,13 @@ try {
       teams,
       coldSeconds: +(cold / 1000).toFixed(2),
       warmPreviewMs: Math.round(warm),
+      duringBuildSubmissionP95Ms: Math.round(duringP95),
       submissionP95Ms: Math.round(p95),
       slowestMs: Math.round(times.at(-1)),
     }),
   );
   assert.ok(warm < 2000, "Warm preview exceeded two seconds");
+  assert.ok(duringP95 < 250, "Live submission p95 during publication exceeded 250 ms");
   assert.ok(p95 < 250, "p95 exceeded 250 ms");
 } finally {
   await f.close();

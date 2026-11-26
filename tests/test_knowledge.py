@@ -30,6 +30,28 @@ class KnowledgeTests(unittest.TestCase):
         }
         ingest(self.db, src, records)
 
+    def test_interrupted_publication_rebuilds_all_answer_indexes_once(self):
+        self.put("places", [
+            {"id": "one", "name": "Montréal", "types": ["place"], "aliases": ["Montreal", "Ville-Marie"]},
+            {"id": "two", "name": "京都", "types": ["place"], "aliases": ["Kyoto", "Kyōto"]},
+        ], terms={"place": []})
+        self.game.execute("""CREATE TEMP TRIGGER interrupt_import BEFORE INSERT ON kb_answer_key
+            BEGIN SELECT raise(ABORT, 'interrupted'); END""")
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "interrupted"):
+            evaluate(self.db, self.game, "Name a place")
+        self.assertEqual(self.game.execute("SELECT metadata FROM kb_bank").fetchall(), [("null",)])
+        self.assertEqual(self.game.execute("SELECT count(*) FROM kb_text").fetchone()[0], 2)
+        self.game.execute("DROP TRIGGER interrupt_import")
+        bank, meta = evaluate(self.db, self.game, "Name a place")
+        self.assertEqual(meta["answerCount"], 2)
+        self.assertEqual(self.game.execute("SELECT count(*) FROM kb_text").fetchone()[0], 2)
+        self.assertEqual(self.game.execute("SELECT entity FROM kb_text WHERE kb_text MATCH 'Kyoto'").fetchall(), [("two",)])
+        for term, owner in [("montréal", "one"), ("montreal", "one"), ("ville-marie", "one"),
+                            ("京都", "two"), ("kyoto", "two"), ("kyōto", "two")]:
+            self.assertEqual(self.game.execute(
+                "SELECT entity FROM kb_answer_key WHERE bank=? AND form=0 AND term=?", (bank, term)
+            ).fetchall(), [(owner,)])
+
     def test_linked_sources_conflicts_unknowns_hierarchy_and_units(self):
         self.put(
             "catalog",

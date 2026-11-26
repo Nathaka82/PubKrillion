@@ -106,21 +106,18 @@ CREATE INDEX IF NOT EXISTS recall_by_entity ON recall(id,prompt);
 
 
 SIMPLE_WORDS = re.compile(r"[A-Za-z0-9]+(?: [A-Za-z0-9]+)*")
+NON_ALPHANUMERIC = re.compile(r"[\W_]+")
 
 
 def norm(s):
     if SIMPLE_WORDS.fullmatch(s):
         return s.lower()
-    s = unicodedata.normalize("NFKD", s.lower())
-    s = "".join(c for c in s if not unicodedata.category(c).startswith("M"))
+    s = s.lower()
+    if not s.isascii():
+        s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.category(c).startswith("M"))
     s = re.sub(r"(^|\s)\+(?=\d)", r"\1over ", s)
     s = re.sub(r"(^|\s)[−-](?=\d)", r"\1under ", s)
-    return " ".join(
-        "".join(
-            c if c.isalnum() else " "
-            for c in s.replace("&", " and ").replace("’", "").replace("'", "")
-        ).split()
-    )
+    return NON_ALPHANUMERIC.sub(" ", s.replace("&", " and ").replace("’", "").replace("'", "")).strip()
 
 
 def spelling(s):
@@ -131,16 +128,19 @@ def spelling(s):
 def folded_spelling(s):
     if SIMPLE_WORDS.fullmatch(s):
         return s.lower()
-    value = []
-    latin = False
-    for char in unicodedata.normalize("NFD", spelling(s)):
-        if unicodedata.category(char).startswith("M"):
-            if not latin:
+    text = spelling(s)
+    if not text.isascii():
+        value = []
+        latin = False
+        for char in unicodedata.normalize("NFD", text):
+            if unicodedata.category(char).startswith("M"):
+                if not latin:
+                    value.append(char)
+            else:
+                latin = unicodedata.name(char, "").startswith("LATIN ")
                 value.append(char)
-        else:
-            latin = unicodedata.name(char, "").startswith("LATIN ")
-            value.append(char)
-    text = unicodedata.normalize("NFC", "".join(value)).replace("&", " and ").replace("'", "")
+        text = unicodedata.normalize("NFC", "".join(value))
+    text = text.replace("&", " and ").replace("'", "")
     text = re.sub(r"(?<!\d)[.,]|[.,](?!\d)|(?<!\d)-(?!\d)|[()\[\]]", " ", text)
     return " ".join(text.split())
 
@@ -186,7 +186,7 @@ def label(s, size=140):
     return s.strip()
 
 
-def ingest(db, src, rows):
+def ingest(db, src, rows, *, index_names=True):
     """Publish one full source release atomically. rows can be a streaming iterator."""
     sid, revision, url = (
         label(src["source"]),
@@ -258,10 +258,11 @@ def ingest(db, src, rows):
                     link,
                 ),
             )
-            db.executemany(
-                "INSERT OR IGNORE INTO entity_name VALUES(?,?,?)",
-                ((sid, norm(a), eid) for a in [name, *aliases]),
-            )
+            if index_names:
+                db.executemany(
+                    "INSERT OR IGNORE INTO entity_name VALUES(?,?,?)",
+                    ((sid, norm(a), eid) for a in [name, *aliases]),
+                )
             for c in set(r.get("types", [])):
                 db.execute("INSERT INTO member VALUES(?,?,?)", (sid, label(c), eid))
             for f in r.get("facts", []):

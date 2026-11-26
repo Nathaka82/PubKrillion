@@ -2,11 +2,27 @@ import json
 import math
 import os
 import re
+import time
 import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
 BANK_FORMAT = 36
+
+
+def publication_batches(game, cursor, size):
+    # SQLite's data_version changes only for commits made by other connections.
+    # Give a burst of game requests time to drain before competing for the writer again.
+    version = game.execute("PRAGMA data_version").fetchone()[0]
+    next_check = time.monotonic()
+    while rows := cursor.fetchmany(size):
+        yield rows
+        if time.monotonic() >= next_check:
+            latest = game.execute("PRAGMA data_version").fetchone()[0]
+            if latest != version:
+                time.sleep(0.050)
+                version = latest
+            next_check = time.monotonic() + 0.100
 
 
 def noun(text):
@@ -477,6 +493,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
     label_fields = ("l.forms,l.checked AS names_checked,l.variants,l.origin" if checked_labels
                     else "NULL AS forms,NULL AS names_checked,NULL AS variants,NULL AS origin")
     label_join = "LEFT JOIN candidate_labels l ON l.id=e.id" if checked_labels else ""
+    surveyed = db.execute("SELECT 1 FROM recall WHERE prompt=? LIMIT 1", (prompt,)).fetchone()
+    has_familiarity = db.execute("SELECT 1 FROM familiarity LIMIT 1").fetchone()
     joined = db.execute(f"""SELECT e.*, {label_fields}, (SELECT json_group_array(m.class) FROM membership m
             WHERE m.id=e.id AND m.source=e.source) AS classes FROM {candidates} c CROSS JOIN entity e ON e.id=c.id
         {label_join}
@@ -627,14 +645,12 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         depth = min(4, min((r["depth"] for r in rows if r["depth"] is not None), default=2))
         term = spelling(primary)
         survey_total = 0
-        for sample in db.execute(
-            "SELECT n,population,source FROM recall WHERE id=? AND prompt=?",
-            (eid, prompt),
-        ):
-            n, p = sample[0], sample[1]
-            bound = upper_recall(n, p)
-            survey_total = max(survey_total, bound)
-            selected.add(sample[2])
+        if surveyed:
+            for count, participants, source in db.execute(
+                "SELECT n,population,source FROM recall WHERE id=? AND prompt=?", (eid, prompt)
+            ):
+                survey_total = max(survey_total, upper_recall(count, participants))
+                selected.add(source)
         # An eligible answer selected zero times in a measured cohort has the
         # same denominator as every other eligible answer in that edition.
         choice_bound = upper_recall(name_picks.get(term, 0), population) if population else 0
@@ -644,7 +660,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         signal = db.execute(
             "SELECT frequency,languages FROM familiarity WHERE id=? ORDER BY frequency DESC LIMIT 1",
             (eid,),
-        ).fetchone()
+        ).fetchone() if has_familiarity else None
         if signal and not any(signal):
             signal = None
         proxy = None
@@ -981,7 +997,11 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             "INSERT OR IGNORE INTO kb_bank VALUES(?,?,'null')", (version, prompt)
         )
     cur = db.execute("SELECT * FROM result ORDER BY id")
-    while chunk := cur.fetchmany(250):
+    for chunk in publication_batches(game, cur, 1000):
+        search_rows = [
+            (version, row["id"], " ".join([row["name"], *json.loads(row["aliases"])]))
+            for row in chunk
+        ]
         with game:
             game.executemany(
                 "INSERT OR REPLACE INTO kb_member VALUES(?,?,?,?,?,?)",
@@ -999,19 +1019,20 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             )
             game.executemany(
                 "INSERT INTO kb_text(bank,entity,terms) VALUES(?,?,?)",
-                (
-                    (version, r["id"], " ".join([r["name"], *json.loads(r["aliases"])]))
-                    for r in chunk
-                ),
+                search_rows,
             )
-    name_rows = db.execute("""SELECT q.owner,s.exact,s.folded,s.legacy FROM qualified q JOIN spellings s USING(id)""")
-    while batch := name_rows.fetchmany(1000):
+    # Deduplicate and sort on the private graph so the shared name index receives
+    # consecutive keys. The upper bound leaves the writer available between batches.
+    name_rows = db.execute("""WITH names AS (
+            SELECT q.owner,s.exact,s.legacy,coalesce(nullif(s.folded,''),s.exact) folded
+            FROM qualified q JOIN spellings s USING(id))
+        SELECT coalesce(nullif(legacy,''),exact) term,owner FROM names WHERE exact<>''
+        UNION SELECT char(31)||folded,owner FROM names WHERE folded IS NOT legacy
+        ORDER BY 1,2""")
+    for batch in publication_batches(game, name_rows, 2000):
         with game:
             game.executemany("INSERT OR IGNORE INTO kb_name VALUES(?,?,?)",
-                ((version, legacy or exact, entity) for entity, exact, folded, legacy in batch if exact))
-            game.executemany("INSERT OR IGNORE INTO kb_name VALUES(?,?,?)",
-                ((version, "\x1f" + (folded or exact), entity) for entity, exact, folded, legacy in batch
-                 if (folded or exact) != legacy))
+                ((version, term, owner) for term, owner in batch))
     # Keep conflicting names from excluded candidates when they could otherwise
     # identify a qualifying item. Losing those owners would turn uncertainty into points.
     if has_name_claims:
@@ -1039,7 +1060,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             WHERE s.{column}<>'' GROUP BY s.{column})
             SELECT d.term,d.owner,coalesce(r.name,d.display),coalesce(r.depth,d.shared_depth)
             FROM decisions d LEFT JOIN result r ON r.id=d.owner""")
-        while batch := decisions.fetchmany(500):
+        for batch in publication_batches(game, decisions, 4000):
             with game:
                 game.executemany("INSERT INTO kb_answer_key VALUES(?,?,?,?,?,?)",
                     ((version, form, term, entity, name or term, depth or 0) for term, entity, name, depth in batch))

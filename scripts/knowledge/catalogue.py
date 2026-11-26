@@ -1383,7 +1383,8 @@ def play_world(db, game, key, prompt, query, args, conditions, file_format, *, d
             source["source"]="wikidata-joined-"+digest(key)
             source["revision"]=digest([source["revision"],hierarchy[0] if hierarchy else None])
         ingest(graph, {**source,
-                       "terms": {root: [subject], **{c["target"]: [c["label"]] for c in conditions}}}, records())
+                       "terms": {root: [subject], **{c["target"]: [c["label"]] for c in conditions}}},
+               records(), index_names=5 <= file_format < 18)
         if linked and file_format >= 29 and key.startswith("w-"):
             from scope_evidence import add_sources
             add_sources(db,graph,cls,rule=key,condition=first)

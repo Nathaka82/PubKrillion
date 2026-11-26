@@ -174,6 +174,6 @@ For a readership-based top score, every owner must have measured readership and 
 
 The independent builder allows a publication up to 50 GB. It stages a new edition on the same volume before replacing the existing file, so allow space for both editions, inputs and temporary indexes. The per-game research graph and its quiz database connection each cap their SQLite files at roughly 8.2 GB. The worker checks local storage and free space before starting. Its feed input has a 2 GB aggregate budget, bounded individual files and a lower limit for formats decoded as a single JSON document. DuckDB uses one thread and a 384 MB memory limit.
 
-Run `npm test`, `npm run test:browser`, `npm run test:knowledge-load` and `python -m unittest discover -s tests` for game, browser, performance and evidence checks. The load test creates an isolated 100,000-member register, reopens its cached preview and submits thirty team answers concurrently.
+Run `npm test`, `npm run test:browser`, `npm run test:knowledge-load` and `python -m unittest discover -s tests` for game, browser, performance and evidence checks. The load test submits answers from thirty teams in an open round while a second room builds a 100,000-member bank. It then reopens the cached preview and times thirty concurrent submissions against the new bank.
 
 Source attribution and collection methods accompany the projections. [Dataset notes](../../data/knowledge/README.md)
