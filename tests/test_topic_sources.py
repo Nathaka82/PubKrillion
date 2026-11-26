@@ -59,7 +59,8 @@ class SourceTopics(unittest.TestCase):
         with (closing(sqlite3.connect(":memory:")) as stage,
               patch.object(topics, "named_candidates", return_value=(forms, False)),
               patch.object(topics, "bindings", return_value=[{"subject": binding("Q", i),
-                  "members": {"value": str(i == 902).lower()}, "children": {"value": "false"}} for i in forms]),
+                  "members": {"value": str(i == 902).lower()}, "children": {"value": "false"},
+                  "classification": {"value": "false"}} for i in forms]),
               patch.object(vocabulary, "capture", side_effect=AssertionError("already verified subject names"))):
             stage.execute("ATTACH DATABASE ? AS world", (str(self.world),))
             stage.executescript(topics.SCHEMA)
@@ -101,10 +102,75 @@ class SourceTopics(unittest.TestCase):
             ideas.published_suggestions(db, {"idea": "prism devices by Cedar", "completeOnly": False})
         self.assertEqual(waiting.exception.requests, [topics.Topic("cedar", 901).key])
 
+    def test_genre_only_subject_rechecks_old_misses_and_publishes_a_verified_work_question(self):
+        topic = topics.Topic("prism genre", subject_lookup="type")
+        prompt, rule = "Name a prism genre", "w-10-136-902"
+        watched_rules.follow(self.root, topic.key)
+        file = topics.cache_path(self.root, topic.key)
+        with patch.object(topics, "named_candidates", return_value=({}, False)):
+            old = topics.capture(topic)
+        old.pop("classificationOnly")
+        old["discoveryVersion"] = 4
+        old["revision"] = topics.digest([old[k] for k in
+            ("key", "rows", "crowded", "proposals", "descriptions", "scopedIdentity", "subclassOnly")])
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_bytes(gzip.compress(json.dumps(old).encode()))
+        self.publish()
+        with closing(catalogue.reader(self.pub)) as db, self.assertRaises(catalogue.UnverifiedRule) as waiting:
+            catalogue.match_question(db, prompt)
+        self.assertEqual(waiting.exception.key, topic.key)
+        forms = {i: [i, "Prism genre", []] for i in (901, 902)}
+        usages = [{"subject": binding("Q", i), "members": {"value": "false"}, "children": {"value": "false"},
+                   "classification": {"value": str(i == 902).lower()}} for i in forms]
+        proposal = {"property": binding("P", 136), "class": binding("Q", 10), "n": {"value": "7"}}
+        with patch.object(topics, "named_candidates", return_value=(forms, False)):
+            with patch.object(topics, "bindings", return_value=usages):
+                self.assertEqual(topics.capture(topics.Topic(topic.term, subject_lookup="kind"))["rows"], [])
+            with patch.object(topics, "bindings", side_effect=[usages, [proposal]]):
+                credit_subject = topics.capture(topics.Topic(topic.term, subject_lookup="subject"))
+                self.assertEqual(credit_subject["rows"], [forms[902]])
+                self.assertEqual(credit_subject["proposals"], [[10, 136, 902, 7]])
+            with (closing(sqlite3.connect(":memory:")) as stage,
+                  patch.object(topics, "bindings", side_effect=[usages, [proposal]]),
+                  patch.object(vocabulary, "capture", return_value={"P136": ["genre", []]})):
+                stage.execute("ATTACH ? AS world", (str(self.world),))
+                stage.executescript(topics.SCHEMA + target_lookup.SCHEMA)
+                stage.execute("CREATE TABLE live_rule(key,revision,captured,n,release)")
+                result, = topics.collect(stage, self.root, False)
+                self.assertEqual(result["classificationOnly"], [902])
+                self.assertEqual(list(class_updates.registered(self.root)), [])
+                target_lookup.collect(stage, self.root, False, topic_captures=[result])
+                self.publish()
+                with closing(catalogue.reader(self.pub)) as db, self.assertRaises(catalogue.UnverifiedRule) as pending:
+                    catalogue.match_question(db, prompt)
+                self.assertEqual(pending.exception.key, rule)
+                members = [{"item": binding("Q", i)} for i in (31, 32)]
+                with (patch.object(watched_rules, "bindings", side_effect=lambda q:
+                        [{"n": {"value": "2"}}] if "COUNT(" in q else members),
+                      patch.object(watched_rules, "named_items", return_value=[
+                          ("Q31", "First prism", [], 0), ("Q32", "Second prism", [], 0)])):
+                    watched_rules.collect(stage, self.root, False)
+        self.publish()
+        with closing(catalogue.reader(self.pub)) as db, closing(sqlite3.connect(":memory:")) as game:
+            card, = ideas.published_suggestions(db, {"idea": prompt, "completeOnly": False})
+            self.assertEqual((card["key"], card["records"]), (rule, 2))
+            self.assertIn("in the genre", card["prompt"])
+            self.assertEqual(catalogue.match_question(db, card["prompt"])["key"], rule)
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            bank, _ = catalogue.play(db, game, rule, card["prompt"])
+            self.assertEqual({r[0] for r in game.execute("SELECT entity FROM kb_member WHERE bank=?", (bank,))},
+                             {"wd:Q31", "wd:Q32"})
+        with closing(sqlite3.connect(self.pub)) as db:
+            db.execute("UPDATE live_rule SET n=0 WHERE key=?", (rule,))
+            db.commit()
+        with closing(catalogue.reader(self.pub)) as db, self.assertRaises(catalogue.RuleWithdrawn):
+            catalogue.match_question(db, prompt)
+
     def test_subclass_only_source_offers_an_explicit_question_after_verification(self):
         topic = topics.Topic("work", subject_lookup="type")
         names = {10: [10, "Work", []]}
-        child = {"subject": binding("Q", 10), "members": {"value": "false"}, "children": {"value": "true"}}
+        child = {"subject": binding("Q", 10), "members": {"value": "false"}, "children": {"value": "true"},
+                 "classification": {"value": "false"}}
         with (patch.object(topics, "named_candidates", return_value=(names, False)),
               patch.object(topics, "bindings", return_value=[child])):
             self.assertEqual(topics.capture(topic)["subclassOnly"], [10])

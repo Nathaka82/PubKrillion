@@ -18,7 +18,7 @@ from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
 FORMAT = int(Path(__file__).with_name("catalogue-format").read_text(encoding="ascii"))
-RULE_REVISION = "named-subject-discovery-1"
+RULE_REVISION = "named-subject-classification-2"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 

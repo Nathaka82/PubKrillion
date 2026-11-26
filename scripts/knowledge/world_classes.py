@@ -83,7 +83,21 @@ def card(db, phrase, *, strict=False, literal=None):
         if forms:
             query,args = work_forms.union(db,key,"SELECT id FROM current_member WHERE rule=?",(key,))
             count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
-        if not count and strict:
+    else:
+        args = (cls, cls) if kinds else (cls,)
+        members = KINDS if kinds else MEMBERS
+        witnessed = (" UNION SELECT w.id FROM scope CROSS JOIN scope_witness w ON w.cls=scope.id"
+                     if fmt >= 29 and not kinds else "")
+        query = DESCENDANTS + f""" SELECT DISTINCT m.id FROM ({members}) m
+                JOIN item i ON i.id=m.id WHERE length(i.name) BETWEEN 1 AND 140{witnessed}"""
+        if forms:
+            query,args = work_forms.union(db,key,query,args)
+        count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
+    if not count:
+        if strict and not kinds:
+            from topic_sources import classified_choices
+            classified_choices(db, cls, edition)
+        if strict and live:
             from catalogue import RuleWithdrawn, UnverifiedRule
             if fmt >= 31 and work_forms.pending(db,key):
                 raise UnverifiedRule(key,"The builder can check works recorded with this form.")
@@ -97,17 +111,6 @@ def card(db, phrase, *, strict=False, literal=None):
                     option = card(db, f"type of q{cls}", strict=True)
                     raise DateChoices([option], "The source lists types of this subject. Select the revised question to play.")
             raise RuleWithdrawn("The current source has no named members for this class question.")
-    else:
-        args = (cls, cls) if kinds else (cls,)
-        members = KINDS if kinds else MEMBERS
-        witnessed = (" UNION SELECT w.id FROM scope CROSS JOIN scope_witness w ON w.cls=scope.id"
-                     if fmt >= 29 and not kinds else "")
-        query = DESCENDANTS + f""" SELECT DISTINCT m.id FROM ({members}) m
-                JOIN item i ON i.id=m.id WHERE length(i.name) BETWEEN 1 AND 140{witnessed}"""
-        if forms:
-            query,args = work_forms.union(db,key,query,args)
-        count = db.execute(f"SELECT count(*) FROM ({query})",args).fetchone()[0]
-    if not count:
         if strict and not live and (fmt >= 31 or fmt >= 27 and db.execute(
             "SELECT 1 FROM source_vocabulary WHERE token=? AND name IS NOT NULL", (f"Q{cls}",)
         ).fetchone()):
