@@ -102,7 +102,7 @@ function shortSpellingSuggestion(db: DatabaseSync, bank: string, input: string,
   return suggestion;
 }
 
-export function lookup(db: DatabaseSync, bank: string, raw: string) {
+export function lookup(db: DatabaseSync, bank: string, raw: string, { exactOnly = false } = {}) {
   const key = normal(raw) || spelling(raw);
   const checked = db.prepare("SELECT form FROM kb_answer_key WHERE bank=? ORDER BY form DESC LIMIT 1").get(bank);
   const select = checked && db.prepare("SELECT entity,name,depth FROM kb_answer_key WHERE bank=? AND form=? AND term=?");
@@ -125,6 +125,7 @@ export function lookup(db: DatabaseSync, bank: string, raw: string) {
       )
       .all(bank, key, ...(prefix ? [key + "\u{10ffff}"] : []));
   const exact = checked ? [] : byTerm(false);
+  if (exactOnly && !exact.length) return;
   if (exact.length > 1) {
     const group = db
       .prepare("SELECT name,depth FROM kb_group WHERE bank=? AND term=?")
@@ -230,7 +231,7 @@ export function restoreRoundNames(db: DatabaseSync) {
     JOIN rounds r ON r.id=p.round JOIN submissions s ON s.round=p.round AND s.key=('kb:'||p.entity)
     WHERE r.phase='open' AND s.depth IS NOT NULL AND s.canonical IS NOT NULL ORDER BY p.round,s.team,p.bank`).all();
   for (const row of rows) {
-    const match = lookup(db,String(row.bank),String(row.raw));
+    const match = lookup(db,String(row.bank),String(row.raw), { exactOnly: true });
     if (match?.exact && "entity" in match && match.entity===row.entity)
       insert.run(row.round,spelling(String(row.raw)),row.bank,row.entity,row.canonical,row.depth);
   }
@@ -244,29 +245,25 @@ export function additionalAnswer(db: DatabaseSync, round: number, room: string, 
     .get(round, spelling(raw));
   if (accepted) return { exact: true, entity: String(accepted.entity),
     answer: { name: String(accepted.name), depth: Number(accepted.depth), aliases: [] } };
-  const term = normal(raw) || spelling(raw);
-  const candidates = db.prepare(`
-    WITH proofs(bank,entity) AS (
-      SELECT bank,entity FROM kb_round_proof WHERE round=?
+  const editions = db.prepare(`
+    WITH editions(bank,current) AS (
+      SELECT DISTINCT bank,0 FROM kb_round_proof WHERE round=?
       UNION ALL
-      SELECT n.bank,n.entity FROM library l JOIN kb_name n
-        ON n.bank=json_extract(l.content,'$.knowledge') AND n.term=?
-        WHERE l.room=? AND l.id=? AND n.bank<>? AND json_extract(l.content,'$.openRule')=?
+      SELECT json_extract(l.content,'$.knowledge'),1 FROM library l
+        WHERE l.room=? AND l.id=? AND json_extract(l.content,'$.openRule')=?
         AND NOT EXISTS(SELECT 1 FROM kb_catalogue_entry e WHERE e.room=l.room AND e.entry=l.id)
     )
-    SELECT m.entity,m.name,m.depth,m.bank FROM proofs p JOIN kb_member m USING(bank,entity)
-      JOIN kb_name n ON n.bank=m.bank AND n.entity=m.entity AND n.term=?
-      ORDER BY m.bank,m.entity
-  `).all(round, term, room, entry, q.knowledge, q.openRule, term);
-  // A folded alias can retrieve several entries (C, C#, C++). Apply the same
-  // eligibility and spelling decisions here as on a submission to that edition.
-  const banks = new Map<string, ReturnType<typeof lookup>>();
-  const rows = candidates.filter(candidate => {
-    const bank = String(candidate.bank);
-    if (!banks.has(bank)) banks.set(bank, lookup(db, bank, raw));
-    const match = banks.get(bank);
-    return match?.exact && "entity" in match && match.entity === candidate.entity;
-  });
+    SELECT bank,max(current) current FROM editions WHERE bank<>? GROUP BY bank ORDER BY bank
+  `).all(round, room, entry, q.openRule, q.knowledge);
+  const member = db.prepare(`SELECT bank,entity,name,depth FROM kb_member m WHERE bank=? AND entity=?
+    AND (?=1 OR EXISTS(SELECT 1 FROM kb_round_proof p WHERE p.round=? AND p.bank=m.bank AND p.entity=m.entity))`);
+  const rows: Ruling[] = [];
+  for (const edition of editions) {
+    const match = lookup(db, String(edition.bank), raw, { exactOnly: true });
+    if (!match?.exact || !("entity" in match) || !match.entity) continue;
+    const row = member.get(edition.bank, match.entity, edition.current, round);
+    if (row) rows.push(row);
+  }
   if (!rows.length || rows.some(r => r.entity !== rows[0].entity)) return;
   const m = rows[0];
   const pinned = db.prepare("SELECT name,depth FROM kb_member WHERE bank=? AND entity=?").get(q.knowledge, m.entity);
@@ -274,7 +271,7 @@ export function additionalAnswer(db: DatabaseSync, round: number, room: string, 
   const previous = db.prepare(`SELECT a.name,a.depth FROM kb_round_proof p JOIN kb_member m USING(bank,entity)
     JOIN round_additions a ON a.round=p.round AND a.name=m.name WHERE p.round=? AND p.entity=? LIMIT 1`).get(round, m.entity);
   const additionKey = (normal(name) || name) + "\u001f" + spelling(name);
-  const original = lookup(db, q.knowledge, name);
+  const original = lookup(db, q.knowledge, name, { exactOnly: true });
   if (!pinned && !previous && (original === null || original?.exact ||
       db.prepare("SELECT 1 FROM round_additions WHERE round=? AND key IN (?,?)").get(round, normal(name), additionKey))) return;
   const depth = Number(pinned?.depth ?? previous?.depth ?? Math.min(2, Number(m.depth)));

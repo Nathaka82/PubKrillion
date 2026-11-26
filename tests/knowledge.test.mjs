@@ -61,6 +61,14 @@ test("a later source change preserves accepted alternate names, their proof and 
     member("edition1","B","New exhibit","New regional name",4);
     db.prepare("INSERT INTO library VALUES('room','entry',?)").run(JSON.stringify({knowledge:"edition1",openRule:"same rule"}));
     const accept = raw => additionalAnswer(db,1,"room","entry",question,raw);
+    // The compiler preserves exact spellings separately from its older search terms.
+    for (const [display, exact, search] of [["O‘Keeffe", "o'keeffe", "o keeffe"], ["-١", "-١", "under ١"]]) {
+      db.prepare("UPDATE kb_member SET aliases=json_insert(aliases,'$[#]',?) WHERE bank='edition1' AND entity='A'").run(display);
+      db.prepare("INSERT INTO kb_name VALUES('edition1',?,'A')").run(search);
+      db.prepare("INSERT INTO kb_answer_key VALUES('edition1',0,?,'A','Existing exhibit',3)").run(exact);
+      assert.equal(lookup(db,"edition1",exact)?.entity,"A");
+      assert.equal(accept(exact)?.entity,"A");
+    }
     assert.equal(accept("Local exhibit name").answer.depth,3);
     assert.equal(accept("New regional name").answer.depth,2);
     db.exec(`CREATE TABLE rounds(id,phase,room,question);
@@ -69,9 +77,12 @@ test("a later source change preserves accepted alternate names, their proof and 
       INSERT INTO submissions VALUES(1,1,'kb:B','New regional name','New exhibit',2);
       DELETE FROM kb_round_name;`);
     restoreRoundNames(db);
+    member("edition1","retired","Retired exhibit","An unplayed old name",3);
     member("edition2","C","Different exhibit","New regional name",1);
     db.prepare("UPDATE library SET content=?").run(JSON.stringify({knowledge:"edition2",openRule:"same rule"}));
     const replay = accept("NEW REGIONAL NAME");
+    assert.equal(accept("An unplayed old name"),undefined);
+    assert.equal(accept("New regio"),undefined);
     assert.deepEqual([replay.entity,replay.answer.name,replay.answer.depth],["B","New exhibit",2]);
     for (const [term, name, depth] of [["regional","New exhibit",2],["Local exhibit name","Existing exhibit",3]]) {
       const page = indexedPage(db,question,new URLSearchParams({q:term}),1);
