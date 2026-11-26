@@ -358,7 +358,10 @@ test(
     const fish = await compile("Name a fish that is bigger than a pear");
     assert.ok(fish.answerCount > 3000);
     assert.ok(fish.gaps.missing > 0 && fish.gaps.borderline > 0);
-    assert.ok(fish.counts[5] > 0 && fish.counts[5] <= fish.answerCount / 100);
+    const languageCoverage = fish.familiarityCoverage.find(group => group.method === "language coverage");
+    assert.ok(languageCoverage.measuredAnswers > 0);
+    assert.ok(fish.answerCount - languageCoverage.measuredAnswers > fish.answerCount * 0.02);
+    assert.equal(fish.counts[5], 0, "The bundled source cannot establish a bottom-two-percent rank for these fish.");
     for (const name of ["Coelacanth", "Oarfish", "Arapaima"])
       assert.ok((await browse(fish.job, name)).filtered > 0);
     const finals = await compile(

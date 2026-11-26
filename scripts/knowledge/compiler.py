@@ -7,7 +7,7 @@ import urllib.request
 
 from graph import digest, folded_spelling, norm, spelling
 
-BANK_FORMAT = 37
+BANK_FORMAT = 38
 
 
 def publication_batches(game, cursor, size):
@@ -793,8 +793,8 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             promoted += num
             budget -= num
         readership["topTierEstimates"] = promoted
-    if budget:
-        attention.rank_familiarity(db, size)
+    familiarity_coverage = attention.rank_familiarity(db, size) if budget else []
+    if familiarity_coverage:
         for rank, num in db.execute("""SELECT proxy_rank,count(*) FROM result WHERE proxy_rank IS NOT NULL
                 GROUP BY proxy_rank ORDER BY proxy_rank""").fetchall():
             if num > budget:
@@ -994,10 +994,13 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
             "Answers must have a directly recorded class and relationship in this Wikidata5M edition."
             if "catalogueKey" in plan else ""
         ) + (" " + plan["borderScope"] if plan.get("borderScope") else ""),
-        "scoring": (f"Published Wikimedia readership over 52 weeks covers {readership['coveredAnswers']:,} of {size:,} answer names. "
+        "scoring": "".join(f"Word frequency and {group['method']} cover all records for "
+                    f"{group['fullyMeasuredAnswers']:,} of {size:,} answer names. " for group in familiarity_coverage) +
+                   (f"Published Wikimedia readership over 52 weeks covers {readership['coveredAnswers']:,} of {size:,} answer names. "
                     f"{readership['topTierEstimates']:,} earned the top tier through bottom-2% readership and sparse graph links. "
                     if readership else "") + "Graph links help estimate relative familiarity. First choices from at least 200 teams across three rooms and exact-prompt surveys use an upper confidence bound. At most 5% qualify for the top tier. Estimates can award it to at most 1% and require two familiarity signals placing an answer in the bottom 2% even after allowing for missing data.",
         "readership": readership,
+        "familiarityCoverage": familiarity_coverage,
         "plan": plan,
         "sources": refs,
         "reference": reference,

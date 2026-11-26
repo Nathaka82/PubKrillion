@@ -180,6 +180,7 @@ def rank_familiarity(graph, size):
     # Zipf frequency is logarithmic. Convert to linear weights before combining owners.
     graph.create_function("familiarity_weight", 2, lambda frequency, reach: (10 ** frequency) * reach,
                           deterministic=True)
+    coverage = []
     for method, table, spread, offset in (
         ("language coverage", "familiarity", "languages", 0),
         ("graph links", "graph_familiarity", "incoming", 1),
@@ -187,17 +188,23 @@ def rank_familiarity(graph, size):
         if not graph.execute("SELECT 1 FROM result WHERE proxy=? AND depth BETWEEN 2 AND 4 LIMIT 1",
                              (method,)).fetchone():
             continue
-        graph.execute(f"""WITH per_item AS MATERIALIZED (
+        graph.execute("DROP TABLE IF EXISTS temp.familiarity_bounds")
+        graph.execute(f"""CREATE TEMP TABLE familiarity_bounds AS WITH per_item AS (
             SELECT q.owner,q.id,max(CASE WHEN f.frequency>0 AND f.{spread}>0
                 THEN familiarity_weight(f.frequency,f.{spread}+{offset}) END) weight
             FROM qualified q LEFT JOIN {table} f ON f.id=q.id GROUP BY q.id
-        ), bounds(owner,low_value,high_value) AS MATERIALIZED (
-            SELECT owner,max(weight),CASE WHEN count(weight)=count(*) THEN sum(weight) END
-            FROM per_item GROUP BY owner HAVING count(weight)>0
-        )""" + RANK_BOUNDS + """ UPDATE result SET proxy_rank=rare_rank FROM ranked
+        ) SELECT owner,max(weight) low_value,CASE WHEN count(weight)=count(*) THEN sum(weight) END high_value
+            FROM per_item GROUP BY owner HAVING count(weight)>0""")
+        measured, full = graph.execute("SELECT count(*),count(high_value) FROM familiarity_bounds").fetchone()
+        coverage.append({"method": method, "measuredAnswers": measured, "fullyMeasuredAnswers": full})
+        if (size-measured+1)*100 > 2*size:
+            continue
+        graph.execute("WITH bounds AS (SELECT * FROM familiarity_bounds)" + RANK_BOUNDS + """
+            UPDATE result SET proxy_rank=rare_rank FROM ranked
             WHERE result.id=ranked.owner AND result.proxy=:method AND result.depth BETWEEN 2 AND 4
                 AND result.upper IS NULL AND result.survey_total=0 AND rare_rank*100<=2*:size""",
             {"method": method, "size": size})
+    return coverage
 
 
 def score(graph, publication, size, *, register=None):
