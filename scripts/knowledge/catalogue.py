@@ -780,7 +780,8 @@ def search(db, idea, complete_only=False, *, comparisons=True):
     if file_format>=14 and not complete_only and not any(c["key"].startswith(("r-","c-")) for c in cards):
         from world_classes import card as class_card
         subject = topic_subject(folded_spelling(idea))
-        candidate = class_card(db,subject) or class_card(db,"type of "+subject)
+        raw_subject = topic_subject(spelling(idea)).removesuffix("?").strip()
+        candidate = class_card(db,subject,literal=raw_subject) or class_card(db,"type of "+subject,literal="type of "+raw_subject)
         if candidate:
             cards = [candidate,*cards][:3]
     if file_format >= 19 and not complete_only:
@@ -907,7 +908,8 @@ def match_question(db, prompt):
             return combined
     if db.execute("SELECT format FROM publication").fetchone()[0] >= 14:
         from world_classes import card as class_card
-        direct = class_card(db,prompt_term(prompt).rstrip("?").strip(),strict=True)
+        direct = class_card(db,prompt_term(prompt).rstrip("?").strip(),strict=True,
+                            literal=COMMAND.sub("",spelling(prompt),count=1).removesuffix("?").strip())
         if direct:
             return direct
     # Keep "and" inside source names intact. A split is valid only when both
@@ -1156,19 +1158,27 @@ def match_relation(db, body, place_body, edition, *, include_empty=False, resolv
         if subject == "person":
             subject = "human"
         if edition[1]>=17:
-            classes,targets = identifiers(db,subject,"class"),identifiers(db,target,"target")
+            raw_subject, _, raw_target = place_body.partition(" " + spelling(phrase) + " ")
+            classes = identifiers(db, subject, "class", literal=raw_subject)
+            targets = identifiers(db, target, "target")
             if edition[1]>=25 and len(targets)==1 and not resolve_only:
                 from target_lookup import class_choices as current_classes
                 class_choices.update((c["key"],c) for c in current_classes(db,subject,prop,targets[0],edition[0]))
             if edition[1]>=25 and len(classes)==1:
                 import target_lookup
-                raw = place_body.partition(" "+spelling(phrase)+" ")[2] or target
+                raw = raw_target or target
                 request = target_lookup.Request(classes[0],prop,spelling(raw),date_key)
                 known = db.execute("SELECT 1 FROM target_lookup WHERE key=?", (request.key,)).fetchone()
                 if known:
                     targets = [target_lookup.require(db,request,edition[0])]
                 elif (request_target and (len(targets)!=1 or not info(db,classes[0],prop,targets[0]))
                       and target_lookup.can_request(db,request)):
+                    if edition[1] >= 26 and not date_key and not resolve_only:
+                        from topic_sources import Topic, verified_credit_choices
+                        from date_rules import DateChoices
+                        cards = verified_credit_choices(db, Topic(spelling(raw), classes[0]), prop, edition[0])
+                        if cards:
+                            raise DateChoices(cards, "Choose the question naming the creator credited for these works.")
                     unresolved[request]=max(unresolved.get(request,0),len(phrase))
             if len(classes)>1 or len(targets)>1:
                 continue

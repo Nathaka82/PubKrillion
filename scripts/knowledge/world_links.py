@@ -4,7 +4,7 @@ import gzip
 import json
 import re
 
-from graph import folded_spelling, plural_class_head
+from graph import folded_spelling, plural_class_head, spelling
 from world_classes import DESCENDANTS
 
 SCHEMA = """
@@ -98,8 +98,33 @@ def members(db, cls, prop, target):
     )
 
 
-def identifiers(db, term, role):
-    import re
+def ranked_class_ids(db, term, literal, rows):
+    """Prefer an exact source spelling, then the preferred label among equally exact names."""
+    best = [cls for cls, preferred in rows if preferred == rows[0][1]]
+    if not literal or not 1 < len(rows) < 13 or folded_spelling(literal) != term:
+        return best
+    forms = {cls: [] for cls, _ in rows}
+    encoded = json.dumps(list(forms))
+    for cls, name, aliases in db.execute("""SELECT i.id,i.name,i.aliases FROM json_each(?) c
+            CROSS JOIN item i ON i.id=c.value""", (encoded,)):
+        forms[cls].append((name, aliases.split("\t")))
+    if db.execute("SELECT 1 FROM sqlite_master WHERE name='source_vocabulary'").fetchone():
+        for cls, name, aliases in db.execute("""SELECT c.value,v.name,v.aliases FROM json_each(?) c
+                CROSS JOIN source_vocabulary v ON v.token='Q'||c.value WHERE v.name IS NOT NULL""", (encoded,)):
+            forms[cls].append((name, json.loads(aliases)))
+    exact = {}
+    wanted = spelling(literal)
+    for cls, sources in forms.items():
+        if any(spelling(label) == wanted for label, _ in sources):
+            exact[cls] = 1
+        elif any(spelling(name) == wanted for _, aliases in sources for name in aliases):
+            exact[cls] = 0
+        elif not any(folded_spelling(name) == term for label, aliases in sources for name in (label, *aliases)):
+            return best  # Some editions supply an index entry without its original display spelling.
+    return [cls for cls, rank in exact.items() if rank == max(exact.values())] if exact else best
+
+
+def identifiers(db, term, role, *, literal=None):
 
     column, table, prefix = (
         ("cls", "world_class_name", "q") if role == "class" else ("target", "world_target_name", "q")
@@ -127,8 +152,9 @@ def identifiers(db, term, role):
         if len(canonical) == 1:
             return [canonical[0][0]]
     if not rows and role == "class" and term.endswith("s"):
-        return identifiers(db, term[:-1], role)
-    best = [row[0] for row in rows if row[1] == rows[0][1]]
+        return identifiers(db, term[:-1], role, literal=literal[:-1] if literal and literal.endswith("s") else None)
+    best = (ranked_class_ids(db, term, literal, rows) if role == "class" else
+            [row[0] for row in rows if row[1] == rows[0][1]])
     return best if len(best) < 13 else []
 
 

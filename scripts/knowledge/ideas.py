@@ -158,7 +158,7 @@ def discover(world, idea):
     return sorted(candidates, key=lambda p: (-candidates[p], len(p), p))[:6]
 
 
-def published_suggestions(db, request):
+def published_suggestions(db, request, *, follow_topic=None):
     from catalogue import UnverifiedRule, match_question, relationship_choices, search, surprise
     from date_rules import DateChoices
     complete_only = request["completeOnly"]
@@ -180,6 +180,8 @@ def published_suggestions(db, request):
     except DateChoices as choices:
         if choices.cards or complete_only:
             request["sourceNote"] = str(choices)
+            if choices.cards and choices.refresh and not complete_only and follow_topic and follow_topic(choices.refresh):
+                request["sourceNote"] += " The builder will check this topic for additional credits."
             return [card for card in choices.cards if card["complete"] or not complete_only]
         raise
     except UnverifiedRule:
@@ -211,7 +213,7 @@ if __name__ == "__main__":
     if published.is_file():
         with closing(reader(published)) as catalogue:
             try:
-                rules = published_suggestions(catalogue, request)
+                rules = published_suggestions(catalogue, request, follow_topic=lambda key: follow(game.parent, key))
             except ValueError as error:
                 message = str(error)
                 waiting = None

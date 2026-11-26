@@ -179,7 +179,7 @@ def match(db, body, edition):
     for end in range(1, len(words)):
         subject = " ".join(words[:end])
         lookup = "human" if subject in ("person", "people", "someone") else folded_spelling(subject)
-        if len(classes := date_subjects.resolve(db, lookup)) != 1:
+        if len(classes := date_subjects.resolve(db, lookup, literal=subject)) != 1:
             continue
         rest = " ".join(words[end:])
         if rest.split()[0] in ("and", "or", "not", "never", "first", "originally"):

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from itertools import pairwise
 
 import date_subjects
-from graph import digest, folded_spelling
+from graph import digest, folded_spelling, spelling
 
 PROPERTIES = {
     569: ("date of birth", "born", "who was born"),
@@ -148,21 +148,27 @@ class DateChoices(ValueError):
         self,
         cards,
         message="Specify which date the question uses, such as a release, founding or birth year.",
+        *,
+        refresh=None,
     ):
         self.cards = cards
+        self.refresh = refresh
         super().__init__(message)
 
 
-def unspecified_date(db, text, edition):
+def unspecified_date(db, text, edition, *, literal=None):
     if parts := re.fullmatch(r"(.+?) (?:in|from) ([1-9]\d{3})", text):
         subject, year = parts.groups()
+        subject_group = 1
     elif parts := re.fullmatch(r"([1-9]\d{3}) (.+)", text):
         year, subject = parts.groups()
+        subject_group = 2
     else:
         return
     if db.execute("SELECT 1 FROM question_text WHERE term=? AND complete=1 LIMIT 1", (text,)).fetchone():
         return
-    classes = date_subjects.resolve(db, subject)
+    original = parts.re.fullmatch(literal) if literal else None
+    classes = date_subjects.resolve(db, subject, literal=original[subject_group] if original else None)
     if len(classes) == 1:
         rows = db.execute(
             """SELECT q.rule,q.prompt,q.n FROM question_year y
@@ -187,7 +193,7 @@ def match(db, body, edition, *, resolve_only=False):
     text = folded_spelling(body).removesuffix("?").strip()
     part = RANGE.fullmatch(text) or GENERIC.fullmatch(text)
     if not part:
-        unspecified_date(db, text, edition)
+        unspecified_date(db, text, edition, literal=spelling(body).removesuffix("?").strip())
         return None
     if not (bounds := period(part[3])):
         return None
@@ -218,7 +224,8 @@ def match(db, body, edition, *, resolve_only=False):
         raise ValueError(
             "An original release needs evidence of the earliest release. Use “with a recorded release” to include regional releases and re-releases."
         )
-    classes = date_subjects.resolve(db, subject)
+    original = part.re.fullmatch(spelling(body).removesuffix("?").strip())
+    classes = date_subjects.resolve(db, subject, literal=original[1] if original else None)
     if len(classes) > 1:
         choices = ", ".join(f"Q{i}" for i in classes[:5])
         raise ValueError("Several source classes match this subject. Use its class ID: " + choices + ".")

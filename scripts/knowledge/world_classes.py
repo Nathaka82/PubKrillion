@@ -46,7 +46,7 @@ KINDS = """SELECT p.child AS id,p.parent AS cls,279 AS property FROM scope s CRO
           WHERE p.child<>?"""
 
 
-def card(db, phrase, *, strict=False):
+def card(db, phrase, *, strict=False, literal=None):
     kinds = phrase.startswith("type of ")
     term = phrase[8:] if kinds else phrase
     tagged = re.fullmatch(r"(.+) q([1-9]\d{0,11})", term)
@@ -54,15 +54,20 @@ def card(db, phrase, *, strict=False):
     args = (tagged[1], int(tagged[2])) if tagged else (term,)
     rows = db.execute(
         f"""SELECT n.cls,i.name,n.preferred FROM world_class_name n JOIN item i ON i.id=n.cls
-                         WHERE {match} ORDER BY n.preferred DESC,n.cls LIMIT 3""", args,
+                         WHERE {match} ORDER BY n.preferred DESC,n.cls LIMIT 13""", args,
     ).fetchall()
     if not rows and term.endswith("s"):
-        return card(db, ("type of " if kinds else "") + term[:-1], strict=strict)
+        return card(db, ("type of " if kinds else "") + term[:-1], strict=strict,
+                    literal=literal[:-1] if literal and literal.endswith("s") else None)
     if not rows:
         return None
-    if len(rows) > 1 and rows[0][2] == rows[1][2]:
+    from world_links import ranked_class_ids
+    raw = literal.removeprefix("type of ") if kinds and literal else literal
+    matches = ranked_class_ids(db, term, raw, [(cls, preferred) for cls, _, preferred in rows])
+    rows = [row for row in rows if row[0] in matches]
+    if len(rows) > 1:
         if strict:
-            options = ", ".join(f"{label} (Q{qid})" for qid, label, _ in rows)
+            options = ", ".join(f"{label} (Q{qid})" for qid, label, _ in rows[:3])
             raise ValueError(
                 "Several source classes match this wording. Specify one of these IDs: " + options
             )

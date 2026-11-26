@@ -142,7 +142,8 @@ def match(db, body, edition, *, include_empty=False, resolve_only=False, request
             ):
                 continue
         classes = identifiers(
-            db, "human" if subject in ("person", "people", "someone", "somebody") else subject, "class"
+            db, "human" if subject in ("person", "people", "someone", "somebody") else subject, "class",
+            literal=body[:split.start()]
         )
         if len(classes) != 1:
             continue

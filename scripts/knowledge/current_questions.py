@@ -35,9 +35,41 @@ def recorded_spellings(db):
                 yield conditions[0][0], int(qid[1:]), name, aliases
 
 
-def publish(db):
-    from catalogue import FORMAT, current_count, named_question, world_clause
+def relationship_wording(db, key):
+    from catalogue import named_question, world_clause
     from world_links import display_subject
+
+    parts = key[4:].split("+") if key.startswith("and:") else [key]
+    clauses = []
+    property_clauses = []
+    topics = set()
+    for part, (cls, prop, target) in zip(parts, predicates(key)):
+        labels = info(db, cls, prop, target)
+        if not labels:
+            break
+        subject, relation, target_name = labels
+        subject = display_subject(db,cls,subject)
+        unique_target = identifiers(db, folded_spelling(target_name), "target") == [target]
+        label = target_name if unique_target else f"{target_name} (Q{target})"
+        if part.startswith("g-"):
+            clauses.append(f"{places.PHRASES[prop][0]} {label}")
+        else:
+            clause = world_clause(prop, relation, label)
+            clauses.append(clause)
+            property_clauses.append(
+                clause if clause.startswith("whose ") else f"whose {relation} is {label}"
+            )
+        topics.update((cls, target))
+    if len(clauses) != len(parts):
+        return None
+    if len(property_clauses) == 2 and any(c.startswith("whose ") for c in clauses):
+        clauses = property_clauses
+    prompt = named_question(subject, " and ".join(clauses))
+    return prompt, topics
+
+
+def publish(db):
+    from catalogue import FORMAT, current_count
 
     db.executemany(
         """INSERT INTO scope_name VALUES(?,?,?,?,?) ON CONFLICT(cls,term,id,display)
@@ -72,33 +104,10 @@ def publish(db):
     for key,count in rules.items():
         if work_forms.available(db,key):
             count = current_count(db,key,count,FORMAT)
-        parts = key[4:].split("+") if key.startswith("and:") else [key]
-        clauses = []
-        property_clauses = []
-        topics = set()
-        for part, (cls, prop, target) in zip(parts, predicates(key)):
-            labels = info(db, cls, prop, target)
-            if not labels:
-                break
-            subject, relation, target_name = labels
-            subject = display_subject(db,cls,subject)
-            unique_target = identifiers(db, folded_spelling(target_name), "target") == [target]
-            if part.startswith("g-"):
-                label = target_name if unique_target else f"{target_name} (Q{target})"
-                clauses.append(f"{places.PHRASES[prop][0]} {label}")
-            else:
-                label = target_name if unique_target else f"{target_name} (Q{target})"
-                clause = world_clause(prop, relation, label)
-                clauses.append(clause)
-                property_clauses.append(
-                    clause if clause.startswith("whose ") else f"whose {relation} is {label}"
-                )
-            topics.update((cls, target))
-        if len(clauses) != len(parts):
+        wording = relationship_wording(db, key)
+        if not wording:
             continue
-        if len(property_clauses) == 2 and any(c.startswith("whose ") for c in clauses):
-            clauses = property_clauses
-        prompt = named_question(subject, " and ".join(clauses))
+        prompt, topics = wording
         if len(prompt) <= 240:
             db.execute("INSERT INTO current_question VALUES(?,?,?)", (key, prompt, count))
             db.executemany(

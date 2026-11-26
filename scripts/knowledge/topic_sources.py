@@ -68,7 +68,7 @@ def parse(db, text, *, bare):
     body = COMMAND.sub("", term, count=1)
     if match := re.fullmatch(r"(.+?) by (.+)", body):
         if name_phrase(match[2]):
-            classes = resolve(db, folded_spelling(match[1]))
+            classes = resolve(db, folded_spelling(match[1]), literal=match[1])
             if len(classes) == 1:
                 return Topic(match[2], classes[0])
         return None
@@ -87,6 +87,30 @@ def source_id(row, field, prefix):
     return int(match[1])
 
 
+def credited_names(topic, forms):
+    """Disambiguate a fully enumerated name search using claims on works credited to each target."""
+    names = " ".join(f"wd:Q{i}" for i in sorted(forms))
+    credits = " ".join(f"wdt:P{prop}" for prop in CREDITS)
+    base = f"VALUES ?target {{ {names} }} VALUES ?credit {{ {credits} }} ?work ?credit ?target ."
+    classified = " ".join(f"wdt:P{prop}" for prop in CLASSIFICATIONS)
+    scope = (f"{{ ?work wdt:P31/wdt:P279* wd:Q{topic.cls} }} UNION "
+             f"{{ VALUES ?form {{ {classified} }} ?work ?form wd:Q{topic.cls} }}")
+    # A source can use a different subject class. Offer that precise wording if
+    # none of these named entities has two credited works with the requested class or form.
+    for condition in (scope, ""):
+        rows = bindings(f"""SELECT ?target (COUNT(DISTINCT ?work) AS ?n) WHERE {{ {base} {condition} }}
+            GROUP BY ?target HAVING(COUNT(DISTINCT ?work)>=2) ORDER BY ?target""")
+        selected = {}
+        for row in rows:
+            target = source_id(row, "target", "Q")
+            if target not in forms or target in selected or int(row["n"]["value"]) < 2:
+                raise ValueError("The source returned an unexpected identity for this credit.")
+            selected[target] = forms[target]
+        if selected:
+            return selected
+    return {}
+
+
 def capture(topic, seeds=(), *, identity=None):
     if identity is None:
         forms, crowded = named_candidates(topic.term, seeds)
@@ -94,6 +118,9 @@ def capture(topic, seeds=(), *, identity=None):
     else:
         forms = {row[0]: row for row in identity["rows"]}
         crowded, named_at = identity["crowded"], identity.get("namedAt", identity["checked"])
+    scoped_identity = bool(topic.cls and not crowded and len(forms) > MAX_NAMES)
+    if scoped_identity:
+        forms = credited_names(topic, forms)
     crowded = crowded or len(forms) > MAX_NAMES
     proposals, descriptions = [], {}
     # If search was truncated, require a specific identity before proposing any rule.
@@ -147,9 +174,10 @@ def capture(topic, seeds=(), *, identity=None):
                     raise ValueError("The source returned a relationship outside the topic query.")
                 proposals.append([cls, prop, target, n])
     rows = [] if crowded else [forms[i] for i in sorted(forms)]
-    content = [topic.key, rows, crowded, proposals, descriptions]
+    content = [topic.key, rows, crowded, proposals, descriptions, scoped_identity]
     return dict(key=topic.key, rows=rows, crowded=crowded, proposals=proposals, descriptions=descriptions,
-                revision=digest(content), checked=int(time.time()), namedAt=named_at, discoveryVersion=2)
+                revision=digest(content), checked=int(time.time()), namedAt=named_at, discoveryVersion=3,
+                scopedIdentity=scoped_identity)
 
 
 def cache_path(storage, key):
@@ -184,6 +212,8 @@ def vocabulary_terms(proposals):
 def read_capture(file, key):
     saved = json.loads(gzip.decompress(file.read_bytes()))
     identity = [saved[k] for k in ("key", "rows", "crowded", "proposals", "descriptions")]
+    if "scopedIdentity" in saved:
+        identity.append(saved["scopedIdentity"])
     if saved["key"] != key or digest(identity) != saved["revision"]:
         raise ValueError("The source topic failed its fingerprint check.")
     return saved
@@ -231,10 +261,11 @@ def collect(db, storage, offline, previous=None):
         due = due_at(file)
         if saved:
             named_at = saved.get("namedAt", saved["checked"])
-            if time.time() - 86400 < named_at and named_at >= identities.get(topic.term, (0,))[0]:
+            if (not saved["crowded"] and not saved.get("scopedIdentity")
+                    and time.time() - 86400 < named_at and named_at >= identities.get(topic.term, (0,))[0]):
                 identities[topic.term] = (named_at, saved)
             # A current name search can also be used to discover newly supported credit rules.
-            if topic.cls and saved.get("discoveryVersion", 1) < 2:
+            if topic.cls and saved.get("discoveryVersion", 1) < 3:
                 attempt = file.with_suffix(".attempt")
                 due = attempt.stat().st_mtime + 900 if attempt.exists() else 0
         pending.append((due, topic.key, topic, file, saved))
@@ -247,7 +278,8 @@ def collect(db, storage, offline, previous=None):
                 updated = capture(topic, seeds, identity=identity[1] if identity else None)
                 replace(file, gzip.compress(json.dumps(updated, ensure_ascii=False).encode(), mtime=0))
                 data = updated
-                identities[topic.term] = (data["namedAt"], data)
+                if not data["crowded"] and not data.get("scopedIdentity"):
+                    identities[topic.term] = (data["namedAt"], data)
             except (OSError, KeyError, ValueError) as error:
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.with_suffix(".attempt").touch()
@@ -256,13 +288,47 @@ def collect(db, storage, offline, previous=None):
             continue
         db.execute("INSERT INTO source_topic VALUES(?,?,?,?)",
                    (key, json.dumps([i for i, _, _ in data["rows"]]), data["crowded"],
-                    bool(topic.cls and data.get("discoveryVersion", 1) < 2)))
+                    bool(topic.cls and data.get("discoveryVersion", 1) < 3)))
         captures.append(data)
     source_vocabulary.collect(db, storage, ((d["key"], vocabulary_terms(d["proposals"])) for d in captures), offline)
     for data in captures:
         for pos, rule in enumerate(pick(db, data["proposals"])):
             db.execute("INSERT INTO source_topic_rule VALUES(?,?,?)", (data["key"], rule, pos))
     return captures
+
+
+def local_credit_rules(db, topic, target):
+    """Find creator credits and creative forms recorded on the same works."""
+    from catalogue import current_count, intersection
+    from current_questions import relationship_wording
+
+    version = db.execute("SELECT format FROM publication").fetchone()[0]
+    credits = json.dumps(CREDITS)
+    properties = [prop for prop, in db.execute("""SELECT value FROM json_each(?) p
+        WHERE EXISTS(SELECT 1 FROM world_link WHERE prop=p.value AND target=?)""", (credits, target))]
+    rules = [f"w-{topic.cls}-{prop}-{target}" for prop in properties]
+    # A work may be catalogued as a book, say, with "novel" recorded on a
+    # separate genre or form statement. Both edges must belong to that work.
+    classified = db.execute("""SELECT m.cls,c.prop,f.prop,count(DISTINCT c.id) AS n
+        FROM json_each(?) p CROSS JOIN world_link c ON (c.prop,c.target)=(p.value,?)
+        CROSS JOIN world_link f ON f.id=c.id AND f.target=? AND f.prop IN (SELECT value FROM json_each(?))
+        CROSS JOIN world_member m ON m.id=c.id
+        GROUP BY m.cls,c.prop,f.prop HAVING n>=2 ORDER BY n DESC,m.cls,c.prop,f.prop LIMIT ?""",
+        (credits, target, topic.cls, json.dumps(CLASSIFICATIONS), MAX_NAMES))
+    for cls, credit, basis, _ in classified:
+        rules.append("and:" + "+".join(sorted([f"w-{cls}-{credit}-{target}", f"w-{cls}-{basis}-{topic.cls}"])))
+    for key in rules:
+        wording = relationship_wording(db, key)
+        if not wording or len(wording[0]) > 240:
+            continue
+        count = 0
+        if key.startswith("and:"):
+            query, args, _ = intersection(db, key[4:].split("+"))
+            count = db.execute(f"SELECT count(*) FROM ({query})", args).fetchone()[0]
+        # Recheck membership against the published edition, including any later withdrawals.
+        count = current_count(db, key, count, version)
+        if count >= 2:
+            yield key, count, wording[0]
 
 
 def published_credits(db, topic):
@@ -278,16 +344,64 @@ def published_credits(db, topic):
         ids = [int(qid[1])]
     else:
         # A folded alias alone cannot identify names with significant punctuation.
-        ids = [i for i, label in db.execute("""SELECT t.id,t.name FROM current_target_name n
-               JOIN current_target t ON t.id=n.target WHERE n.term=? AND n.preferred=1""",
-               (folded_spelling(topic.term),)) if spelling(label) == topic.term]
+        # Keep every matching identity, including an archived namesake of a recently checked target.
+        rows = db.execute("""SELECT DISTINCT n.target,coalesce(t.name,i.name) FROM world_target_name n
+            LEFT JOIN current_target t ON t.id=n.target LEFT JOIN item i ON i.id=n.target
+            WHERE n.term=? AND n.preferred=1""", (folded_spelling(topic.term),))
+        ids = sorted({i for i, name in rows if name and spelling(name) == topic.term})
     if not 1 <= len(ids) <= MAX_NAMES:
         return [], []
     keys = [f"w-{topic.cls}-{prop}-{target}" for target in ids for prop in CREDITS]
     matches = db.execute("""SELECT q.rule,l.n,q.prompt FROM json_each(?) wanted
         CROSS JOIN current_question q ON q.rule=wanted.value CROSS JOIN live_rule l ON l.key=q.rule
         WHERE l.n>=2 ORDER BY l.n DESC,q.prompt,q.rule LIMIT ?""", (json.dumps(keys), MAX_NAMES)).fetchall()
-    return ids, matches
+    known = {key: (key, n, prompt) for key, n, prompt in matches}
+    for target in ids:
+        for key, n, prompt in local_credit_rules(db, topic, target):
+            known.setdefault(key, (key, n, prompt))
+    return ids, sorted(known.values(), key=lambda row: (-row[1], row[2], row[0]))[:MAX_NAMES]
+
+
+def credit_card(db, topic, key, prompt, count, edition):
+    """Use shorter wording when the publication proves that both rules have the same named members."""
+    from watched_rules import predicates
+    if key.startswith("and:") and db.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='work_form_match'"
+    ).fetchone():
+        conditions = predicates(key)
+        if any(pid == 7937 and value == topic.cls for _, pid, value in conditions):
+            for _, pid, target in conditions:
+                if pid in CREDITS:
+                    simple = f"w-{topic.cls}-{pid}-{target}"
+                    # Each matching row below came from this specific compound rule.
+                    # Its full roster must be present and the simpler rule may add no other members.
+                    equal = db.execute("""SELECT prompt FROM current_question WHERE rule=? AND n=?
+                        AND n=(SELECT count(*) FROM work_form_match WHERE rule=? AND origin=?)""",
+                        (simple, count, simple, key)).fetchone()
+                    if equal:
+                        key, prompt = simple, equal[0]
+    return dict(key=key, prompt=prompt, records=count, edition=edition, complete=False)
+
+
+def verified_credit_choices(db, topic, prop, edition):
+    """Reuse the source's identified creators when an explicit credit has several namesakes."""
+    from watched_rules import predicates
+    if prop not in CREDITS:
+        return []
+    row = db.execute("SELECT ids FROM source_topic WHERE key=? AND crowded=0", (topic.key,)).fetchone()
+    if not row:
+        return []
+    targets = set(json.loads(row[0]))
+    result = []
+    for key, prompt, count in db.execute("""SELECT q.rule,q.prompt,l.n FROM source_topic_rule t
+            JOIN current_question q USING(rule) JOIN live_rule l ON l.key=q.rule
+            WHERE t.topic=? AND l.n>0 ORDER BY t.position""", (topic.key,)):
+        conditions = predicates(key)
+        if (any(pid == prop and target in targets for _, pid, target in conditions)
+                and any(cls == topic.cls or (pid in CLASSIFICATIONS and target == topic.cls)
+                        for cls, pid, target in conditions)):
+            result.append(credit_card(db, topic, key, prompt, count, edition))
+    return result
 
 
 def choices(db, topic, edition):
@@ -305,8 +419,12 @@ def choices(db, topic, edition):
         ids, rows = published_credits(db, topic)
         if not rows:
             raise UnverifiedRule(topic.key, "This edition has not searched for question subjects and credits for this topic.")
-    cards = [dict(key=key, prompt=prompt, edition=edition, records=n, complete=False)
-             for key, n, prompt in rows if prompt and n is not None and n >= 2]
+    by_rule = {}
+    for key, n, prompt in rows:
+        if prompt and n is not None and n >= 2:
+            card = credit_card(db, topic, key, prompt, n, edition)
+            by_rule.setdefault(card["key"], card)
+    cards = list(by_rule.values())
     note = "Choose a question to play with its documented answers."
     if topic.cls and cards:
         from watched_rules import predicates
@@ -326,7 +444,7 @@ def choices(db, topic, edition):
             details.append(f"Q{i} ({hint[0]})" if hint else f"Q{i}")
         note = "Several entities share this name. " + ", ".join(details) + ". " + note
     if cards:
-        raise DateChoices(cards, note)
+        raise DateChoices(cards, note, refresh=topic.key if row is None else None)
     pending = [key for key, n, _ in rows if n is None]
     if pending:
         raise UnverifiedRule(topic.key, "The builder is checking the answer lists for this topic.")

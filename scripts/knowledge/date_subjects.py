@@ -105,8 +105,8 @@ def install(db, storage, classes, previous=None):
     return digest(used)
 
 
-def resolve(db, subject):
-    historical = identifiers(db, subject, "class")
+def resolve(db, subject, *, literal=None):
+    historical = identifiers(db, subject, "class", literal=literal)
     current_schema = db.execute("SELECT 1 FROM sqlite_master WHERE name='date_subject_name'").fetchone()
     if tagged := re.fullmatch(r"(.+) q([1-9]\d{0,11})", subject):
         cls = int(tagged[2])

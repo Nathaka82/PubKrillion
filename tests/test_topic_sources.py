@@ -41,6 +41,49 @@ class SourceTopics(unittest.TestCase):
     def publish(self):
         return catalogue.build(self.world, self.pub, self.root, include_bundled=False, offline=True)
 
+    def test_uncached_credits_preserve_literal_class_names_roles_and_individual_evidence(self):
+        with closing(sqlite3.connect(self.world)) as db:
+            db.execute("UPDATE entity SET names=names||char(9)||'folio' WHERE id=10")
+            db.execute("UPDATE entity SET names=names||char(9)||'.folio' WHERE id=12")
+            db.execute("INSERT INTO property VALUES(86,'composer'),(136,'genre')")
+            db.execute("INSERT INTO entity VALUES(90,'Copper House'),(95,'story'),(96,'Alternate Writer')")
+            db.executemany("INSERT INTO triple VALUES(?,?,?)",
+                [(90,31,95),(1,50,90),(2,50,90),(3,50,90),(4,86,90),(5,86,90),
+                 (6,50,90),(1,136,95),(2,136,95),(7,136,95),(7,50,96)])
+            db.commit()
+        self.publish()
+        followed = []
+        def suggest(db, idea):
+            return ideas.published_suggestions(db, {"idea": idea, "completeOnly": False}, follow_topic=followed.append)
+        with closing(catalogue.reader(self.pub)) as db, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            self.assertEqual(catalogue.match_question(db, "Name a folio")["key"], "type:Q10")
+            self.assertEqual(catalogue.match_question(db, "Name a .folio")["key"], "type:Q12")
+            self.assertEqual(catalogue.match_question(db, "Name a .folio written by Copper House")["key"], "w-12-50-90")
+            cards = suggest(db, "Name a folio by Copper House")
+            self.assertEqual({c["key"] for c in cards}, {"w-10-50-90", "w-10-86-90"})
+            self.assertEqual(followed, [topics.Topic("copper house", 10).key])
+            form, = suggest(db, "Name a story by Copper House")
+            self.assertEqual(form["key"], "and:w-10-136-95+w-10-50-90")
+            self.assertEqual({c["complete"] for c in [*cards, form]}, {False})
+            for card in [*cards, form]:
+                self.assertEqual(catalogue.match_question(db, card["prompt"])["key"], card["key"])
+                bank, _ = catalogue.play(db, game, card["key"], card["prompt"])
+                seen = list(game.execute("SELECT entity,evidence FROM kb_member WHERE bank=?", (bank,)))
+                expected = {"w-10-50-90": {1, 2, 3}, "w-10-86-90": {4, 5}, form["key"]: {1, 2}}
+                self.assertEqual({eid for eid, _ in seen}, {f"wd:Q{i}" for i in expected[card["key"]]})
+                for _, evidence in seen:
+                    for _, prop, _ in watched_rules.predicates(card["key"]):
+                        self.assertIn(f"#P{prop}", evidence)
+        with closing(sqlite3.connect(self.pub)) as db:
+            db.execute("INSERT INTO live_rule VALUES('w-10-50-90','withdrawal',100,0,?)",
+                       (gzip.compress(b'{"rows":[]}'),))
+            db.commit()
+        with closing(catalogue.reader(self.pub)) as db:
+            self.assertEqual([c["key"] for c in suggest(db, "folios by Copper House")], ["w-10-86-90"])
+            with self.assertRaises(catalogue.UnverifiedRule):
+                suggest(db, "Name a story by Copper House")
+
     def test_topic_to_two_identities_to_verified_playable_answers(self):
         topic = topics.Topic("cedar")
         with closing(catalogue.reader(self.pub)) as db:
@@ -96,6 +139,62 @@ class SourceTopics(unittest.TestCase):
                 self.assertEqual(catalogue.match_question(db, card["prompt"])["key"], card["key"])
                 bank, _ = catalogue.play(db, game, card["key"], card["prompt"], card["edition"])
                 self.assertEqual(game.execute("SELECT count(*) FROM kb_member WHERE bank=?", (bank,)).fetchone()[0], 3)
+
+    def test_many_namesakes_are_checked_per_credit_without_reusing_scoped_identities(self):
+        forms = {i: [i, "Cedar", []] for i in range(801, 809)}
+        scopes = [(topics.Topic("cedar", 10), 801), (topics.Topic("cedar", 12), 802)]
+        def facts(query):
+            if "GROUP BY ?target HAVING" in query:
+                self.assertIn("VALUES ?credit", query)
+                self.assertIn("wd:Q808", query)
+                owner = 801 if "wd:Q10 " in query else 802
+                return [{"target": binding("Q", owner), "n": {"value": "5"}}]
+            cls = 10 if "wd:Q801 " in query else 12
+            return [{"property": binding("P", 50), "class": binding("Q", cls), "n": {"value": "5"}}]
+        for topic, _ in scopes:
+            self.assertTrue(watched_rules.follow(self.root, topic.key))
+        with (closing(sqlite3.connect(":memory:")) as db,
+              patch.object(topics, "named_candidates", return_value=(forms, False)) as names,
+              patch.object(topics, "bindings", side_effect=facts)):
+            db.execute("ATTACH DATABASE ? AS world", (str(self.world),))
+            db.executescript(topics.SCHEMA)
+            topics.collect(db, self.root, offline=False)
+            self.assertEqual(names.call_count, 2)
+            for topic, expected in scopes:
+                saved = topics.read_capture(topics.cache_path(self.root, topic.key), topic.key)
+                self.assertTrue(saved["scopedIdentity"])
+                self.assertEqual(saved["rows"], [forms[expected]])
+                self.assertEqual(saved["proposals"], [[topic.cls, 50, expected, 5]])
+        with (patch.object(topics, "named_candidates", return_value=(forms, True)),
+              patch.object(topics, "bindings", side_effect=AssertionError("incomplete name search"))):
+            self.assertTrue(topics.capture(scopes[0][0])["crowded"])
+
+    def test_explicit_credit_reuses_only_the_matching_role_and_equivalent_form_roster(self):
+        topic = topics.Topic("cedar", 10)
+        simple = "w-10-50-801"
+        compound = "and:w-12-50-801+w-12-7937-10"
+        complex_prompt = "Name an other written by Cedar and in the form of Work"
+        with closing(sqlite3.connect(self.pub)) as db:
+            db.execute("INSERT INTO source_topic VALUES(?,?,0,0)", (topic.key, "[801,802]"))
+            db.executemany("INSERT INTO source_topic_rule VALUES(?,?,?)",
+                           [(topic.key, compound, 0), (topic.key, "w-10-57-802", 1)])
+            db.executemany("INSERT INTO live_rule VALUES(?,'test',1,2,?)",
+                           [(compound, b"fixture"), ("w-10-57-802", b"fixture")])
+            db.executemany("INSERT INTO current_question VALUES(?,?,2)",
+                           [(simple, "Name a work written by Cedar"), (compound, complex_prompt),
+                            ("w-10-57-802", "Name a work directed by Cedar")])
+            db.executemany("INSERT INTO work_form_match VALUES(?,?,?)",
+                           [(simple, 1, compound), (simple, 2, compound)])
+            def keys():
+                return [c["key"] for c in topics.verified_credit_choices(db, topic, 50, "edition")]
+            self.assertEqual(keys(), [simple])
+            db.execute("UPDATE current_question SET n=3 WHERE rule=?", (simple,))
+            self.assertEqual(keys(), [compound])
+            db.execute("UPDATE current_question SET n=2 WHERE rule=?", (simple,))
+            db.execute("DELETE FROM work_form_match WHERE id=1")
+            self.assertEqual(keys(), [compound])
+            db.execute("UPDATE live_rule SET n=0 WHERE key=?", (compound,))
+            self.assertEqual(keys(), [])
 
     def test_credit_keeps_the_requested_subject_or_offers_a_revised_question(self):
         with closing(catalogue.reader(self.pub)) as db:
