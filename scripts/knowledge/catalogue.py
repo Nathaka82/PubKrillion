@@ -18,7 +18,7 @@ from sources import AGENT, bootstrap, import_file
 from world_index import SOURCE, index_path, install
 
 FORMAT = int(Path(__file__).with_name("catalogue-format").read_text(encoding="ascii"))
-RULE_REVISION = "named-subject-classification-2"
+RULE_REVISION = "discover-relationship-overlap-1"
 WORLD_TABLES = ("item", "predicate", "pattern", "topic", "world_homonym", "world_member")
 
 
@@ -1341,7 +1341,7 @@ def prepare_bank(db, game, key, prompt, release):
         query,args = members(db,cls,prop,target)
         if release[1] >= 29:
             from scope_evidence import with_archived_edge
-            query,args = with_archived_edge(key,query,args)
+            query,args = with_archived_edge(db,key,query,args)
     else:
         rule = db.execute("""SELECT c.name,r.name,t.name FROM pattern p JOIN item c ON c.id=p.cls
         JOIN predicate r ON r.id=p.prop JOIN item t ON t.id=p.target WHERE cls=? AND prop=? AND target=?""",

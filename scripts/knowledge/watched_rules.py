@@ -210,6 +210,14 @@ def discovered_requests(storage, publication, *, include_topics=False, retained_
             if include_topics and prior.execute("SELECT 1 FROM sqlite_master WHERE name='source_topic_rule'").fetchone():
                 sql += " UNION SELECT rule FROM source_topic_rule"
             keys = {row[0] for row in prior.execute(sql)}
+            if prior.execute("SELECT 1 FROM sqlite_master WHERE name='scope_witness'").fetchone():
+                # Retain the source evidence while exploring the next overlap.
+                keys.update(key for key, in prior.execute("SELECT key FROM live_rule WHERE key GLOB 'and:*'"))
+                if prior.execute("SELECT 1 FROM sqlite_master WHERE name='relationship_proposal'").fetchone():
+                    keys.update(key for key, in prior.execute("SELECT rule FROM relationship_proposal"))
+                else:
+                    from scope_evidence import proposals
+                    keys.update(proposals(prior))
             if prior.execute("SELECT 1 FROM sqlite_master WHERE name='work_form_scope'").fetchone():
                 from work_forms import subscriptions
                 keys.update(subscriptions(prior,(key for key,_ in rule_keys(storage))))

@@ -230,7 +230,7 @@ def joined_release(db, keys, query, args):
             for origin,revision,checked,blob in scope_evidence.origins(db,key):
                 captures.append((origin,revision,checked,json.loads(gzip.decompress(blob))["rows"]))
                 inherited = True
-            extra, values = scope_evidence.classified_edges(key)
+            extra, values = scope_evidence.classified_edges(db, key)
             for item, cls, origin, revision, checked in db.execute(f"""SELECT x.id,x.cls,x.origin,l.revision,l.captured
                     FROM ({extra}) x JOIN live_rule l ON l.key=x.origin ORDER BY l.captured DESC,x.origin""", values):
                 class_evidence.setdefault((key, "Q" + str(item)), {

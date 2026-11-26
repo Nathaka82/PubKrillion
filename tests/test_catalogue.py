@@ -739,6 +739,47 @@ class CatalogueTests(unittest.TestCase):
                     play(db,game,both(publisher,genre),"Name a work in the genre Genre published by Studio")
                 self.assertEqual(game.execute("SELECT count(*) FROM kb_member WHERE bank=?",(old,)).fetchone()[0],7)
 
+    def test_builder_discovers_incomplete_relationships_and_checks_the_whole_roster(self):
+        import gzip
+        from graph import digest
+        from scope_evidence import proposals
+        anchor, second = "w-10-123-11", "w-10-50-13"
+        compound = "and:" + "+".join(sorted((anchor, second)))
+        with closing(sqlite3.connect(self.world)) as world, world:
+            world.executescript("""
+                INSERT INTO entity VALUES(13,'Creator');
+                INSERT INTO property VALUES(50,'author');
+                INSERT INTO triple VALUES(1,50,13),(2,50,13);
+            """)
+        def save(path, key, ids):
+            rows = [[f"Q{i}", f"Work {i}", []] for i in ids]
+            watched_rules.replace(path, gzip.compress(json.dumps(dict(key=key, rows=rows,
+                revision=digest([key,rows]), captured=1000)).encode()))
+        watched_rules.follow(self.root, anchor)
+        save(dict(watched_rules.requests(self.root))[anchor], anchor, (1,2,3,4,5))
+        self.publish()
+        requests = dict(watched_rules.discovered_requests(self.root,self.published))
+        self.assertIn(compound, requests)
+        self.assertNotIn(compound, dict(watched_rules.requests(self.root)))
+        with closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            def members(db):
+                bank, _ = catalogue.play(db,game,second,"Name a work whose author is Creator")
+                return {r[0] for r in game.execute("SELECT entity FROM kb_member WHERE bank=?", (bank,))}
+            with closing(catalogue.reader(self.published)) as db:
+                self.assertIn(compound, proposals(db))
+                self.assertEqual(members(db), {"wd:Q1","wd:Q2"})
+            save(requests[compound], compound, (1,2,3))
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                self.assertNotIn(compound, proposals(db))
+                self.assertEqual(members(db), {"wd:Q1","wd:Q2","wd:Q3"})
+            self.assertIn(compound, dict(watched_rules.discovered_requests(self.root,self.published)))
+            save(requests[compound], compound, ())
+            self.publish()
+            with closing(catalogue.reader(self.published)) as db:
+                self.assertEqual(members(db), {"wd:Q1","wd:Q2"})
+
     def test_independent_classification_and_archived_relationship_join_on_the_entity(self):
         import gzip
         from graph import digest
@@ -774,6 +815,13 @@ class CatalogueTests(unittest.TestCase):
                 both = "and:" + "+".join(sorted((director,publisher)))
                 joined, _ = catalogue.play(db, game, both, "Name a work directed by Creator and published by Studio")
                 self.assertEqual([r[0] for r in game.execute("SELECT entity FROM kb_member WHERE bank=?", (joined,))], ["wd:Q8"])
+                db.execute("CREATE TEMP TABLE current_class AS SELECT * FROM main.current_class")
+                db.execute("CREATE TEMP TABLE current_unnamed AS SELECT * FROM main.current_unnamed")
+                db.execute("INSERT INTO current_class VALUES('type:Q14','later',2000,0,1)")
+                db.execute("INSERT INTO current_unnamed VALUES('type:Q14',8)")
+                self.assertEqual(catalogue.current_count(db, publisher, 0, catalogue.FORMAT), 6)
+                db.execute("UPDATE current_unnamed SET id=9")
+                self.assertEqual(catalogue.current_count(db, publisher, 0, catalogue.FORMAT), 5)
             capture(director, [(8, "Unclassified title"), (9, "Other title")])
             self.publish()
             with closing(catalogue.reader(self.published)) as db:
