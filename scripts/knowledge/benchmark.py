@@ -28,6 +28,20 @@ def questions(dataset):
             yield entry["id"], prompt, expected
 
 
+def bank_members(game, bank):
+    members = set()
+    name_count = 0
+    for owner, evidence in game.execute("SELECT entity,evidence FROM kb_member WHERE bank=?", (bank,)):
+        name_count += 1
+        members.add(owner.removeprefix("wd:"))
+        # Several qualifying items can share one playable name. Their original
+        # membership records survive in the evidence for the merged display row.
+        for fact in json.loads(evidence):
+            if "classes" in fact and "entity" in fact:
+                members.add(fact["entity"].removeprefix("wd:"))
+    return members, name_count
+
+
 def compare(db, game, prompt, reference):
     request = {"idea": prompt, "direct": False, "completeOnly": False}
     try:
@@ -45,8 +59,8 @@ def compare(db, game, prompt, reference):
         bank, _ = catalogue.play(db, game, card["key"], card["prompt"])
     except ValueError as error:
         return {"status": "compile_error", "reason": str(error)}
-    members = {r[0].removeprefix("wd:") for r in game.execute("SELECT entity FROM kb_member WHERE bank=?", (bank,))}
-    return {"status": "compiled", "prompt": card["prompt"], "rule": card["key"], "members": len(members),
+    members, names = bank_members(game, bank)
+    return {"status": "compiled", "prompt": card["prompt"], "rule": card["key"], "members": len(members), "names": names,
             "exact": members == reference, "missing": sorted(reference - members), "extra": sorted(members - reference)}
 
 
@@ -65,7 +79,7 @@ def main():
             counts["questions"] += 1
             counts[result["status"]] += 1
             if result["status"] == "compiled":
-                counts["multi_answer"] += result["members"] >= 2
+                counts["multi_answer"] += result["names"] >= 2
                 counts["exact"] += result["exact"]
                 counts["contains_all_reference"] += not result["missing"]
             if args.details:

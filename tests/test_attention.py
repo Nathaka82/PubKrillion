@@ -141,6 +141,12 @@ class ReadershipTests(unittest.TestCase):
             self.assertEqual(tiers["Shared A"], 2)
             self.assertEqual(tiers["Shared B"], 2)
             self.assertEqual(tiers["Film 3"], 4)
+            self.assertEqual(game.execute("""SELECT form,entity,depth FROM kb_answer_key
+                WHERE bank=? AND term='shared a' ORDER BY form""",(bank,)).fetchall(), [(0,"",2),(1,"",2)])
+            from benchmark import bank_members
+            members, names = bank_members(game, bank)
+            self.assertEqual(members, {film["id"].removeprefix("wd:") for film in films})
+            self.assertEqual(names, len({film["name"] for film in films}))
 
     def test_top_readership_estimates_respect_missing_owners_ties_surveys_and_the_combined_cap(
         self,
