@@ -117,7 +117,44 @@ def publish(db, path, expected):
     db.execute("DETACH DATABASE attention_source")
 
 
-def score(graph, publication, size):
+def add_registry_readership(graph, publication, register, revision, url):
+    if not graph.execute("SELECT 1 FROM sqlite_master WHERE name='readership_item'").fetchone():
+        return
+    # Retain the register's stable answer ID. A conflicting identity or an item
+    # already represented by a qualifying Wikidata entity must not supply views twice.
+    links = graph.execute("""WITH linked AS (
+            SELECT x.id,min(x.item) item,min(x.url) url FROM readership_item x
+            CROSS JOIN qualified q ON q.id=x.id
+            WHERE (:register IS NULL OR x.source=:register)
+                AND q.id<>'wd:Q'||CAST(substr(q.id,5) AS INTEGER)
+            GROUP BY x.id HAVING min(x.item)=max(x.item)
+        ) SELECT min(id),item,min(url) FROM linked
+            WHERE NOT EXISTS (SELECT 1 FROM qualified q WHERE q.id='wd:Q'||linked.item)
+            GROUP BY item HAVING count(*)=1""", {"register": register})
+    has_items = publication.execute("SELECT 1 FROM sqlite_master WHERE name='item'").fetchone()
+    incoming = "(SELECT incoming FROM item WHERE id=r.id)" if has_items else "NULL"
+    mapped_count = 0
+    while batch := links.fetchmany(500):
+        observations = publication.execute(f"""SELECT r.id,r.views,{incoming}
+            FROM json_each(?) j CROSS JOIN readership r ON r.id=j.value""",
+            (json.dumps([row[1] for row in batch]),))
+        values = {item: (views, count) for item, views, count in observations}
+        mapped_count += len(values)
+        graph.executemany("INSERT INTO answer_views VALUES(?,?,?,?,?)",
+            ((entity, values[item][0], item, values[item][1], identity_url)
+             for entity, item, identity_url in batch if item in values))
+    if mapped_count:
+        graph.execute("""WITH proofs AS (
+            SELECT owner,json_group_array(json_object('item','Q'||item,'url',identity_url,'views',views)) items
+            FROM (SELECT q.owner,v.item,v.identity_url,v.views FROM answer_views v
+                CROSS JOIN qualified q ON q.id=v.id WHERE v.identity_url IS NOT NULL ORDER BY q.owner,v.item)
+            GROUP BY owner
+        ) UPDATE result SET evidence=json_insert(evidence,'$[#]',json_object('source','Wikidata QRank',
+            'url',?,'revision',?,'readershipItems',json(proofs.items))) FROM proofs
+            WHERE result.id=proofs.owner AND result.upper IS NULL""", (url, revision))
+
+
+def score(graph, publication, size, *, register=None):
     """Measure only already-qualified answer names. An unlisted QID has unknown readership."""
     if publication is None or not publication.execute(
         "SELECT 1 FROM sqlite_master WHERE name='readership_release'"
@@ -128,16 +165,19 @@ def score(graph, publication, size):
         return None
     graph.executescript("""DROP TABLE IF EXISTS temp.answer_views;
         DROP TABLE IF EXISTS temp.name_views;
-        CREATE TEMP TABLE answer_views(id TEXT PRIMARY KEY,views INTEGER NOT NULL) WITHOUT ROWID;""")
+        CREATE TEMP TABLE answer_views(id TEXT PRIMARY KEY,views INTEGER NOT NULL,item INTEGER,
+            incoming INTEGER,identity_url TEXT) WITHOUT ROWID;""")
     items = graph.execute("""SELECT CAST(substr(id,5) AS INTEGER) FROM qualified
         WHERE id='wd:Q'||CAST(substr(id,5) AS INTEGER)""")
     while batch := items.fetchmany(500):
         matches = publication.execute("""SELECT 'wd:Q'||r.id,r.views FROM json_each(?) j
             CROSS JOIN readership r ON r.id=j.value""", (json.dumps([r[0] for r in batch]),))
-        graph.executemany("INSERT INTO answer_views VALUES(?,?)", matches)
+        graph.executemany("INSERT INTO answer_views(id,views) VALUES(?,?)", matches)
+    add_registry_readership(graph, publication, register, info[0], info[1])
     graph.execute("""CREATE TEMP TABLE name_views AS
         SELECT q.owner,max(v.views) views,sum(v.views) total_views,count(v.views)=count(*) complete,
-            min(coalesce((SELECT max(g.incoming) FROM graph_familiarity g WHERE g.id=q.id),0) BETWEEN 1 AND 6) sparse
+            min(max(coalesce((SELECT max(g.incoming) FROM graph_familiarity g WHERE g.id=q.id),0),
+                coalesce(v.incoming,0)) BETWEEN 1 AND 6) sparse
         FROM qualified q LEFT JOIN answer_views v USING(id) GROUP BY q.owner HAVING count(v.views)>0""")
     covered, full = graph.execute("SELECT count(*),coalesce(sum(complete),0) FROM name_views").fetchone()
     if not covered:

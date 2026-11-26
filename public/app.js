@@ -811,6 +811,13 @@ function evidenceLinks(evidence) {
   const items = new Set();
   const link = (url, label) => '<li><a target="_blank" rel="noopener noreferrer" href="' + esc(url) + '">' + label + '</a></li>';
   for (const record of evidence) {
+    if (record.readershipItems?.length && record.url) {
+      items.add(link(record.url, "Wikimedia readership over 52 weeks"));
+      for (const entry of record.readershipItems) {
+        items.add(link(entry.url, esc(entry.item) + " · " + Number(entry.views).toLocaleString() + " page views"));
+      }
+      continue;
+    }
     if (record.relationshipLabel && record.targetLabel && record.url) {
       items.add(link(record.url, esc(record.relationshipLabel) + " · <bdi>" + esc(record.targetLabel) + "</bdi>"));
       continue;

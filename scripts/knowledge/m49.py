@@ -8,6 +8,7 @@ from collections import defaultdict
 from html.parser import HTMLParser
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from urllib.parse import urlencode
 
 from graph import digest, ingest
 from sources import DATA, fetch
@@ -84,6 +85,21 @@ def cldr_names():
     return {"territories": territories, "codes": codes}
 
 
+def wikidata_codes():
+    query = "SELECT DISTINCT ?i ?two ?three ?numeric WHERE { ?i wdt:P297 ?two; wdt:P298 ?three; wdt:P299 ?numeric. }"
+    data = json.loads(fetch("https://query.wikidata.org/sparql?" + urlencode({"query": query, "format": "json"}),
+                            limit=2_000_000))
+    result = set()
+    for row in data["results"]["bindings"]:
+        item = re.fullmatch(r"https?://www.wikidata.org/entity/(Q[1-9]\d{0,11})", row["i"]["value"])
+        if not item:
+            raise ValueError("Invalid Wikidata identity in the country code export.")
+        result.add((row["two"]["value"], row["three"]["value"], row["numeric"]["value"], item[1]))
+    if not result:
+        raise ValueError("Empty Wikidata country code export.")
+    return sorted(result)
+
+
 def records(tables):
     if set(tables) != set(LANGUAGES):
         raise ValueError("Missing M49 language edition.")
@@ -126,7 +142,7 @@ def records(tables):
 
 
 def load(db, export):
-    revision = digest(["m49-v2", export])
+    revision = digest(["m49-v3", export])
     if db.execute("SELECT 1 FROM source WHERE id=? AND revision=?", (SOURCE, revision)).fetchone():
         return
     areas, regions = records(export["tables"])
@@ -139,6 +155,11 @@ def load(db, export):
     counts = defaultdict(int)
     rows = []
     parents = set()
+    by_code, by_item = defaultdict(set), defaultdict(set)
+    for two, three, numeric, item in export.get("wikidata", ()):
+        # A source that gives an item multiple code triples cannot establish a unique identity.
+        by_item[item].add((two, three, numeric))
+        by_code[two, three, numeric].add(item)
     for code, (two, three, groups, labels) in sorted(areas.items()):
         classes = [SUBJECT]
         for key in groups:
@@ -156,10 +177,16 @@ def load(db, export):
         if (mapping.get("_numeric"), mapping.get("_alpha3")) == (code, three):
             common = {value for tag, value in display_names.items() if tag == two or tag.startswith(two + "-alt-")}
         extra = sorted(common.difference(labels.values()))
-        rows.append({"id": "un-m49:" + code, "name": labels["EN"],
-                     "aliases": sorted({*labels.values(), *common, two, three}), "types": classes,
-                     "nameSources": [{"source": "Unicode CLDR", "url": CLDR, "identity": f"ISO {two} / {three}, M49 {code}",
-                                      "names": extra}] if extra else []})
+        record = {"id": "un-m49:" + code, "name": labels["EN"],
+                  "aliases": sorted({*labels.values(), *common, two, three}), "types": classes,
+                  "nameSources": [{"source": "Unicode CLDR", "url": CLDR, "identity": f"ISO {two} / {three}, M49 {code}",
+                                   "names": extra}] if extra else []}
+        matches = by_code[two, three, code]
+        if len(matches) == 1:
+            item = next(iter(matches))
+            if len(by_item[item]) == 1:
+                record["readershipItem"] = {"item": item, "url": "https://www.wikidata.org/wiki/" + item + "#P299"}
+        rows.append(record)
     ingest(db, {"source": SOURCE, "url": URL, "revision": revision, "suggestFor": suggested,
                 "terms": terms, "parents": sorted(parents), "census": counts}, rows)
 
@@ -178,6 +205,12 @@ def refresh(db, cache, offline):
             names = {key: saved[key] for key in ("territories", "codes")}
             print(f"CLDR refresh deferred; matching prior names against the new region codes: {error}", flush=True)
         export = {"tables": tables, **names}
+        try:
+            export["wikidata"] = wikidata_codes()
+        except (OSError, KeyError, TypeError, ValueError) as error:
+            saved = json.loads(gzip.decompress(prior.read_bytes()))
+            export["wikidata"] = saved.get("wikidata", [])
+            print(f"Wikidata readership links deferred; checking stored identifiers: {error}", flush=True)
         load(db, export)
     except (OSError, KeyError, TypeError, ValueError) as error:
         load(db, json.loads(gzip.decompress(prior.read_bytes())))

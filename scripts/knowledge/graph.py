@@ -89,6 +89,9 @@ CREATE INDEX IF NOT EXISTS entity_id ON entity(id);
 CREATE TABLE IF NOT EXISTS entity_name(source TEXT,term TEXT,id TEXT,PRIMARY KEY(source,term,id)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS entity_name_lookup ON entity_name(term,id);
 CREATE TABLE IF NOT EXISTS entity_name_proof(source TEXT,id TEXT,proof TEXT NOT NULL,PRIMARY KEY(source,id)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS readership_item(source TEXT,id TEXT,item INTEGER NOT NULL,url TEXT NOT NULL,
+    PRIMARY KEY(source,id), UNIQUE(source,item)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS readership_item_by_entity ON readership_item(id,item);
 CREATE TABLE IF NOT EXISTS suggested_scope(term TEXT,source TEXT,class TEXT,PRIMARY KEY(term,source,class)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS member(source TEXT, class TEXT, id TEXT, PRIMARY KEY(source,class,id)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS member_class ON member(class,id);
@@ -211,6 +214,7 @@ def ingest(db, src, rows, *, index_names=True):
             "entity",
             "entity_name",
             "entity_name_proof",
+            "readership_item",
             "suggested_scope",
             "term",
             "term_display",
@@ -278,6 +282,11 @@ def ingest(db, src, rows, *, index_names=True):
                     proofs.append({"source": label(claim["source"]), "url": web_url(claim["url"]),
                                    "identity": label(claim["identity"]), "names": forms})
                 db.execute("INSERT INTO entity_name_proof VALUES(?,?,?)", (sid, eid, json.dumps(proofs)))
+            if metric := r.get("readershipItem"):
+                qid = re.fullmatch(r"Q([1-9]\d{0,11})", metric["item"])
+                if not qid:
+                    raise ValueError("Invalid Wikidata readership item.")
+                db.execute("INSERT INTO readership_item VALUES(?,?,?,?)", (sid, eid, int(qid[1]), web_url(metric["url"])))
             for c in set(r.get("types", [])):
                 db.execute("INSERT INTO member VALUES(?,?,?)", (sid, label(c), eid))
             for f in r.get("facts", []):

@@ -130,6 +130,8 @@ The publisher checks every entry and requires exactly one value for each declare
 
 A register can use `suggestFor` to associate broad host wording with a more precise question. Its keys identify classes in the declared census and its values list phrases. For example, “country in South America” offers the UN M49 country-or-area scope. The host sees the definition before play. For names joined from a second provider, an entity’s `nameSources` entries record the publisher, URL, matching identifier and spellings. The answer browser includes the citation with that entity.
 
+A register can attach a verified Wikidata identity through `readershipItem` with an `item` and evidence `url`. The UN M49 adapter checks the two ISO letter codes and the numeric code together. Each triple must identify one Wikidata item and each item must have one triple. The compiler uses this link for readership and graph familiarity. UN identifiers continue to determine membership. The answer browser links to the matching item and the readership release. Missing or conflicting links leave the entity eligible with unknown readership.
+
 ```json
 {
   "source": "dairy-register",

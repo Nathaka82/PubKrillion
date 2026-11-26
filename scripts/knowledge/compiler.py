@@ -758,7 +758,7 @@ def evaluate(db, game, prompt, plan=None, *, outside_names=(), name_edition=None
         WHEN ranks.low<=0.25 THEN 3 ELSE 2 END FROM ranks
         WHERE result.id=ranks.id AND ranks.n>=12 AND result.depth=2 AND result.upper IS NULL""")
     import attention
-    readership = attention.score(db,name_catalogue,size)
+    readership = attention.score(db, name_catalogue, size, register=plan.get("register"))
     # A partial survey can cap the bonus that indirect signals give a shared name.
     partial = db.execute("SELECT id,survey_total FROM result WHERE upper IS NULL AND survey_total>0")
     db.executemany("UPDATE result SET depth=min(depth,?) WHERE id=?",

@@ -23,6 +23,25 @@ class ReadershipTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
 
+    def test_cross_register_conflicts_and_native_ids_do_not_double_count_readership(self):
+        with closing(open_graph(":memory:")) as graph, closing(sqlite3.connect(":memory:")) as game:
+            game.executescript((ROOT / "server/knowledge.sql").read_text())
+            graph.executescript(attention.SCHEMA)
+            graph.execute("INSERT INTO readership_release VALUES('release','https://example.org/rank',5)")
+            graph.executemany("INSERT INTO readership VALUES(?,?)", [(i, i * 100) for i in range(1, 6)])
+            for source, pairs in [("one", [("aa", 1), ("bb", 2), ("cc", 3), ("dd", 4), ("wd:Q2", None)]),
+                                  ("two", [("aa", 5), ("ee", 3)])]:
+                rows = [{"id": eid, "name": eid, "types": ["work"],
+                         **({"readershipItem": {"item": f"Q{item}", "url": "https://example.org/id"}} if item else {})}
+                        for eid, item in pairs]
+                ingest(graph, {"source": source, "revision": "1", "url": "https://example.org",
+                               "terms": {"work": []}, "census": {"work": len(rows)}}, rows)
+            for scope, expected in [(None, {"dd", "wd:Q2"}), ("one", {"aa", "cc", "dd", "wd:Q2"})]:
+                plan = {"class": "work", **({"register": scope} if scope else {})}
+                _, meta = evaluate(graph, game, "Name a work", plan, name_catalogue=graph)
+                self.assertEqual(meta["readership"]["coveredAnswers"], len(expected))
+                self.assertEqual({r[0] for r in graph.execute("SELECT id FROM answer_views")}, expected)
+
     def test_exact_title_shared_with_another_valid_alias_earns_the_common_score(self):
         prompt = "Name a work"
         source = {"source":"works","revision":"1","url":"https://example.org","terms":{"work":[]}}
