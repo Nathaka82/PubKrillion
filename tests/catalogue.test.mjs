@@ -9,7 +9,7 @@ import {
 import { validateQuestion, matchAnswer } from "../server/rules.ts";
 import { fixture, client } from "./fixture.mjs";
 
-test("published scope, regional spellings, equivalent editions and scarce top scores", () => {
+test("published scope, regional spellings and scarce top scores", () => {
   for (const [id, inputs] of [
     ["general-cheese", ["feta", "paneer", "halloumi"]],
     ["general-pasta", ["fusilli", "orecchiette", "bucatini", "angel hair"]],
@@ -29,8 +29,6 @@ test("published scope, regional spellings, equivalent editions and scarce top sc
     const q = builtInQuestions.get(id);
     assert.equal(matchAnswer(input, q.answers, q.matching), undefined);
   }
-  for (const [q, equivalent] of [["abba", "music-abba-albums"], ["german-borders", "geography-germany"]])
-    assert.deepEqual(builtInQuestions.get(q).answers, builtInQuestions.get(equivalent).answers);
   assert.match(builtInQuestions.get("music-charts-2000").context, /Explicit titles/);
   assert.match(builtInQuestions.get("ultimate-throws").context, /Specialist/);
 });
@@ -77,59 +75,53 @@ test("world currencies require a currency name or code and the final accepted an
     (await host("/rooms", "POST", { name: "Currency night" })).data.code;
   await first(root + "/join", "POST", { name: "Oysters" });
   await second(root + "/join", "POST", { name: "Turtles" });
-  const sample = (await host("/packs/sample")).data;
-  await host(root + "/packs", "POST", sample);
   const countries = catalogueQuestions("geography").find(
     (q) => q.id === "geography-un",
   ).answers;
-  let previous = null;
-  for (const id of ["general-currencies", "sampler-world-currencies"]) {
-    const q = (await host(root + "/library/" + id)).data;
-    for (const country of countries)
-      assert.equal(
-        matchAnswer(country.name, q.answers, q.matching),
-        undefined,
-        country.name,
-      );
-    const start = await host(root + "/start", "POST", {
-      questionId: id,
-      previous,
-      seconds: 60,
-    });
-    assert.equal(start.status, 200);
-    previous = start.data.id;
-    const round = root + "/rounds/" + previous;
-    const answer = (team, raw) =>
-      team(round + "/answer", "POST", { answer: raw, revision: 0 });
-    for (const raw of [
-      "Japan",
-      "Japanese",
-      "New Zealand",
-      "United Arab Emirates",
-      "Dollar",
-    ]) {
-      const reply = await answer(first, raw);
-      assert.equal(reply.status, 422, raw);
-      assert.equal(reply.data.suggestion, undefined, raw);
-    }
-    const typo = await answer(first, "Japansee Yen");
-    assert.equal(typo.status, 422);
-    assert.equal(typo.data.suggestion, "Japanese Yen");
-    const state = () => host(root + "/state?view=host").then((r) => r.data);
-    assert.equal((await state()).received, 0);
-    assert.equal((await answer(first, "Yen")).status, 200);
-    assert.equal((await state()).round.phase, "open");
-    assert.equal((await host(round + "/reveal", "POST", {})).status, 409);
-    const final = await Promise.all([
-      answer(second, "GBP"),
-      answer(second, "GBP"),
-    ]);
-    assert.ok(final.every((r) => r.status === 200));
-    assert.equal((await state()).round.phase, "locked");
-    assert.equal((await state()).received, 2);
-    assert.equal((await host(round + "/reveal", "POST", {})).status, 200);
-    assert.equal((await state()).round.results.length, 2);
+  const q = (await host(root + "/library/general-currencies")).data;
+  for (const country of countries)
+    assert.equal(
+      matchAnswer(country.name, q.answers, q.matching),
+      undefined,
+      country.name,
+    );
+  const start = await host(root + "/start", "POST", {
+    questionId: "general-currencies",
+    previous: null,
+    seconds: 60,
+  });
+  assert.equal(start.status, 200);
+  const round = root + "/rounds/" + start.data.id;
+  const answer = (team, raw) =>
+    team(round + "/answer", "POST", { answer: raw, revision: 0 });
+  for (const raw of [
+    "Japan",
+    "Japanese",
+    "New Zealand",
+    "United Arab Emirates",
+    "Dollar",
+  ]) {
+    const reply = await answer(first, raw);
+    assert.equal(reply.status, 422, raw);
+    assert.equal(reply.data.suggestion, undefined, raw);
   }
+  const typo = await answer(first, "Japansee Yen");
+  assert.equal(typo.status, 422);
+  assert.equal(typo.data.suggestion, "Japanese Yen");
+  const state = () => host(root + "/state?view=host").then((r) => r.data);
+  assert.equal((await state()).received, 0);
+  assert.equal((await answer(first, "Yen")).status, 200);
+  assert.equal((await state()).round.phase, "open");
+  assert.equal((await host(round + "/reveal", "POST", {})).status, 409);
+  const final = await Promise.all([
+    answer(second, "GBP"),
+    answer(second, "GBP"),
+  ]);
+  assert.ok(final.every((r) => r.status === 200));
+  assert.equal((await state()).round.phase, "locked");
+  assert.equal((await state()).received, 2);
+  assert.equal((await host(round + "/reveal", "POST", {})).status, 200);
+  assert.equal((await state()).round.results.length, 2);
 });
 
 test("released packs contain distinct, playable questions and scoped source lists", () => {
@@ -230,7 +222,7 @@ test("inferred entities, synonyms and examples use the active bank", () => {
   assert.equal(matchAnswer("variation", examples, "names"), undefined);
   assert.equal(matchAnswer("flick", examples, "names").exact, true);
 });
-test("all published categories are ready to play and legacy installs preserve edits and snapshots", async (t) => {
+test("every shipped pack is playable and authoring endpoints are retired", async (t) => {
   const f = await fixture();
   t.after(() => f.close());
   const host = client(f),
@@ -254,17 +246,12 @@ test("all published categories are ready to play and legacy installs preserve ed
   for (const pack of catalogue) {
     for (const q of catalogueQuestions(pack.id))
       assert.equal(grouped.get(q.id), q.topic);
-    const installed = await host(root + "/packs/" + pack.id, "POST", {});
-    assert.deepEqual(installed.data, { added: 0, skipped: pack.count }, pack.title);
+    assert.equal(entries.filter(q => q.pack === pack.title).length, pack.count);
   }
-  const adds = await Promise.all([
-    host(install, "POST", {}),
-    host(install, "POST", {}),
-  ]);
-  assert.deepEqual(
-    adds.map((x) => x.data.added).sort((a, b) => a - b),
-    [0, 0],
-  );
+  for (const route of ["/packs", "/generate", "/drafts", "/library"])
+    assert.equal((await host(root + route, "POST", {})).status, 404);
+  assert.equal((await host("/packs/sample")).status, 404);
+  assert.equal((await host(root + "/start", "POST", {questionId:"custom", previous:null, seconds:0})).status, 404);
   await team(root + "/join", "POST", { name: "Red kites" });
   const round = await host(root + "/start", "POST", {
     questionId: "ultimate-throws",
@@ -282,13 +269,9 @@ test("all published categories are ready to play and legacy installs preserve ed
         answers: [{ name: "Club special", aliases: [], depth: 5 }],
       })
     ).status,
-    200,
+    404,
   );
-  assert.deepEqual((await host(install, "POST", {})).data, {
-    added: 0,
-    skipped: 30,
-  });
-  assert.equal((await host(qpath)).data.title, "Our throwing round");
+  assert.equal((await host(qpath)).data.title, prior.title);
   const inferred = await team(r + "/answer", "POST", {
     answer: "high release flick",
     revision: 0,
@@ -318,4 +301,26 @@ test("all published categories are ready to play and legacy installs preserve ed
   assert.equal((await team(root + "/state")).data.round.results, undefined);
   await host(r + "/reveal", "POST", {});
   assert.equal((await team(root + "/state")).data.round.results[0].points, 10);
+});
+
+test("a host can start, score and reveal a round from each pack in the same room", async t => {
+  const f = await fixture();
+  t.after(() => f.close());
+  const host = client(f), team = client(f);
+  await host("/login", "POST", { password:f.password });
+  const room = "/rooms/" + (await host("/rooms", "POST", { name:"Pack tour" })).data.code;
+  await team(room + "/join", "POST", { name:"Divers" });
+  let previous = null, total = 0;
+  for (const pack of catalogue) {
+    const [q] = catalogueQuestions(pack.id);
+    const round = await host(room + "/start", "POST", { previous, questionId:q.id, seconds:0 });
+    assert.equal(round.status, 200);
+    previous = round.data.id;
+    const endpoint = room + "/rounds/" + previous;
+    const [answer] = q.answers;
+    assert.equal((await team(endpoint + "/answer", "POST", { answer:answer.name, revision:0 })).status, 200);
+    assert.equal((await host(endpoint + "/reveal", "POST", {})).status, 200);
+    total += [0,10,15,60,85,100][answer.depth];
+    assert.equal((await team(room + "/state")).data.board[0].total,total);
+  }
 });

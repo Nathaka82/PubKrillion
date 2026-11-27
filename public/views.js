@@ -428,7 +428,7 @@ function roundPanel(s, host, draft, unseenDive) {
       '<section class="panel">' +
       top +
       '<p class="inline-note">Answers locked. The host is preparing the reveal.</p>' +
-      (s.eligibleForRound && !r.sourceJudged
+      (s.eligibleForRound
           ? '<p class="fine top-gap">No answer was locked in. The host can review your last submitted guess.</p>'
         : "") +
       "</section>"
@@ -444,7 +444,7 @@ function roundPanel(s, host, draft, unseenDive) {
     timing(r) +
     '</div><h2 class="question">' +
     esc(r.prompt) +
-    '</h2>' + (r.playerRule ? '<details class="fine"><summary>What counts?</summary><p>'+esc(r.playerRule)+'</p></details>' : "") + '<p class="depth-hint">Rarer answers sink deeper</p></div><div class="answer-deck">' +
+    '</h2><p class="depth-hint">Rarer answers sink deeper</p></div><div class="answer-deck">' +
     (saved
       ? '<div role="status" class="answer-receipt" data-saved-answer>' +
         icon("check") +
@@ -475,7 +475,7 @@ function roundPanel(s, host, draft, unseenDive) {
             button("Edit answer", "edit-answer") +
             "</div>"
           : esc(draft.feedback.message)) +
-        (r.sourceJudged ? "" : s.appeal === draft.text.trim() ? '<p>Sent to the host for review.</p>' : button("Ask host to review","request-review","secondary")) +
+        (s.appeal === draft.text.trim() ? '<p>Sent to the host for review.</p>' : button("Ask host to review","request-review","secondary")) +
         "</div>"
       : "") +
     (!saved && !pending

@@ -28,7 +28,7 @@ compatible() {
 activate() {
   local dir=$1 origin expected body
   expected=$(revision "$dir")
-  compose "$dir" up -d --no-build --pull never --wait --wait-timeout 100 || return 1
+  compose "$dir" up -d --remove-orphans --no-build --pull never --wait --wait-timeout 100 || return 1
   origin=$(compose "$dir" exec -T app node -p 'process.env.PUBLIC_ORIGIN') || return 1
   # Caddy may briefly cache the replaced container's address.
   for attempt in {1..10}; do
@@ -68,6 +68,17 @@ elif docker volume inspect "${project}_quiz_data" >/dev/null 2>&1; then
   esac
 fi
 if [[ "$needs_backup" == true ]]; then
+  if [[ "$mode" == deploy ]]; then
+    while true; do
+      status=0
+      compose "$release" run --rm --no-deps -T --pull never app node scripts/retire-builder.mjs check || status=$?
+      case "$status" in
+        0) break ;;
+        42) echo "Waiting for the host to reveal a legacy round."; sleep 20 ;;
+        *) exit "$status" ;;
+      esac
+    done
+  fi
   backup="before-$(basename "$release")-$(date -u +%Y%m%dT%H%M%S)-$$.sqlite"
   compose "$reader" run --rm --no-deps -T --pull never app node scripts/database.mjs backup "$backup"
   printf '%s\n' "$backup" > "$release/last-backup"
@@ -92,5 +103,12 @@ fi
 if [[ "$current" != "$release" ]]; then
   if [[ -n "$current" ]]; then point previous "$current"; fi
   point current "$release"
+fi
+if [[ "$mode" == deploy ]]; then
+  compose "$release" exec -T app node scripts/retire-builder.mjs clean
+  volume="${project}_knowledge_model"
+  if [[ "$(docker volume inspect --format '{{index .Labels "com.docker.compose.project"}} {{index .Labels "com.docker.compose.volume"}}' "$volume" 2>/dev/null || true)" == "$project knowledge_model" ]]; then
+    docker volume rm "$volume"
+  fi
 fi
 echo "Healthy release: $(revision "$release")"

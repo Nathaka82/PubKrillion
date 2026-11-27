@@ -1,11 +1,4 @@
 services:
-  knowledge-builder:
-    build: .
-    command: ["/opt/knowledge/bin/python", "-u", "scripts/knowledge/catalogue.py", "--watch"]
-    mem_limit: 1g
-    restart: unless-stopped
-    volumes:
-      - quiz_data:/app/storage
   app:
     mem_limit: 4g
     build: .
@@ -13,10 +6,6 @@ services:
     environment:
       HOST_PASSWORD: ${HOST_PASSWORD?Set HOST_PASSWORD in .env}
       PUBLIC_ORIGIN: https://${DOMAIN:?Set DOMAIN in .env}
-      KNOWLEDGE_MODEL_URL: ${KNOWLEDGE_MODEL_URL:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
-      KNOWLEDGE_WORLD_DB: /app/storage/world/wikidata5m-v1.sqlite
       QUIZ_SEMANTIC: ${QUIZ_SEMANTIC:-on}
       FRONTEND_URL: ${FRONTEND_URL:-}
       TRUST_PROXY: "1"

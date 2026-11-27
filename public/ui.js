@@ -178,13 +178,10 @@ export function modal(title, body) {
 export function closeModal() {
   if ($("#modal").open) $("#modal").close();
 }
-export function how(sourceJudged) {
-  const missing = sourceJudged
-    ? "The game checks answers against the round’s sources. If it asks for a fuller name, try the complete title or another recorded spelling."
-    : "When Ask host to review appears, you can send your last guess to the host.";
+export function how() {
   modal(
     "How to play",
-    '<ol class="how"><li><strong>Join a crew</strong><p>Use the host’s room code and choose a team name. One phone is enough for your whole team.</p></li><li><strong>Think of a rare answer</strong><p>Tap Dive to submit. If you see “Did you mean?”, confirm the suggestion or edit your answer. Your first accepted answer is final. ' + missing + '</p></li><li><strong>Watch the dive</strong><p>Teams start side by side with their current scores and dive together. Answers share five rarity bands. Several answers can tie. Scores are set before play using recall data or estimates of how familiar a name is. A miss stays at the surface.</p></li></ol><button class="primary wide" data-close>Got it</button>',
+    '<ol class="how"><li><strong>Join a crew</strong><p>Use the host’s room code and choose a team name. One phone is enough for your whole team.</p></li><li><strong>Think of a rare answer</strong><p>Tap Dive to submit. If you see “Did you mean?”, confirm the suggestion or edit your answer. Your first accepted answer is final. When Ask host to review appears, you can send your last guess to the host.</p></li><li><strong>Watch the dive</strong><p>Teams start side by side with their current scores and dive together. Answers share five rarity bands. Several answers can tie. Scores are set before play using recall data or estimates of how familiar a name is. A miss stays at the surface.</p></li></ol><button class="primary wide" data-close>Got it</button>',
   );
 }
 export const splitHosting =
@@ -232,11 +229,7 @@ export async function api(
         ...headers,
       },
       body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(
-        method !== "GET" && /\/(?:packs|drafts|library(?:\/[\w-]+)?)$/.test(path)
-          ? 120000
-          : 10000,
-      ),
+      signal: AbortSignal.timeout(10000),
     });
   } catch {
     const e = new Error("Connection lost. Check your signal and try again.");

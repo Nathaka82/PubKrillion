@@ -82,6 +82,10 @@ async function checkAmbientMotion(page) {
 async function checkQuestionPicker(host) {
   const original = host.viewportSize();
   const list = host.locator("#question-list");
+  await host.setViewportSize({width:1366,height:768});
+  await list.getByRole("button", {name:/General Knowledge/}).waitFor();
+  assert.equal(await list.getByRole("button").count(), 6);
+  assert.ok(await list.evaluate(el => el.getBoundingClientRect().right <= innerWidth));
   const search = host.getByRole("textbox", { name: "Find a question" });
   try {
     const filters = host.locator(".picker-filters summary");
@@ -107,22 +111,19 @@ async function checkQuestionPicker(host) {
     const fits = await list.evaluate((el) => {
       const dialog = el.closest("dialog");
       const bounds = dialog.getBoundingClientRect();
-      const footer = dialog
-        .querySelector('[data-action="new"]')
-        .getBoundingClientRect();
       return (
         dialog.scrollHeight <= dialog.clientHeight + 1 &&
         dialog.scrollWidth <= dialog.clientWidth + 1 &&
         el.clientHeight >= 44 &&
         el.scrollHeight > el.clientHeight &&
         bounds.top >= 0 &&
-        footer.bottom <= bounds.bottom &&
+        el.getBoundingClientRect().bottom <= bounds.bottom &&
         bounds.bottom <= visualViewport.height + 1
       );
     });
     assert.ok(
       fits,
-      "Search, scrollable results and New question fit on a short phone screen",
+      "Search and scrollable results fit on a short phone screen",
     );
     for (const action of ["configure", "bank-answers"]) {
       const last = list.locator('[data-action="' + action + '"]').last();
@@ -152,7 +153,7 @@ async function checkQuestionPicker(host) {
         [id, action],
       );
     }
-    await search.fill("summer olympic cities");
+    await search.fill("capital city of a UN member state");
     assert.equal(await list.locator("li").count(), 1);
     assert.equal(await list.evaluate((el) => el.scrollTop), 0);
   } finally {
@@ -206,7 +207,7 @@ async function interruptedRounds(host, team) {
   const start = async (previous) =>
     (
       await request(host, root + "/start", {
-        questionId: "summer-hosts",
+        questionId: "geography-capitals",
         previous,
         seconds: 0,
       })
@@ -311,7 +312,7 @@ async function fullRoomReveal(f, host, team) {
   });
   const root = "/rooms/" + code;
   const picker = await request(host, root + "/library");
-  const category = picker.find((q) => q.title === "The first 36 elements");
+  const category = picker.find((q) => q.title === "The entire periodic table");
   const bank = await request(host, root + "/library/" + category.id);
   const observers = Array.from({ length: 29 }, () => client(f));
   const lastTeam = "Z".repeat(32);
@@ -558,9 +559,9 @@ try {
       await checkQuestionPicker(host);
       await host
         .getByPlaceholder("Search by title, topic, region or era")
-        .fill("summer olympic cities");
+        .fill("capital city of a UN member state");
       await host
-        .getByRole("button", { name: /Summer Olympic cities/ })
+        .getByRole("button", { name: /Capital cities/ })
         .first()
         .click();
       await host.getByLabel("Countdown").selectOption("60");
@@ -568,20 +569,20 @@ try {
         .getByRole("button", { name: "Accepted answers", exact: true })
         .click();
       await host.getByLabel("Rarity").selectOption("5");
-      assert.ok((await host.locator('[data-rarity="5"]:visible').count()) > 0);
+      await host.locator('[data-rarity="5"]:visible').first().waitFor();
       assert.equal(await host.locator('[data-rarity="1"]:visible').count(), 0);
       await host.getByRole("button", { name: "Back to round setup" }).click();
       assert.equal(await host.getByLabel("Countdown").inputValue(), "60");
       await host.getByRole("button", { name: "Back to questions" }).click();
       await host
         .getByPlaceholder("Search by title, topic, region or era")
-        .fill("first 36 elements");
+        .fill("entire periodic table");
       await host.locator('#question-list [data-action="configure"]').click();
       assert.equal(await host.getByLabel("Countdown").inputValue(), "0");
       await host.getByRole("button", { name: "Back to questions" }).click();
       await host
         .getByPlaceholder("Search by title, topic, region or era")
-        .fill("summer olympic cities");
+        .fill("capital city of a UN member state");
       await host.locator('#question-list [data-action="configure"]').click();
       await host.getByLabel("Countdown").selectOption("60");
       await host
@@ -609,7 +610,7 @@ try {
       await host.getByLabel("Rarity").selectOption("2");
       await host
         .getByRole("dialog")
-        .getByText("Barcelona", { exact: true })
+        .getByText("Addis Ababa", { exact: true })
         .waitFor();
       await host.getByRole("button", { name: "Close dialog" }).click();
       await team
@@ -622,26 +623,26 @@ try {
       await host.getByText("0 / 1 teams submitted").waitFor();
       await team
         .getByRole("textbox", { name: "Your team’s answer" })
-        .fill("Barcelnoa");
+        .fill("Addis Abbaa");
       await team.screenshot({
         path: "test-results/" + name + "-question.png",
         fullPage: true,
       });
       await team.getByRole("button", { name: "Dive — submit answer" }).click();
-      await team.getByText("Did you mean: Barcelona?").waitFor();
+      await team.getByText("Did you mean: Addis Ababa?").waitFor();
       await team.reload();
       await team.getByRole("button", { name: "Edit answer" }).click();
       assert.equal(
-        await team.getByRole("button", { name: "Submit Barcelona" }).count(),
+        await team.getByRole("button", { name: "Submit Addis Ababa" }).count(),
         0,
       );
       await team
         .getByRole("button", { name: "Dive — submit answer", exact: true })
         .click();
-      await team.getByText("Did you mean: Barcelona?").waitFor();
+      await team.getByText("Did you mean: Addis Ababa?").waitFor();
       const beforeRetry = await team.evaluate(() => window.effectProbe.notes);
       await p.setOffline(true);
-      await team.getByRole("button", { name: "Submit Barcelona" }).click();
+      await team.getByRole("button", { name: "Submit Addis Ababa" }).click();
       await team.getByText("Awaiting confirmation").waitFor();
       await hostStatus
         .locator("section")
@@ -666,7 +667,7 @@ try {
       await p.setOffline(false);
       await team
         .locator("[data-saved-answer]")
-        .getByText("Barcelona", { exact: true })
+        .getByText("Addis Ababa", { exact: true })
         .waitFor();
       assert.equal(
         await team
@@ -691,7 +692,7 @@ try {
         .waitFor();
       assert.equal(await host.locator('[data-action="lock"]').count(), 0);
       await host.getByRole("button", { name: "Reveal answers" }).click();
-      await team.getByText("Barcelona", { exact: true }).waitFor();
+      await team.getByText("Addis Ababa", { exact: true }).waitFor();
       await team
         .locator(".reveal-line.mine")
         .getByText("+15 pts", { exact: true })
@@ -719,56 +720,20 @@ try {
       await host
         .getByRole("button", { name: "Questions", exact: true })
         .click();
-      await host.getByRole("button", { name: /^Sport \d+ questions$/ }).click();
+      await host.getByRole("button", { name: /^Ultimate Frisbee \d+ questions$/ }).click();
       const category = host.locator("#question-list");
       await category
         .getByRole("button", { name: /Ways to throw a disc/ })
         .first()
         .waitFor();
-      await category
-        .getByRole("button", { name: /Formula One champions/ })
-        .first()
-        .waitFor();
-      await category.getByRole("button", { name: "All categories" }).click();
-      await host.getByRole("button", { name: "Import questions" }).click();
-      await host
-        .getByLabel("Question pack", { exact: true })
-        .setInputFiles("data/pub-sampler.json");
-      await host.getByRole("button", { name: "Import questions" }).click();
-      await host.getByRole("heading", { name: "Question library" }).waitFor();
-      await host
-        .getByRole("textbox", { name: "Find a question" })
-        .fill("Change from your travels");
-      await host
-        .getByRole("button", {
-          name: "Accepted answers for Change from your travels",
-        })
-        .click();
-      await host.getByText("1–40 of 269", { exact: true }).waitFor();
+      await category.getByRole("button", { name: "All packs" }).click();
+      assert.equal(await category.getByRole("button").count(), 6);
+      assert.equal(await host.getByRole("button", { name: /Import questions|New question|Generate from a prompt/ }).count(), 0);
+      await host.getByLabel("Find a question").fill("Foreign exchange");
+      await category.getByRole("button", {name:/Foreign exchange/}).click();
       await host.getByRole("button", { name: "Next", exact: true }).click();
-      await host.getByText("41–80 of 269", { exact: true }).waitFor();
       await host.getByLabel("Find an answer").fill("GBP");
       await host.getByText("British Pound", { exact: true }).waitFor();
-      assert.equal(await host.locator("#bank-rows li").count(), 1);
-      await host.getByRole("button", { name: "Back to questions" }).click();
-      await host.locator('#question-list [data-action="edit"]').click();
-      assert.equal(
-        await host.getByLabel("Answer matching").inputValue(),
-        "full",
-      );
-      assert.equal(await host.locator(".editor-row").count(), 25);
-      await host.getByRole("button", { name: "Next answers" }).click();
-      await host.getByText("26–50 of 269", { exact: true }).waitFor();
-      await host.getByRole("button", { name: "Save question" }).click();
-      await host.getByRole("button", { name: "New question" }).click();
-      await host.getByLabel("Picker title").fill("Our society");
-      await host.getByLabel("Category", { exact: true }).fill("Society");
-      await host.getByLabel("Prompt", { exact: true }).fill("Name a mascot.");
-      await host
-        .getByRole("textbox", { name: "Accepted answer", exact: true })
-        .fill("Krill");
-      await host.getByRole("button", { name: "Save question" }).click();
-      await host.getByRole("heading", { name: "Question library" }).waitFor();
       await host.getByRole("button", { name: "Close dialog" }).click();
       await host.getByRole("button", { name: "Start round" }).click();
       await host.getByLabel("Find a question").fill("Ways to throw a disc");
@@ -794,10 +759,10 @@ try {
         .click();
       await team.getByRole("heading", { name: "Final podium" }).waitFor();
       await team.getByText("Round history (2)").click();
-      await team.getByRole("button", { name: /Round 1 · Summer/ }).click();
+      await team.getByRole("button", { name: /Round 1 · Capital/ }).click();
       await team
         .getByRole("dialog")
-        .getByText("Barcelona", { exact: true })
+        .getByText("Addis Ababa", { exact: true })
         .waitFor();
       await host.getByRole("link", { name: "Host console" }).click();
       await host

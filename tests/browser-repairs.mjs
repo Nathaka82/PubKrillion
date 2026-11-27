@@ -158,44 +158,33 @@ try {
         result.results.find((x) => x.team === "Lanternfish").points,
         85,
       );
-      const custom = {
-        id: "positions",
-        title: "Positions",
-        topic: "Football positions",
-        prompt: "Name a position in association football.",
-        matching: "categories",
-        answers: ["Goalkeeper", "Defender", "Striker", "Midfielder"].map(
-          (name) => ({ name, depth: 2 }),
-        ),
-      };
-      await admin(room + "/packs", "POST", { questions: [custom] });
       const next = await admin(room + "/start", "POST", {
         previous: start.data.id,
         seconds: 0,
-        questionId: custom.id,
+        questionId: "ultimate-throws",
       });
       assert.equal(next.status, 200);
       let attempts = 0;
       team.on("request", (request) => {
         if (request.url().endsWith("/answer")) attempts++;
       });
-      await field.fill("the player in goal");
+      await field.fill("high release flick");
       await team.waitForResponse((res) => res.url().includes("/state"));
       assert.equal(attempts, 0);
       assert.equal(await team.locator("#answer-feedback").count(), 0);
       await field.press("Enter");
-      await team.getByText("Did you mean: Goalkeeper?").waitFor();
+      await team.getByText("Did you mean: Forehand?").waitFor();
       assert.equal(await team.evaluate(() => document.activeElement.id), "answer-feedback");
       await team.keyboard.press("Tab");
       assert.equal(await team.evaluate(() => document.activeElement.dataset.action), "confirm-suggestion");
       await team.getByRole("button", { name: "Edit answer" }).click();
-      assert.equal(await field.inputValue(), "the player in goal");
+      assert.equal(await field.inputValue(), "high release flick");
       assert.equal((await admin(room + "/state?view=host")).data.received, 0);
       await team.getByRole("button", { name: "Dive — submit answer" }).click();
-      await team.getByRole("button", { name: "Submit Goalkeeper" }).click();
+      await team.getByRole("button", { name: "Submit Forehand" }).click();
       await team
         .locator("[data-saved-answer]")
-        .getByText("Goalkeeper", { exact: true })
+        .getByText("Forehand", { exact: true })
         .waitFor();
       assert.equal((await admin(room + "/state?view=host")).data.received, 1);
       const prior = room + "/rounds/" + next.data.id;

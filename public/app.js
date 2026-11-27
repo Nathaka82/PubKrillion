@@ -40,7 +40,6 @@ let page = 0,
   pollRun = 0,
   detail = null,
   library = [],
-  editing = null,
   stopDive,
   refreshTicket = 0,
   sendJob = null;
@@ -324,7 +323,6 @@ async function navigate() {
   tag = "";
   detail = null;
   library = [];
-  editing = null;
   lastRoomContent = "";
   previousClock = null;
   route = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
@@ -470,7 +468,7 @@ function openHistory(r) {
             "secondary",
             'data-round="' + r.id + '" data-from="history"',
           ) +
-          (r.sourceJudged ? "" : '<details class="top-gap"><summary>Correct a ruling</summary>' +
+          ('<details class="top-gap"><summary>Correct a ruling</summary>' +
           review(r) +
           "</details>") +
           audit(r)
@@ -506,7 +504,7 @@ function showJudge(id, key, teamId) {
       "” · " +
       row.count +
       (row.count === 1 ? " team" : " teams") +
-      "</p>" + (missed?.reviewEvidence ? JSON.parse(missed.reviewEvidence).map(e=>'<p><a target="_blank" rel="noopener noreferrer" href="'+esc(e.url)+'">'+esc(e.label)+'</a></p>').join("") : "") +
+      "</p>" +
     '<form id="judge-form" class="stack top-gap" data-round="' +
       id +
       (missed
@@ -519,7 +517,7 @@ function showJudge(id, key, teamId) {
       (round.accepted ? "" : '<div class="bank-pages"><button type="button" id="ruling-prev">Previous</button><span id="ruling-count" role="status"></span><button type="button" id="ruling-next">Next</button></div>') +
       '</div><div class="stack" id="unlisted-ruling" hidden><label>Unlisted answer<input name="newName" maxlength="140" required disabled></label>' +
       '<label>Rarity for this round<select name="newDepth" disabled>' +
-      round.pointValues.map((score, i) => i && (!round.unlistedDepth || i === round.unlistedDepth) ? '<option value="'+i+'">'+depthNames[i]+' · '+score+' points</option>' : "").join("") +
+      round.pointValues.map((score, i) => i ? '<option value="'+i+'">'+depthNames[i]+' · '+score+' points</option>' : "").join("") +
       '</select></label><p class="fine">Teams with the same submitted guess receive the same ruling.</p></div><button class="primary">Save ruling</button></form>',
   );
   const form = $("#judge-form");
@@ -617,7 +615,6 @@ async function acceptedAnswers(path, scale, back, trigger) {
     rows.innerHTML = part.answers
       .map(a => {
         const longList = a.aliases.length > 4 || a.aliases.join(", ").length > 100;
-        const sharedTitle = a.sharedNames?.find(shared => shared.name === a.name);
         return (
           '<li data-rarity="' +
           a.depth +
@@ -631,20 +628,12 @@ async function acceptedAnswers(path, scale, back, trigger) {
           depthNames[a.depth] +
           " · " +
           depthLabel(a.depth) +
-          (sharedTitle ? " · This name alone scores " + scale[sharedTitle.depth] + " pts" : "") +
-          (a.needsDetail?.includes(a.name) ? " · This name alone is ambiguous" : "") +
           (a.aliases.length && !longList
             ? " · Also accepts " + spellings(a.aliases)
             : "") +
           "</small>" +
           (longList ? "<details><summary>Also accepts " + a.aliases.length + " alternate " +
             (a.aliases.length === 1 ? "name" : "names") + "</summary><p>" + spellings(a.aliases) + "</p></details>" : "") +
-          (a.needsDetail?.length || a.sharedNames?.length
-            ? "<details><summary>Other recorded names</summary>" +
-              (a.needsDetail?.length ? "<p>Use a more specific name for " + spellings(a.needsDetail) + ".</p>" : "") +
-              (a.sharedNames || []).map(shared => "<p><bdi>" + esc(shared.name) + "</bdi> identifies multiple eligible answers and scores " +
-                scale[shared.depth] + " pts.</p>").join("") + "</details>" : "") +
-          evidenceLinks(a.evidence) +
           (a.examples?.length
             ? "<details><summary>Suggested examples</summary><small>" +
               esc(a.examples.join(", ")) +
@@ -712,7 +701,7 @@ function listEntries(filter = "") {
   if (!pickerCategory && !query) {
     const counts = new Map();
     for (const q of available)
-      counts.set(q.topic, (counts.get(q.topic) ?? 0) + 1);
+      counts.set(q.pack, (counts.get(q.pack) ?? 0) + 1);
     return [...counts]
       .sort(([a], [b]) => {
         if (a === b) return 0;
@@ -741,8 +730,8 @@ function listEntries(filter = "") {
   const entries = available
     .filter(
       (q) =>
-        (!pickerCategory || q.topic === pickerCategory) &&
-        [q.title, q.topic, q.prompt, q.context].join(" ")
+        (!pickerCategory || q.pack === pickerCategory) &&
+        [q.title, q.pack, q.topic, q.prompt, q.context].join(" ")
           .toLocaleLowerCase("en-GB")
           .includes(query),
     )
@@ -753,7 +742,7 @@ function listEntries(filter = "") {
     ? '<li class="category-heading"><strong>' +
       esc(pickerCategory) +
       "</strong>" +
-      button("All categories", "all-categories", "text-btn") +
+      button("All packs", "all-categories", "text-btn") +
       "</li>"
     : "";
   return (
@@ -773,11 +762,11 @@ function listEntries(filter = "") {
                   (q.context ? esc(q.context) + " · " : "") +
                   (q.plays ? q.plays + " played" : "Unused") +
                   "</small>",
-                pickerMode === "pick" ? "configure" : q.generated ? "regenerate" : "edit",
+                pickerMode === "pick" ? "configure" : "bank-answers",
                 "item-main",
                 'data-id="' + esc(q.id) + '"',
               ) +
-              button(
+              (pickerMode === "pick" ? button(
                 "Answers",
                 "bank-answers",
                 "text-btn",
@@ -786,7 +775,7 @@ function listEntries(filter = "") {
                   '" aria-label="Accepted answers for ' +
                   esc(q.title) +
                   '"',
-              ) +
+              ) : "") +
               "</li>",
           )
           .join("") +
@@ -805,68 +794,6 @@ function listEntries(filter = "") {
           : "")
       : '<li class="empty">No matching questions.</li>')
   );
-}
-function evidenceLinks(evidence) {
-  if (!evidence?.length) return "";
-  const items = new Set();
-  const link = (url, label) => '<li><a target="_blank" rel="noopener noreferrer" href="' + esc(url) + '">' + label + '</a></li>';
-  for (const record of evidence) {
-    if (Number.isSafeInteger(record.rankAtMost) && Number.isSafeInteger(record.answerNames)) {
-      const signals = record.readershipViews != null ? "Wikimedia readership and graph links" :
-        Array.isArray(record.familiaritySignals) ? record.familiaritySignals.join(" and ") : "";
-      const rank = record.rankAtMost === 1 ? 'the rarest' : 'among the ' + record.rankAtMost.toLocaleString() + ' rarest';
-      if (signals) items.add('<li>Estimated to be ' + rank + ' of ' + record.answerNames.toLocaleString() +
-        ' answers, using ' + esc(signals) + '.</li>');
-    }
-    if (record.readershipItems?.length && record.url) {
-      items.add(link(record.url, "Wikimedia readership over 52 weeks"));
-      for (const entry of record.readershipItems) {
-        items.add(link(entry.url, esc(entry.item) + " · " + Number(entry.views).toLocaleString() + " page views"));
-      }
-      continue;
-    }
-    if (record.relationshipLabel && record.targetLabel && record.url) {
-      items.add(link(record.url, esc(record.relationshipLabel) + " · <bdi>" + esc(record.targetLabel) + "</bdi>"));
-      continue;
-    }
-    if (record.nameProperty && record.url) {
-      items.add(link(record.url, esc(record.nameProperty) + " · " + '<bdi lang="' + esc(record.language) + '">' + esc(record.name) + '</bdi>'));
-      continue;
-    }
-    if (record.namesChecked && record.url) {
-      items.add(link(record.url, "Names and translations recorded on Wikidata"));
-      continue;
-    }
-    if (record.qualifiedNames?.length && record.url) {
-      items.add(link(record.url, "Archived titles with verified qualifiers · " +
-        record.qualifiedNames.map(name => "<bdi>" + esc(name) + "</bdi>").join(", ")));
-      continue;
-    }
-    if (record.dates?.length) {
-      for (const claim of record.dates) {
-        const value = claim.value;
-        let display = value;
-        if (/^\d{4}-\d{2}(?:-\d{2})?$/.test(value)) {
-          const exactDay = value.length === 10;
-          const instant = new Date((exactDay ? value : value + "-01") + "T00:00:00Z");
-          if (Number.isFinite(instant.getTime())) {
-            display = instant.toLocaleDateString(undefined, {
-              year: "numeric", month: "long", ...(exactDay ? { day: "numeric" } : {}), timeZone: "UTC",
-            });
-          }
-        }
-        items.add(link(claim.url, esc(record.relation || "Recorded date") + " · " +
-          '<time datetime="' + esc(value) + '">' + esc(display) + '</time>'));
-      }
-      continue;
-    }
-    if (!record.url) continue;
-    const unit = {length:"cm",mass:"g",year:"years"}[record.property];
-    const label = unit ? record.basis+" "+record.low+(record.high!==record.low?"–"+record.high:"")+" "+unit : record.source;
-    const readable = label?.startsWith("wikidata-query-") ? "Wikidata source record" : label;
-    items.add(link(record.url,esc(readable || "Source record")));
-  }
-  return items.size ? '<details><summary>Evidence</summary><ul>'+[...items].join("")+'</ul></details>' : "";
 }
 function coverageNote(question) {
   if (!question.coverage) return "";
@@ -891,153 +818,6 @@ function fitQuestionPicker() {
     viewport.offsetTop + viewport.height / 2 + "px",
   );
 }
-let lastResearch;
-function generateForm(prompt = "") {
-  modal("Generate a question",
-    '<form class="stack" id="generate-form"><label>Question for players<textarea name="prompt" maxlength="450" required placeholder="Name a film directed by Akira Kurosawa">'+esc(prompt)+'</textarea></label>'+
-    '<p>Ask for a subject, or narrow it with a relationship such as “with publisher Nintendo”.</p>'+
-    '<label><input type="checkbox" name="research"> Check live Wikidata for updates</label>'+
-    '<button class="primary">Preview answers</button>'+
-    button("Draft questions from an idea", "draft-idea")+
-    button("Back to questions","back-to-questions","text-btn")+'</form>');
-}
-
-function ideaForm(idea, completeOnly = false) {
-  modal("Draft questions from an idea",
-    '<form class="stack" id="idea-form"><label>Your idea<textarea name="idea" maxlength="450" required placeholder="Japanese cinema for a mixed-age table">'+esc(idea)+'</textarea></label>'+
-    '<label><input type="checkbox" name="completeOnly"'+(completeOnly ? ' checked' : '')+'> Only use complete source registers</label>'+
-    (state?.questionDrafts ? '<label><input type="checkbox" name="useModel"> Ask OpenAI for wording if the catalogue has no match</label>' : '')+
-    '<button class="primary">Suggest questions</button><button type="submit" value="surprise" formnovalidate>Surprise me</button>'+button("Enter a question directly", "generate", "text-btn")+'</form>');
-}
-
-async function suggestQuestions(form, surprise) {
-  const idea = form.elements.idea.value;
-  const completeOnly = form.elements.completeOnly.checked;
-  const useModel = !!form.elements.useModel?.checked;
-  const dialog = $("#modal");
-  const current = () => form.isConnected && dialog.open && idea === form.elements.idea.value &&
-    completeOnly === form.elements.completeOnly.checked && useModel === !!form.elements.useModel?.checked;
-  const status = document.createElement("p");
-  status.setAttribute("role", "status");
-  status.textContent = "Looking for questions in the sources…";
-  form.append(status);
-  try {
-    const request = { idea, completeOnly, surprise, prepareOnSelect: true, waitForSource: true, useModel };
-    let drafts = await api(endpoint("/drafts"), "POST", request);
-    while (drafts.awaitingEdition && current()) {
-      status.textContent = "The builder is checking the source. Questions will appear here when the result is published.";
-      await new Promise(resolve => {
-        function done() {
-          clearTimeout(timer);
-          form.removeEventListener("input",done);
-          dialog.removeEventListener("close",done);
-          resolve();
-        }
-        const timer = setTimeout(done,5000);
-        form.addEventListener("input",done,{once:true});
-        dialog.addEventListener("close",done,{once:true});
-      });
-      if (!current()) return;
-      const { edition } = await api(endpoint("/drafts/edition"));
-      if (current() && edition && edition !== drafts.awaitingEdition)
-        drafts = await api(endpoint("/drafts"),"POST",request);
-    }
-    if (!current()) return;
-    const { jobs, note } = drafts;
-    modal("Choose a question", '<div class="stack" id="draft-options">'+
-      (note ? '<p role="status">'+esc(note)+'</p>' : '')+
-      jobs.map(j => '<section class="draft-card" data-job="'+esc(j.id)+'"><h3>'+esc(j.prompt)+'</h3>'+
-        [...new Set(Array.from(j.prompt.matchAll(/\((Q[1-9]\d{0,11})\)/g),match=>match[1]))]
-          .map(id=>'<p><a target="_blank" rel="noopener noreferrer" href="https://www.wikidata.org/wiki/'+id+'">View Wikidata entry '+id+'</a></p>').join("")+
-        (j.records ? '<p>'+j.records.toLocaleString()+(j.complete ? ' entries in the complete register' : ' matching records in the source edition')+'</p>' : '')+
-        (j.deferred ? button("Preview this round", "prepare-draft", "primary") :
-          '<p data-progress role="status">Preparing playable answers…</p>')+'</section>').join("")+
-      button("Edit your idea", "draft-idea", "text-btn", 'data-idea="'+esc(idea)+'" data-complete="'+completeOnly+'"')+'</div>');
-    const list = $("#draft-options");
-    const pending = new Map(jobs.filter(j => !j.deferred).map(j => [j.id, j]));
-    while (pending.size && list.isConnected && $("#modal").open) {
-      await Promise.all([...pending.keys()].map(async id => {
-        const result = await api(endpoint("/generate/"+id));
-        if (!list.isConnected || !$("#modal").open) return;
-        const card = list.querySelector('[data-job="'+CSS.escape(id)+'"]');
-        const info = card.querySelector("[data-progress]");
-        if (result.status === "ready") {
-          const q = result.preview;
-          info.textContent = q.answerCount.toLocaleString()+" source-backed answers"+
-            (q.examples?.length ? " · "+q.examples.join(", ") : "");
-          const open = document.createElement("button");
-          open.className = "primary";
-          open.textContent = "Preview this round";
-          open.onclick = () => previewResearch(id, q);
-          card.append(open);
-        } else if (result.status === "waiting_source") {
-          info.textContent = result.message;
-          return;
-        } else if (result.status === "choose_topic") {
-          info.textContent = result.message;
-          const select = document.createElement("button");
-          select.textContent = "See matching questions";
-          select.onclick = () => { ideaForm(result.prompt); $("#idea-form").requestSubmit(); };
-          card.append(select);
-        } else if (result.status === "failed") {
-          info.textContent = result.message;
-        } else return;
-        pending.delete(id);
-      }));
-      if (pending.size) await new Promise(done => setTimeout(done, 800));
-    }
-  } finally {
-    status.remove();
-  }
-}
-function previewResearch(job, q) {
-  lastResearch = {job,q};
-  const readershipSource = q.readership
-    ? ' <a href="https://qrank.toolforge.org/" target="_blank" rel="noopener noreferrer">How Wikimedia readership is measured</a>.'
-    : '';
-  modal("Question preview", '<div class="stack"><h3>'+esc(q.prompt)+'</h3><p>'+esc(q.interpretation)+'</p><p><strong>'+
-    q.answerCount.toLocaleString()+' verified answers</strong> · '+esc(q.coverage)+'</p><p>'+
-    q.gaps.missing.toLocaleString()+' candidates lack supporting evidence. '+q.gaps.borderline.toLocaleString()+' are borderline.</p>'+
-    (q.sourceJudged ? '<p>'+ (q.observedTeams ? 'Rarity calibrated with '+q.observedTeams.toLocaleString()+' verified first choices.' : 'Rarity uses source estimates until enough teams have played.')+' '+q.counts[5].toLocaleString()+' answers earn the top score.</p>' : '')+
-    '<details><summary>Sources and scoring</summary><ul>'+q.sources.map(s=>'<li><a target="_blank" rel="noopener noreferrer" href="'+esc(s.url)+'">'+esc(s.label || s.id)+'</a> · '+esc(s.revision.slice(0,14))+' · loaded '+esc(new Date(s.checked*1000).toLocaleDateString())+'</li>').join("")+'</ul><p>'+esc(q.scoring || "Rarity estimates are fixed when the round opens. The top score requires evidence of unusually low recall.")+readershipSource+'</p></details>'+
-    button("Browse answers","preview-members")+button("Save to library","save-generated","primary")+
-    (q.plan?.worldSource ? button("Refresh from Wikidata", "refresh-research") : "")+
-    button("Edit prompt","revise-prompt","text-btn")+'</div>');
-}
-async function generate(f, prompt = f.elements.prompt.value, research = f.elements.research.checked) {
-  return awaitPreview(f, () => api(endpoint("/generate"), "POST", {prompt, research}));
-}
-async function awaitPreview(f, start) {
-  const status=document.createElement("p");
-  status.setAttribute("role","status");
-  status.textContent="Checking sources and compiling answers…";
-  f.append(status);
-  try {
-    const job=await start();
-    while (f.isConnected && $("#modal").open) {
-      const result=await api(endpoint("/generate/"+job.id));
-      if(!f.isConnected || !$("#modal").open) return;
-      if(result.status==="ready") {
-        const preview=result.preview;
-        return previewResearch(job.id,result.worldNotice ? {...preview,coverage:preview.coverage+" "+result.worldNotice} : preview);
-      }
-      if(result.status==="failed") throw new Error(result.message);
-      if(result.status==="choose_topic") {
-        ideaForm(result.prompt);
-        $("#idea-form").requestSubmit();
-        return;
-      }
-      if(result.status==="waiting_source") {
-        status.textContent=result.message;
-        await new Promise(done=>setTimeout(done,5000));
-        continue;
-      }
-      status.textContent=result.installingWorld ? "Preparing the cross-domain knowledge index for first use. Your question is queued…" :
-        result.status==="queued" ? "Waiting for the research worker…" : "Checking evidence and scoring answers…";
-      await new Promise(done=>setTimeout(done,600));
-    }
-  } finally {status.remove();}
-}
 async function picker(mode, restore = false) {
   const stamp = page;
   if (!restore || mode !== pickerMode) pickerPosition = null;
@@ -1056,11 +836,6 @@ async function picker(mode, restore = false) {
       '<ul class="menu-list" id="question-list" aria-label="Questions">' +
       listEntries(pickerPosition?.filter) +
       "</ul>" +
-      '<div class="picker-tools">' +
-      button("Generate from a prompt", "generate") +
-      button(icon("add") + " New question", "new") +
-      (mode === "library" ? button("Import questions", "import-pack") : "") +
-      "</div>" +
       "</div>",
   );
   fitQuestionPicker();
@@ -1083,7 +858,6 @@ function configure(id, seconds = "0", previous = state.round?.id ?? "") {
     "Start round " + ((state.round?.seq ?? 0) + 1),
     '<form class="stack" id="start-form" data-id="' +
       esc(id) +
-      (q.generated ? '" data-revision="' + esc(q.revision) : "") +
       '" data-previous="' +
       esc(previous) +
       '"><p class="kicker">' +
@@ -1091,14 +865,13 @@ function configure(id, seconds = "0", previous = state.round?.id ?? "") {
       "</p><h3>" +
       esc(q.prompt) +
       "</h3>" +
-      (q.sourceNotice ? '<p role="status">'+esc(q.sourceNotice)+'</p>' : '') +
       (q.context ? '<p class="fine">' + esc(q.context) + "</p>" : "") +
       (q.plays
         ? '<p class="inline-note">This question has already been played ' +
           q.plays +
           " time(s).</p>"
         : "") +
-      '<label>Countdown<select name="seconds"><option value="0">No time limit</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="90">90 seconds</option><option value="120">2 minutes</option><option value="180">3 minutes</option></select></label><button class="primary"'+(q.sourceNotice ? " disabled" : "")+'>Open question</button>' +
+      '<label>Countdown<select name="seconds"><option value="0">No time limit</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="90">90 seconds</option><option value="120">2 minutes</option><option value="180">3 minutes</option></select></label><button class="primary">Open question</button>' +
       button(
         "Accepted answers",
         "bank-answers",
@@ -1109,120 +882,6 @@ function configure(id, seconds = "0", previous = state.round?.id ?? "") {
       "</form>",
   );
   $("#start-form [name=seconds]").value = seconds;
-}
-let editOffset = 0;
-const editPageSize = 25;
-function readAnswerRows() {
-  document.querySelectorAll("#edit-form .editor-row").forEach((row, i) => {
-    const previous = editing.answers[editOffset + i];
-    const name = $(".answer-name", row).value;
-    editing.answers[editOffset + i] = {
-      name,
-      ...(name === previous.name && previous.wordnetSenses
-        ? { wordnetSenses: previous.wordnetSenses }
-        : {}),
-      depth: Number($(".answer-depth", row).value),
-      examples: $(".examples", row)
-        .value.split("|")
-        .map((v) => v.trim())
-        .filter(Boolean),
-      aliases: $(".aliases", row)
-        .value.split("|")
-        .map((v) => v.trim())
-        .filter(Boolean),
-    };
-  });
-}
-function paintAnswerRows() {
-  editOffset = Math.min(
-    editOffset,
-    Math.max(
-      0,
-      Math.floor((editing.answers.length - 1) / editPageSize) * editPageSize,
-    ),
-  );
-  const rows = editing.answers.slice(editOffset, editOffset + editPageSize);
-  $(".editor-rows").innerHTML = rows.map(answerRow).join("");
-  $("#edit-pages").innerHTML =
-    editing.answers.length > editPageSize
-      ? (editOffset ? button("Previous answers", "edit-prev") : "") +
-        "<span>" +
-        (editOffset + 1) +
-        "–" +
-        (editOffset + rows.length) +
-        " of " +
-        editing.answers.length +
-        "</span>" +
-        (editOffset + rows.length < editing.answers.length
-          ? button("Next answers", "edit-next")
-          : "")
-      : "";
-}
-function answerRow(a) {
-  return (
-    '<div class="editor-row"><input aria-label="Accepted answer" class="answer-name" value="' +
-    esc(a.name) +
-    '" maxlength="140" placeholder="Answer" required><select aria-label="Answer depth" class="answer-depth">' +
-    depthNames
-      .slice(1)
-      .map(
-        (n, i) =>
-          '<option value="' +
-          (i + 1) +
-          '" ' +
-          (a.depth === i + 1 ? "selected" : "") +
-          ">" +
-          n +
-          "</option>",
-      )
-      .join("") +
-    '</select><input aria-label="Aliases, separated by vertical bars" class="aliases" value="' +
-    esc(a.aliases.join(" | ")) +
-    '" placeholder="Aliases (a | b)"><details class="example-editor"><summary>Examples to suggest</summary><input class="examples" aria-label="Examples to suggest, separated by vertical bars" value="' +
-    esc((a.examples ?? []).join(" | ")) +
-    '" placeholder="Specific examples (a | b)"></details><button type="button" class="remove-answer" data-action="del-row" aria-label="Remove answer">×</button></div>'
-  );
-}
-async function editor(id) {
-  const stamp = page;
-  const q = id
-    ? await api(endpoint("/library/" + id))
-    : {
-        title: "",
-        topic: pickerCategory,
-        prompt: "",
-        source: "",
-        answers: [{ name: "", depth: 1, aliases: [] }],
-      };
-  if (!during(stamp)) return;
-  editing = q;
-  editOffset = 0;
-  modal(
-    id ? "Edit question" : "New question",
-    '<form id="edit-form" class="editor stack"><label>Picker title<input name="title" maxlength="100" required value="' +
-      esc(q.title) +
-      '"></label><label>Category<input list="question-categories" name="topic" maxlength="60" required value="' +
-      esc(q.topic) +
-      '"></label><datalist id="question-categories">' +
-      [...new Set(library.map((entry) => entry.topic))]
-        .sort()
-        .map((topic) => '<option value="' + esc(topic) + '"></option>')
-        .join("") +
-      '</datalist><label>Prompt<textarea name="prompt" rows="2" maxlength="400" required>' +
-      esc(q.prompt) +
-      '</textarea></label><label>Source URL (optional)<input type="url" name="source" value="' +
-      esc(q.source) +
-      '"></label><label>Picker notes (region, era or content)<input name="context" maxlength="200" value="' +
-      esc(q.context ?? "") +
-      '"></label><label>Coverage (optional)<textarea name="coverage" rows="2" maxlength="900">' +
-      esc(q.coverage ?? "") +
-      '</textarea></label><label>Answer matching<select name="matching"><option value="categories">Categories · recognise specific examples</option><option value="names">Names and titles · allow shortened names</option><option value="full">Full names or codes · allow spelling corrections</option></select></label><div><h3>Accepted answers</h3><p class="fine">Use British display names. Separate alternative names with a vertical bar ( | ).</p></div><div class="editor-rows"></div><div class="bank-pages" id="edit-pages"></div>' +
-      button("+ Add answer", "add-row") +
-      '<button class="primary">Save question</button></form>',
-  );
-  $("#edit-form select[name=matching]").value =
-    q.matching ?? (id ? "names" : "categories");
-  paintAnswerRows();
 }
 function runDive(r, audible = true, elapsed = 0) {
   if (!state.board.length) return notice("No teams in this round.");
@@ -1239,7 +898,7 @@ $("#modal").addEventListener("close", () => {
   if (unseenDive() && !state.room.finished && !document.hidden)
     void pollRoom(page, false, true);
 });
-$("#help-button").addEventListener("click", () => how(state?.round?.sourceJudged));
+$("#help-button").addEventListener("click", () => how());
 document.addEventListener("input", (e) => {
   const t = e.target;
   if (t.name === "answer" && state?.round) {
@@ -1291,27 +950,6 @@ async function action(el) {
       list.scrollTop = 0;
       list.querySelector("button")?.focus({ preventScroll: true });
       return;
-    case "import-pack":
-      return modal(
-        "Import questions",
-        '<form id="pack-form" class="stack"><p>Choose a JSON file from your device. Each question includes its accepted answers and rarity tiers.</p>' +
-          '<label>Question pack<input name="pack" type="file" accept=".json,application/json" required></label><small>Up to 16 MiB per file. Identical questions are skipped.</small>' +
-          '<button class="primary">Import questions</button>' +
-          (splitHosting
-            ? button("Download example JSON", "download-sample", "text-btn")
-            : '<a class="text-btn" href="/api/packs/sample" download>Download example JSON</a>') +
-          button("Back to questions", "back-to-questions", "text-btn") +
-          "</form>",
-      );
-    case "download-sample": {
-      const blob = await api("/packs/sample", "GET", null, {}, true);
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "pub-sampler.json";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 30000);
-      return;
-    }
     case "confirm-suggestion": {
       const suggestion = draft()?.feedback;
       if (!suggestion?.suggestion || state?.round?.phase !== "open") return;
@@ -1385,27 +1023,6 @@ async function action(el) {
       return picker(a);
     case "back-to-questions":
       return picker(pickerMode, true);
-    case "generate": return generateForm();
-    case "draft-idea": return ideaForm(el.dataset.idea ?? el.form?.elements.prompt?.value ?? "", el.dataset.complete === "true");
-    case "prepare-draft": {
-      const card = el.closest("[data-job]");
-      // Keep selection and status together, including for screen readers and small displays.
-      modal("Prepare question", '<div class="stack" id="selected-draft"><h3>'+esc(card.querySelector("h3").textContent)+'</h3></div>');
-      const id = card.dataset.job;
-      return awaitPreview($("#selected-draft"), () => api(endpoint("/generate/"+id+"/prepare"), "POST", {}));
-    }
-    case "regenerate": return generateForm(library.find(q=>q.id===el.dataset.id)?.prompt);
-    case "preview-members": return acceptedAnswers(endpoint("/generate/"+lastResearch.job+"/answers"),points,button("Back to preview","research-preview"),el);
-    case "research-preview": return previewResearch(lastResearch.job,lastResearch.q);
-    case "refresh-research": return generate(el.closest(".stack"), lastResearch.q.prompt, true);
-    case "revise-prompt": return generateForm(lastResearch.q.prompt);
-    case "save-generated": {
-      const saved=await api(endpoint("/generate/"+lastResearch.job+"/save"),"POST",{});
-      await picker(pickerMode);
-      if (pickerMode==="pick") configure(saved.id);
-      else notice("Generated question saved.");
-      return;
-    }
     case "request-review": {
       const raw=draft()?.text.trim();
       if (!raw || !state.round) return;
@@ -1414,38 +1031,8 @@ async function action(el) {
       renderRoom();
       return;
     }
-    case "new":
-      return editor();
-    case "edit":
-      return editor(el.dataset.id);
     case "configure":
       return configure(el.dataset.id, el.dataset.seconds, el.dataset.previous);
-    case "edit-prev":
-    case "edit-next":
-      readAnswerRows();
-      editOffset += a === "edit-next" ? editPageSize : -editPageSize;
-      paintAnswerRows();
-      $(".editor-row input")?.focus();
-      return;
-    case "add-row":
-      readAnswerRows();
-      editing.answers.push({ name: "", depth: 1, aliases: [] });
-      editOffset =
-        Math.floor((editing.answers.length - 1) / editPageSize) * editPageSize;
-      paintAnswerRows();
-      $(".editor-row:last-child input").focus();
-      return;
-    case "del-row":
-      readAnswerRows();
-      editing.answers.splice(
-        editOffset +
-          [...document.querySelectorAll(".editor-row")].indexOf(
-            el.closest(".editor-row"),
-          ),
-        1,
-      );
-      paintAnswerRows();
-      return;
     case "replay":
       return runDive(state.round);
     case "dismiss-dive":
@@ -1557,19 +1144,6 @@ document.addEventListener("click", async (e) => {
     if (el.isConnected) el.disabled = false;
   }
 });
-async function importQuestions(data, form) {
-  const stamp = page;
-  if (!form?.isConnected || !$("#modal").open) return;
-  const result = await api(endpoint("/packs"), "POST", {
-    questions: Array.isArray(data) ? data : data?.questions,
-  });
-  if (during(stamp) && form.isConnected && $("#modal").open) {
-    await picker("library");
-    notice(
-      result.added + " added · " + result.skipped + " already in this room",
-    );
-  }
-}
 document.addEventListener("submit", async (e) => {
   const f = e.target;
   if (!(f instanceof HTMLFormElement)) return;
@@ -1581,19 +1155,6 @@ document.addEventListener("submit", async (e) => {
   if (submit) submit.disabled = true;
   try {
     switch (f.id) {
-      case "pack-form": {
-        const file = f.elements.pack.files[0];
-        if (!file || file.size > 16 * 1024 * 1024)
-          throw new Error("Choose a JSON file up to 16 MiB.");
-        let data;
-        try {
-          data = JSON.parse(await file.text());
-        } catch {
-          throw new Error("This file isn't valid JSON.");
-        }
-        await importQuestions(data, f);
-        break;
-      }
       case "delete-form":
         if (values.name !== f.dataset.name) break;
         await api("/rooms/" + f.dataset.code, "DELETE", { name: values.name });
@@ -1628,8 +1189,6 @@ document.addEventListener("submit", async (e) => {
         location.hash = "/host/" + out.code;
         break;
       }
-      case "generate-form": await generate(f); break;
-      case "idea-form": await suggestQuestions(f, e.submitter?.value === "surprise"); break;
       case "answer-form": {
         const answer = values.answer.trim();
         if (!answer) throw new Error("Enter an answer.");
@@ -1640,25 +1199,12 @@ document.addEventListener("submit", async (e) => {
       case "start-form":
         await api(endpoint("/start"), "POST", {
           questionId: f.dataset.id,
-          ...(f.dataset.revision ? {revision:Number(f.dataset.revision)} : {}),
           previous: Number(f.dataset.previous) || null,
           seconds: Number(values.seconds),
         });
         closeModal();
         await refreshNow();
         break;
-      case "edit-form": {
-        readAnswerRows();
-        const out = await api(
-          endpoint("/library" + (editing.id ? "/" + editing.id : "")),
-          editing.id ? "PUT" : "POST",
-          { ...values, answers: editing.answers, revision: editing.revision },
-        );
-        await picker(pickerMode);
-        if (pickerMode === "pick") configure(out.id);
-        else notice("Question saved.");
-        break;
-      }
       case "judge-form": {
         const id = Number(f.dataset.round);
         await api(endpoint("/rounds/" + id + "/judge"), "POST", {

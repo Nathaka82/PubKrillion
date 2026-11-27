@@ -1,10 +1,5 @@
 FROM node:24-bookworm-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv \
-    && python3 -m venv /opt/knowledge \
-    && /opt/knowledge/bin/pip install --no-cache-dir duckdb==2.0.1 wordfreq==3.1.1 \
-    && rm -rf /var/lib/apt/lists/*
-ENV KNOWLEDGE_PYTHON=/opt/knowledge/bin/python
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY --chown=node:node server ./server

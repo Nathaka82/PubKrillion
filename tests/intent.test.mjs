@@ -186,16 +186,7 @@ test("a team can edit, confirm once, or miss the deadline after a model suggesti
     "/rooms/" + (await host("/rooms", "POST", { name: "New pack" })).data.code;
   await first(room + "/join", "POST", { name: "Dolphins" });
   await second(room + "/join", "POST", { name: "Puffins" });
-  const q = question(
-    "Football positions",
-    "Name a position in association football.",
-    ["Goalkeeper", "Defender", "Striker", "Midfielder"],
-  );
-  assert.equal(
-    (await host(room + "/packs", "POST", { questions: [q] })).status,
-    200,
-  );
-  const prep = room + "/library/custom/prepare";
+  const prep = room + "/library/ultimate-throws/prepare";
   assert.equal((await first(prep, "POST", {})).status, 401);
   assert.equal((await host(prep, "POST", {})).status, 200);
   const round =
@@ -203,7 +194,7 @@ test("a team can edit, confirm once, or miss the deadline after a model suggesti
     "/rounds/" +
     (
       await host(room + "/start", "POST", {
-        questionId: "custom",
+        questionId: "ultimate-throws",
         previous: null,
         seconds: 0,
       })
@@ -211,27 +202,27 @@ test("a team can edit, confirm once, or miss the deadline after a model suggesti
   const submit = (who, answer) =>
     who(round + "/answer", "POST", { answer, revision: 0 });
   const suggestions = await Promise.all([
-    submit(first, "the player in goal"),
-    submit(second, "the player in goal"),
+    submit(first, "high release flick"),
+    submit(second, "high release flick"),
   ]);
   for (const result of suggestions) {
     assert.equal(result.status, 422);
-    assert.equal(result.data.suggestion, "Goalkeeper");
+    assert.equal(result.data.suggestion, "Forehand");
   }
   assert.equal((await host(room + "/state?view=host")).data.received, 0);
   assert.equal(
     (await submit(first, "weather forecast")).data.suggestion,
     undefined,
   );
-  assert.equal((await submit(first, "Goalkeeper")).status, 200);
-  assert.equal((await submit(first, "Goalkeeper")).status, 200);
-  assert.equal((await submit(first, "Defender")).status, 409);
+  assert.equal((await submit(first, "Forehand")).status, 200);
+  assert.equal((await submit(first, "Forehand")).status, 200);
+  assert.equal((await submit(first, "Hammer")).status, 409);
   await host(round + "/lock", "POST", {});
-  assert.equal((await submit(second, "Goalkeeper")).status, 409);
+  assert.equal((await submit(second, "Forehand")).status, 409);
   await host(round + "/reveal", "POST", {});
   assert.deepEqual(
     (await host(room + "/state?view=host")).data.board.map((t) => t.total),
-    [15, 0],
+    [10, 0],
   );
 });
 test("in-flight guesses respect concurrent submissions, locks and transfers", async (t) => {
@@ -252,12 +243,7 @@ test("in-flight guesses respect concurrent submissions, locks and transfers", as
   ])
     await team(room + "/join", "POST", { name });
   const bId = (await b(room + "/state")).data.team.id;
-  const labels = Array.from(
-    { length: 1500 },
-    (_, i) => "Society specimen " + (i + 1),
-  );
-  const q = question("Archive", "Name a society specimen.", labels, "names");
-  await host(room + "/packs", "POST", { questions: [q] });
+  const q = (await host(room + "/library/animals-songbirds")).data;
   const round =
     room +
     "/rounds/" +
@@ -274,7 +260,7 @@ test("in-flight guesses respect concurrent submissions, locks and transfers", as
     submit(team, "a type of prehistoric creature"),
   );
   await new Promise((done) => setTimeout(done, 100));
-  assert.equal((await submit(a, labels[0])).status, 200);
+  assert.equal((await submit(a, q.answers[0].name)).status, 200);
   const { transfer } = (await host(room + "/transfer", "POST", { teamId: bId }))
     .data;
   await client(f)(room + "/join", "POST", { transfer });

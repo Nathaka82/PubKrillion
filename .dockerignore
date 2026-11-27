@@ -7,5 +7,3 @@ test-results
 dist
 data/minilm/catalogue.sqlite.*.tmp*
 tests
-**/__pycache__/
-.ruff_cache/

@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile, mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fixture, client } from "./fixture.mjs";
-import { validateQuestion, matchAnswer } from "../server/rules.ts";
+import { validateQuestion, matchAnswer, resolveAnswer } from "../server/rules.ts";
+import { builtInQuestions } from "../server/catalogue.ts";
 import { Game } from "../server/store.ts";
 const ok = async (p) => {
   const r = await p;
@@ -46,11 +47,11 @@ test("upgrade scores all five tiers consistently and keeps finished events on th
     codes.push(code);
     const { id } = game.start(game.room(code), {
       previous: null,
-      questionId: "summer-hosts",
+      questionId: "geography-capitals",
       seconds: 0,
     });
     const round = game.round(code, id);
-    const bank = game.question(code, "summer-hosts").answers;
+    const bank = game.question("geography-capitals").answers;
     for (let tier = 1; tier <= 5; tier++) {
       const name = "Crew " + tier;
       game.join(game.room(code), { name });
@@ -91,23 +92,19 @@ test("upgrade scores all five tiers consistently and keeps finished events on th
   }
 });
 
-test("all starter categories, aliases, typos and ambiguous examples", async () => {
-  const pack = JSON.parse(await readFile("data/questions.json", "utf8"));
-  assert.equal(pack.length, 20);
-  assert.equal(new Set(pack.map((x) => x.id)).size, 20);
-  for (const raw of pack) {
-    const q = validateQuestion(raw, raw.id);
-    assert.ok(q.answers.filter((a) => a.depth === 5).length <= Math.max(1, Math.floor(q.answers.length / 20)));
+test("shipped aliases, typos and ambiguous examples", () => {
+  const pack = [...builtInQuestions.values()];
+  for (const q of pack)
     for (const a of q.answers)
-      for (const name of [a.name, ...a.aliases])
-        assert.deepEqual(matchAnswer(name, q.answers), {
-          answer: a,
-          exact: true,
-        });
-  }
-  const cities = pack.find((x) => x.id === "summer-hosts").answers;
-  const close = matchAnswer("Barcelnoa", cities);
-  assert.equal(close.answer.name, "Barcelona");
+      for (const name of [a.name, ...a.aliases]) {
+        const result = resolveAnswer(name, q.answers, q.matching);
+        // Some shortened aliases identify several names. Those require more detail.
+        if (result === null && name !== a.name) continue;
+        assert.equal(result?.answer.name, a.name);
+      }
+  const cities = builtInQuestions.get("geography-capitals").answers;
+  const close = matchAnswer("Addis Abbaa", cities);
+  assert.equal(close.answer.name, "Addis Ababa");
   assert.equal(close.exact, false);
   assert.equal(matchAnswer("ZZZ", cities), undefined);
   assert.equal(
@@ -198,128 +195,27 @@ test("category matches are directional, British-localised and scoped to this rou
   );
 });
 
-test("bulk import, paging, semantic receipts and immutable large rounds", async (t) => {
+test("large published banks page privately and survive a restart", async t => {
   const f = await fixture();
   t.after(() => f.close());
-  const host = client(f),
-    team = client(f);
+  const host = client(f), team = client(f);
   await ok(host("/login", "POST", { password: f.password }));
-  const { code } = await ok(host("/rooms", "POST", { name: "Large library" }));
-  const root = "/rooms/" + code;
-  const sample = await ok(host("/packs/sample"));
-  assert.equal((await team("/packs/sample")).status, 401);
-  assert.deepEqual(await ok(host(root + "/packs", "POST", sample)), {
-    added: 1,
-    skipped: 1,
-  });
-  const q = {
-    id: "large",
-    title: "Large archive",
-    topic: "Archive",
-    prompt: "Name an entry.",
-    matching: "names",
-    answers: Array.from({ length: 10000 }, (_, i) => ({
-      name: "Specimen " + i,
-      depth: (i % 5) + 1,
-      aliases: ["Catalogue entry " + i],
-    })),
-  };
-  const extra = Array.from({ length: 999 }, (_, i) => ({
-    ...sample.questions[0],
-    id: "small-" + i,
-    title: "Device set " + i,
-  }));
-  const pack = { questions: [q, ...extra] };
-  assert.equal((await team(root + "/packs", "POST", pack)).status, 401);
-  assert.deepEqual(await ok(host(root + "/packs", "POST", pack)), {
-    added: 1000,
-    skipped: 0,
-  });
-  assert.deepEqual(
-    await ok(host(root + "/packs", "POST", { questions: [q] })),
-    { added: 0, skipped: 1 },
-  );
-  const failed = await host(root + "/packs", "POST", {
-    questions: [
-      { ...q, id: "rollback" },
-      { ...q, title: "Conflicting question" },
-    ],
-  });
-  assert.equal(failed.status, 409);
-  assert.equal((await host(root + "/library/rollback")).status, 404);
-  assert.equal((await ok(host(root + "/library"))).length, 1198);
-  const part = await ok(
-    host(root + "/library/large/answers?depth=5&offset=40"),
-  );
-  assert.equal(part.total, 10000);
-  assert.equal(part.filtered, 2000);
-  assert.equal(part.answers.length, 40);
-  assert.ok(part.answers.every((a) => a.depth === 5));
-  await ok(team(root + "/join", "POST", { name: "Group one" }));
-  const start = async (questionId, previous) =>
-    (
-      await ok(
-        host(root + "/start", "POST", { questionId, previous, seconds: 0 }),
-      )
-    ).id;
-  const gaming = await start(sample.questions[0].id, null);
-  const gamingPath = root + "/rounds/" + gaming;
-  const inferred = await team(gamingPath + "/answer", "POST", {
-    answer: "Xbox controller",
-    revision: 0,
-  });
-  assert.equal(inferred.status, 422);
-  assert.equal(inferred.data.suggestion, "Games controller");
-  assert.equal((await ok(team(root + "/state"))).mine, null);
-  await ok(
-    team(gamingPath + "/answer", "POST", {
-      answer: inferred.data.suggestion,
-      revision: 0,
-    }),
-  );
-  const locked = (await ok(team(root + "/state"))).mine;
-  assert.equal(locked.canonical ?? locked.raw, "Games controller");
-  await ok(host(gamingPath + "/lock", "POST", {}));
-  await ok(host(gamingPath + "/reveal", "POST", {}));
-  assert.equal((await ok(team(root + "/state"))).round.results[0].points, 10);
-  const id = await start("large", gaming);
-  const path = root + "/rounds/" + id;
-  const live = await ok(host(root + "/state?view=host"));
-  assert.equal(live.round.answerCount, 10000);
-  assert.ok(JSON.stringify(live).length < 10000 && !("accepted" in live.round));
-  assert.equal((await team(path + "/answers")).status, 401);
-  await ok(
-    host(root + "/library/large", "PUT", {
-      ...q,
-      revision: 1,
-      answers: [q.answers[0]],
-    }),
-  );
-  const last = await ok(host(path + "/answers?q=Catalogue%20entry%209999"));
-  assert.equal(last.answers[0].name, "Specimen 9999");
-  assert.equal(last.filtered, 1);
-  const receipt = await ok(
-    team(path + "/answer", "POST", {
-      answer: "Catalogue entry 9999",
-      revision: 0,
-    }),
-  );
-  assert.equal(receipt.canonical, "Specimen 9999");
-  assert.equal(
-    (
-      await team(path + "/answer", "POST", {
-        answer: "Specimen 0",
-        revision: 0,
-      })
-    ).status,
-    409,
-  );
+  const room = "/rooms/" + (await ok(host("/rooms", "POST", {name:"Large bank"}))).code;
+  await ok(team(room + "/join", "POST", {name:"Dolphins"}));
+  const start = await ok(host(room + "/start", "POST", {previous:null, questionId:"general-currencies", seconds:0}));
+  const round = room + "/rounds/" + start.id;
+  const live = await ok(host(room + "/state?view=host"));
+  assert.ok(live.round.answerCount > 80);
+  assert.ok(JSON.stringify(live).length < 10000);
+  assert.equal((await team(round + "/answers")).status, 401);
+  const next = await ok(host(round + "/answers?offset=40"));
+  assert.equal(next.answers.length, 40);
+  const receipt = await ok(team(round + "/answer", "POST", {answer:"GBP", revision:0}));
+  assert.equal(receipt.canonical, "British Pound");
   await f.stop();
   await f.start();
-  assert.equal(
-    (await ok(host(path + "/answers?offset=9960"))).answers.length,
-    40,
-  );
+  assert.deepEqual(await ok(host(round + "/answers?offset=40")), next);
+  assert.equal((await ok(team(room + "/state"))).mine.canonical, receipt.canonical);
 });
 test("the first accepted answer wins and room deletion requires the host and exact title", async (t) => {
   const f = await fixture();
@@ -335,17 +231,17 @@ test("the first accepted answer wins and room deletion requires the host and exa
   const { id } = await ok(
     host(path + "/start", "POST", {
       previous: null,
-      questionId: "summer-hosts",
+      questionId: "geography-capitals",
       seconds: 0,
     }),
   );
   const round = path + "/rounds/" + id;
   assert.ok(
-    (await ok(host(path + "/state?view=host"))).round.accepted.length > 1,
+    (await ok(host(path + "/state?view=host"))).round.answerCount > 1,
   );
   const send = (answer) =>
     team(round + "/answer", "POST", { answer, revision: 0 });
-  const candidates = ["London", "Barcelona"];
+  const candidates = ["London", "Addis Ababa"];
   const replies = await Promise.all(candidates.map(send));
   assert.deepEqual(replies.map((r) => r.status).sort(), [200, 409]);
   const winner = candidates[replies.findIndex((r) => r.status === 200)];
@@ -387,7 +283,7 @@ test(
     const created = await hs();
     assert.equal(created.round, null);
     const pack = await ok(host(root + "/library"));
-    assert.equal(pack.length, 197);
+    assert.equal(pack.length, 182);
     assert.equal((await anon(root + "/library")).status, 401);
     const teams = Array.from({ length: 30 }, () => client(f));
     await Promise.all(
@@ -403,7 +299,7 @@ test(
       (await anon(root + "/join", "POST", { name: "Team 00" })).status,
       409,
     );
-    const start = async (previous, questionId = "summer-hosts", seconds = 0) =>
+    const start = async (previous, questionId = "geography-capitals", seconds = 0) =>
       ok(host(root + "/start", "POST", { previous, seconds, questionId }));
     const { id } = await start(null);
     assert.equal(
@@ -411,7 +307,7 @@ test(
         await host(root + "/start", "POST", {
           previous: null,
           seconds: 0,
-          questionId: "summer-hosts",
+          questionId: "geography-capitals",
         })
       ).status,
       409,
@@ -432,7 +328,7 @@ test(
               ? "Paris"
               : "London"
             : i % 3 === 1 || i === 2
-              ? "Barcelnoa"
+              ? "Addis Abbaa"
               : "zzzz";
         const result = await q(path + "/answer", "POST", {
           answer: guess,
@@ -441,7 +337,7 @@ test(
         assert.equal(result.status, i % 3 === 0 ? 200 : 422);
         assert.equal(
           result.data.suggestion,
-          guess === "Barcelnoa" ? "Barcelona" : undefined,
+          guess === "Addis Abbaa" ? "Addis Ababa" : undefined,
         );
       }),
     );
@@ -464,7 +360,7 @@ test(
       teams
         .filter((_, i) => i % 3 === 1)
         .map((q) =>
-          ok(q(path + "/answer", "POST", { answer: "Barcelona", revision: 0 })),
+          ok(q(path + "/answer", "POST", { answer: "Addis Ababa", revision: 0 })),
         ),
     );
     await Promise.all(
@@ -483,7 +379,7 @@ test(
       ).status,
       409,
     );
-    for (const attempt of ["zzzz", "Barcelnoa"]) {
+    for (const attempt of ["zzzz", "Addis Abbaa"]) {
       assert.equal(
         (
           await teams[0](path + "/answer", "POST", {
@@ -513,7 +409,7 @@ test(
     assert.equal(
       (
         await teams[2](path + "/answer", "POST", {
-          answer: "Barcelona",
+          answer: "Addis Ababa",
           revision: 0,
         })
       ).status,
@@ -551,7 +447,7 @@ test(
     assert.equal(
       first.round.results.filter(
         (x) =>
-          x.canonical === "Barcelona" && x.points === 15 && x.metres === 300,
+          x.canonical === "Addis Ababa" && x.points === 15 && x.metres === 300,
       ).length,
       10,
     );
@@ -580,24 +476,7 @@ test(
     assert.equal((await teams[0](root + "/state")).status, 401);
     assert.equal((await anon(root + "/join", "POST", transfer)).status, 400);
     teams[0] = replacement;
-    const q = await ok(host(root + "/library/summer-hosts"));
-    await ok(
-      host(root + "/library/summer-hosts", "PUT", {
-        ...q,
-        title: "Changed title",
-      }),
-    );
-    assert.notEqual((await hs()).round.title, "Changed title");
-    const custom = await ok(
-      host(root + "/library", "POST", {
-        title: "Event chair",
-        topic: "Society",
-        prompt: "Name the chair.",
-        source: "",
-        answers: [{ name: "The chair", aliases: [], depth: 3 }],
-      }),
-    );
-    const second = await start(id, custom.id, 1);
+    const second = await start(id, "ultimate-throws", 1);
     const timed = root + "/rounds/" + second.id;
     const extra = await hs();
     await ok(
@@ -613,7 +492,7 @@ test(
     );
     await ok(host(timed + "/lock", "POST", {}));
     await ok(host(timed + "/reveal", "POST", {}));
-    const third = await start(second.id, "summer-hosts", 1);
+    const third = await start(second.id, "geography-capitals", 1);
     await f.stop();
     await new Promise((r) => setTimeout(r, 1100));
     await f.start();
@@ -636,7 +515,7 @@ test(
       prev = r.id;
     }
     await ok(
-      host(path + "/judge", "POST", { key: "paris", name: "Barcelona" }),
+      host(path + "/judge", "POST", { key: "paris", name: "Addis Ababa" }),
     );
     const final = await hs();
     assert.equal(final.history.length, 21);
@@ -653,7 +532,7 @@ test(
         await host(root + "/start", "POST", {
           previous: prev,
           seconds: 0,
-          questionId: "summer-hosts",
+          questionId: "geography-capitals",
         })
       ).status,
       409,

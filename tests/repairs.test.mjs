@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { catalogueQuestions } from "../server/catalogue.ts";
 import { validateQuestion, matchAnswer } from "../server/rules.ts";
-import { Game, digest } from "../server/store.ts";
+import { Game } from "../server/store.ts";
 import { fixture, client } from "./fixture.mjs";
 
 test("natural names, full aliases and clear typos resolve within their question", () => {
@@ -195,144 +195,42 @@ test("missed answers can be corrected per eligible team and audited after reveal
   );
 });
 
-test("catalogue upgrade keeps room edits, shared play history and original snapshots", async (t) => {
-  const dir = await mkdtemp(join(tmpdir(), "krill-upgrade-")),
-    file = join(dir, "quiz.sqlite");
-  let game = new Game(file);
-  t.after(async () => {
-    game.db.close();
-    await rm(dir, { recursive: true, force: true });
-  });
-  const { code } = game.create("Old room");
-  const { revision, ...canonical } = game.question(code, "tube-lines");
-  const { coverage, context, ...oldFields } = canonical;
-  oldFields.answers = oldFields.answers.map((a, i) => ({ ...a, depth: Number("11223334455"[i]) }));
-  const oldStarter = { ...oldFields, topic: "Travel" };
-  const hashes = JSON.parse(
-    await readFile("data/catalogue-v1-hashes.json", "utf8"),
-  );
-  assert.equal(digest(JSON.stringify(oldStarter)), hashes["tube-lines"]);
-  game.run(
-    "INSERT INTO library(content,room,id) VALUES(?,?,?)",
-    JSON.stringify(oldStarter),
-    code,
-    canonical.id,
-  );
-  const legacy = {
-    ...canonical,
-    id: "general-tube-lines",
-    title: "Society Tube lines",
-  };
-  game.importPack(code, { questions: [legacy] });
-  const { id } = game.start(game.room(code), {
-    questionId: legacy.id,
-    seconds: 0,
-    previous: null,
-  });
-  const readSnapshot = () =>
-    game.one("SELECT snapshot FROM rounds WHERE id=?", id).snapshot;
-  const snapshot = readSnapshot();
-  assert.equal(JSON.parse(snapshot).title, legacy.title);
-  const customRoom = game.create("Two custom questions").code;
-  game.run(
-    "INSERT INTO library(content,room,id) VALUES(?,?,?)",
-    JSON.stringify({ ...canonical, title: "Host starter" }),
-    customRoom,
-    canonical.id,
-  );
-  game.importPack(customRoom, { questions: [legacy] });
-  game.db.exec("PRAGMA user_version=3");
-  game.db.close();
-  game = new Game(file);
-  assert.equal(game.round(code, id).question, canonical.id);
-  assert.equal(readSnapshot(), snapshot);
-  assert.equal(game.question(customRoom, canonical.id).title, "Host starter");
-  assert.equal(game.question(customRoom, legacy.id).title, legacy.title);
-  const library = game.library(code);
-  assert.equal(
-    library.some((q) => q.id === legacy.id),
-    false,
-  );
-  const shared = library.find((q) => q.id === canonical.id);
-  assert.equal(shared.title, legacy.title);
-  assert.equal(shared.plays, 1);
-  assert.equal(
-    game.importPack(code, { questions: [canonical] }, true).added,
-    0,
-  );
-});
-
-test("existing rooms inherit categories and prompts while open round snapshots retain the original wording", async (t) => {
-  const dir = await mkdtemp(join(tmpdir(), "krill-categories-"));
+test("retiring the builder preserves scores, historical banks and outstanding reviews", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "krill-upgrade-"));
   const file = join(dir, "quiz.sqlite");
+  t.after(() => rm(dir, {recursive:true, force:true}));
   let game = new Game(file);
-  t.after(async () => {
-    game.db.close();
-    await rm(dir, { recursive: true, force: true });
-  });
-  const { code } = game.create("Friday night");
-  const id = "general-paris-venues";
-  const { revision, ...current } = game.question(code, id);
-  const old = {
-    ...current,
-    context: undefined,
-    answers: current.answers.map((a, i) => ({ ...a, depth: Number("34212525412245341221131533451335454"[i]) })),
-    topic: "General Knowledge",
-    prompt: "Name a venue in the Paris 2024 Olympic venues file.",
-  };
-  const priorRelease = { ...old, topic: "Sport", prompt: current.prompt };
-  const priorHashes = JSON.parse(await readFile("data/catalogue-v3-hashes.json", "utf8"));
-  assert.equal(digest(JSON.stringify(priorRelease)), priorHashes[id]);
-  const previousRoom = game.create("Previous release").code;
-  const editedRoom = game.create("Edited release").code;
-  for (const [room, bank] of [[previousRoom, priorRelease], [editedRoom, { ...priorRelease, title: "Our venues" }]])
-    game.run("INSERT INTO library(room,id,content) VALUES(?,?,?)", room, id, JSON.stringify(bank));
-  game.run(
-    "INSERT INTO library(room,id,content) VALUES(?,?,?)",
-    code,
-    id,
-    JSON.stringify(old),
-  );
-  const round = game.start(game.room(code), {
-    previous: null,
-    questionId: id,
-    seconds: 0,
-  });
-  const snapshot = game.one(
-    "SELECT snapshot FROM rounds WHERE id=?",
-    round.id,
-  ).snapshot;
-  game.join(game.room(code), { name: "Sharks" });
-  const team = game.one("SELECT * FROM teams WHERE room=?", code);
-  game.tx(() =>
-    game.submit(game.room(code), game.round(code, round.id), team, {
-      answer: old.answers[0].name,
-      revision: 0,
-    }),
-  );
-  // A pre-upgrade host would still be looking at the lock button.
-  game.run(
-    "UPDATE rounds SET phase='open',last_team_id=NULL WHERE id=?",
-    round.id,
-  );
-  game.db.exec("PRAGMA user_version=4");
+  const {code} = game.create("Old event");
+  game.join(game.room(code), {name:"Divers"});
+  const team = game.one("SELECT id FROM teams WHERE room=?",code);
+  const {id} = game.start(game.room(code), {questionId:"tube-lines", previous:null, seconds:0});
+  game.submit(game.room(code), game.round(code,id), team, {answer:"Victoria", revision:0});
+  const snapshot = {...game.question("tube-lines"),id:"legacy",knowledge:"old-bank",answers:[]};
+  game.run("UPDATE rounds SET question=?,snapshot=?,phase='locked' WHERE id=?",snapshot.id,JSON.stringify(snapshot),id);
+  game.db.exec("CREATE TABLE library(id TEXT); CREATE TABLE kb_member(bank,entity,name,depth,aliases); CREATE TABLE kb_appeal(round,team,raw); PRAGMA user_version=7;");
+  game.run("INSERT INTO kb_member VALUES('old-bank','one','Victoria',2,'[]')");
+  game.db.exec("CREATE TABLE kb_round_proof(round,bank,entity)");
+  game.run("INSERT INTO kb_member VALUES('new-bank','two','Circle',3,?)", JSON.stringify(["Circular"]));
+  game.run("INSERT INTO kb_round_proof VALUES(?,'new-bank','two')", id);
+  game.run("INSERT INTO round_additions VALUES(?,'circle','Circle',2)", id);
+  game.run("INSERT INTO kb_appeal VALUES(?,?,?)", id, team.id, "Victoria");
+  const { retireQuestionBuilder } = await import("../server/upgrade.ts");
+  assert.throws(() => game.tx(() => retireQuestionBuilder(game.db)), /reveal/);
+  assert.equal(game.one("PRAGMA user_version").user_version, 7);
+  game.run("UPDATE rounds SET phase='revealed' WHERE id=?",id);
+  const before = game.state(game.room(code),true).board;
   game.db.close();
   game = new Game(file);
-  assert.equal(game.question(code, id).prompt, current.prompt);
-  assert.equal(game.question(code, id).topic, "Sport");
-  assert.equal(game.question(code, id).revision, 2);
-  assert.deepEqual(game.question(previousRoom, id), { ...current, revision: 2 });
-  assert.equal(game.question(editedRoom, id).title, "Our venues");
-  assert.equal(game.round(code, round.id).phase, "locked");
-  assert.equal(
-    game.one("SELECT snapshot FROM rounds WHERE id=?", round.id).snapshot,
-    snapshot,
-  );
-  const fresh = game.create("Another room").code;
-  game.save(code, id, { ...current, revision: 2, title: "Our venues" });
-  assert.equal(game.question(fresh, id).title, current.title);
-  assert.equal(game.importPack(code, { questions: [old] }).skipped, 1);
-  assert.equal(game.question(code, id).title, "Our venues");
+  try {
+    assert.equal(game.one("PRAGMA user_version").user_version,8);
+    assert.equal(game.all("SELECT name FROM sqlite_schema WHERE name GLOB 'kb_*' OR name='library'").length,0);
+    assert.equal(game.one("SELECT requested FROM review_guesses WHERE round=? AND team=?", id,team.id).requested,1);
+    assert.deepEqual(game.state(game.room(code),true).board,before);
+    assert.deepEqual(game.judgingBank(game.round(code,id)).answers, [
+      {name:"Victoria",depth:2,aliases:[]}, {name:"Circle",depth:2,aliases:["Circular"]},
+    ]);
+    assert.throws(() => game.question("legacy"), /not found/);
+  } finally { game.db.close(); }
 });
 
 test("offline restore replaces a damaged database and preserves its sidecars", async (t) => {

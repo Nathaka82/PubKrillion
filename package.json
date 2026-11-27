@@ -13,9 +13,8 @@
     "start": "node --env-file-if-exists=.env server/main.ts",
     "dev": "node --watch --env-file-if-exists=.env server/main.ts",
     "build": "tsc --noEmit",
-    "test": "node --test tests/game.test.mjs tests/catalogue.test.mjs tests/repairs.test.mjs tests/intent.test.mjs tests/knowledge.test.mjs",
-    "test:knowledge-load": "node tests/knowledge-load.mjs",
-    "test:browser": "node tests/browser.mjs && node tests/browser-repairs.mjs && node tests/knowledge-browser.mjs"
+    "test": "node --test tests/game.test.mjs tests/catalogue.test.mjs tests/repairs.test.mjs tests/intent.test.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/browser-repairs.mjs"
   },
   "dependencies": {
     "@huggingface/tokenizers": "0.2.0",

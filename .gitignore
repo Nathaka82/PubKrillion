@@ -5,5 +5,3 @@ backups/
 test-results/
 dist/
 data/minilm/catalogue.sqlite.*.tmp*
-__pycache__/
-.ruff_cache/
